@@ -2,7 +2,8 @@ from .tools import general_tools
 from protfasta import utilities 
 from . import sparrow_exceptions
 from . import calculate_parameters
-from .data import configs
+from sparrow import data
+import numpy as np
 
 
 
@@ -37,6 +38,7 @@ class Protein:
         self.__ali = None
         self.__polar = None
         self.__disorder = None
+        self.__IDP_check = None
         
             
         
