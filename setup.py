@@ -6,6 +6,23 @@ import sys
 from setuptools import setup, find_packages
 import versioneer
 
+
+# ................................
+# added for cython compilation
+from setuptools.extension import Extension
+from Cython.Build import cythonize
+import numpy
+
+extensions = [
+    Extension(
+        "sparrow.patterning",
+        ["sparrow/patterning.pyx"],
+        include_dirs=[numpy.get_include()], 
+    )]
+
+# ................................
+
+
 short_description = __doc__.split("\n")
 
 # from https://github.com/pytest-dev/pytest-runner#conditional-requirement
@@ -35,6 +52,10 @@ setup(
     # Handled automatically by setuptools. Use 'exclude' to prevent some specific
     # subpackage(s) from being added, if needed
     packages=find_packages(),
+
+    # external modules
+    ext_modules = cythonize(extensions, compiler_directives={'language_level' : "3"}),
+
 
     # Optional include package data to ship with your package
     # Customize MANIFEST.in if the general case does not suit your needs

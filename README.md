@@ -5,6 +5,8 @@ sparrow
 [![codecov](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/sparrow/branch/master/graph/badge.svg)](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/sparrow/branch/master)
 
 
+# SPARROW: Sequence PARameters of Regions in disOrdered Windows 
+
 Next generation package for sequence parameter calculation
 
 ### Copyright

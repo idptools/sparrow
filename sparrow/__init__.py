@@ -4,7 +4,7 @@ Next generation package for sequence parameter calculation
 """
 
 # Add imports here
-from .sparrow import *
+
 
 # Handle versioneer
 from ._version import get_versions
