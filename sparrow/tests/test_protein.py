@@ -55,3 +55,4 @@ def test_protein_code_coverage():
     assert np.mean(P.build_linear_profile('positive')) == 0.012295081967213115
     assert np.mean(P.build_linear_profile('negative')) == 0.036885245901639344
     assert np.mean(P.build_linear_profile('hydrophobicity')) == 3.0450819672131146
+    assert np.mean(P.build_linear_profile_composition(['E','K'])) == 0.012295081967213115

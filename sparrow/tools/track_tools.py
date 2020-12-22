@@ -65,6 +65,7 @@ def predefined_linear_track(seq, mode, window_size, end_mode):
     # and in protein.build_linear_profile
     # 
     #
+        
     
     if mode == 'FCR':
         def FX(s):
@@ -149,7 +150,7 @@ def linear_track_composition(seq, composition_list, window_size, end_mode):
     """
 
     def FX(s):
-        return protein.Protein(s).compute_residue_fractions([composition_list])
+        return protein.Protein(s).compute_residue_fractions(composition_list)
 
     return build_track(seq, FX, window_size, end_mode)
 
@@ -194,6 +195,10 @@ def build_track(seq, track_function, window_size=7, end_mode='extend-ends'):
 
     """
 
+    if len(seq) < window_size:
+        raise sparrow_exceptions.SparrowException('Windowsize [%i] is larger than sequence [%i]' % (window_size,len(seq)))
+
+
     # run through window_size fragments and compute params using the
     # custom passed function
     end = (len(seq) - window_size)
@@ -201,8 +206,8 @@ def build_track(seq, track_function, window_size=7, end_mode='extend-ends'):
     for i in range(end):
         frag = seq[i:i+window_size]
         track_vals.append(track_function(frag))
-
-
+    
+    
     # deal with ends
     if end_mode == 'extend-ends':
         front = int(window_size/2)

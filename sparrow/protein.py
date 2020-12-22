@@ -298,10 +298,13 @@ class Protein:
         the sequence
         
         """
+
         f = 0
-        for i in residue_selector:
+
+        for i in residue_selector:            
             if i in self.amino_acid_fractions:
                 f = f + self.amino_acid_fractions[i]
+
         return f
             
         
@@ -309,7 +312,7 @@ class Protein:
 
     # .................................................................
     #            
-    def build_linear_profile(self, mode, window_size=8, end_mode='extend-ends'):
+    def linear_sequence_profile(self, mode, window_size=8, end_mode='extend-ends'):
         """
         Function that returns a vectorized representation of local composition/sequence properties, as defined
         by the passed 'mode', which acts as a selector toggle for a large set of pre-defined analyses types.
@@ -360,7 +363,9 @@ class Protein:
         """
 
         name = '%s-%i-%s' %(mode, window_size, end_mode)
+
         if name not in self.__linear_profiles:
+            print('Building denvovo')
             self.__linear_profiles[name] = track_tools.predefined_linear_track(self.__seq,  mode, window_size, end_mode)
         
         return self.__linear_profiles[name]
@@ -368,8 +373,7 @@ class Protein:
 
     # .................................................................
     #            
-    @property
-    def build_linear_profile_composition(self, composition_list, window_size=8, end_mode='extend-ends'):
+    def linear_composition_profile(self, composition_list, window_size=8, end_mode='extend-ends'):
         """
         Function that returns a vectorized representation of local composition/sequence properties, as defined
         by the set of one or more residues passed in composition_list.

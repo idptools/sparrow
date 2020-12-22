@@ -4,6 +4,8 @@ Next generation package for sequence parameter calculation
 """
 
 # Add imports here
+from .tools import io
+from .protein import Protein
 
 
 
