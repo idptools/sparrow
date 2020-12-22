@@ -365,7 +365,6 @@ class Protein:
         name = '%s-%i-%s' %(mode, window_size, end_mode)
 
         if name not in self.__linear_profiles:
-            print('Building denvovo')
             self.__linear_profiles[name] = track_tools.predefined_linear_track(self.__seq,  mode, window_size, end_mode)
         
         return self.__linear_profiles[name]
