@@ -1,3 +1,7 @@
+class SparrowException(Exception):
+    pass
+
+
 class ProteinException(Exception):
     pass
 

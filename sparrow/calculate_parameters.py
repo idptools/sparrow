@@ -1,8 +1,9 @@
 from sparrow.data import amino_acids
+import numpy as np
 
 
-
-
+# .................................................................
+#
 def calculate_aa_fractions(s):
     """
     Standalone function that computes amino-acid fractions for
@@ -33,12 +34,23 @@ def calculate_aa_fractions(s):
         aa_dict[i] = aa_dict[i]/len_s
 
     return aa_dict
-    
-
-        
+ 
+   
+# .................................................................
+#        
 def calculate_disorder(s):
     """
-    Standalone function that uses Metapredict to calculate the per-residue 
+    Standalone function that uses metapredict to calculate the per-residue.
+    
+    Parameters
+    --------------
+    s : str
+        Amino acid sequence
+
+    Returns
+    -------------
+        np.array returns an array with per-residue disorder score as per
+        calculated by metapredict.
 
 
     """
@@ -48,6 +60,8 @@ def calculate_disorder(s):
     return meta.predict_disorder(s)
 
 
+# .................................................................
+#
 def calculate_hydrophobicity(s, mode='KD', normalize=False):
     """
     Standalone function that computes hydrophobicity 
@@ -75,8 +89,37 @@ def calculate_hydrophobicity(s, mode='KD', normalize=False):
     return np.mean(calculate_linear_hydrophobicity(s, mode, normalize))
     
 
-
+# .................................................................
+#
 def calculate_linear_hydrophobicity(s, mode='KD', normalize=False):
+    """
+    Compute linear hydrophobicity from sequence using one of several possible 
+    hydrophobicity scales. 
+
+    By default this is Kyte-Doolitle, but, we'll add in additional scales
+    as/when needed.
+
+    Parameters:
+    --------------
+    s : str
+         Amino acid sequence
+
+    mode : str
+        Selector for hydrophobicity table. Options available are
+
+        'KD'    | Kyte-Doolittle
+
+    normalize : bool
+        Boolean that means hydrophobicity scales operate on a normalized
+        dynamic range of 0 to 1
+
+    Returns:
+    ------------
+    list 
+        List of values that correspond to per-residue hydrophobicity based on
+        a given hydrophobicity scale.
+    
+    """
 
     if mode == 'KD':
         try:

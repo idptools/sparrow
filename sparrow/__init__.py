@@ -6,6 +6,7 @@ Next generation package for sequence parameter calculation
 # Add imports here
 
 
+
 # Handle versioneer
 from ._version import get_versions
 versions = get_versions()

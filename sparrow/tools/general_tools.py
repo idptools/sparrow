@@ -17,7 +17,7 @@ def is_valid_protein_sequence(sequence):
     """
     
     for i in sequence:
-        if i not in amino_acids:
+        if i not in amino_acids.VALID_AMINO_ACIDS:
             return False
 
     return True
