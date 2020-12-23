@@ -13,7 +13,7 @@ from . import sparrow_exceptions
 
 # ....................................................................................................
 #
-def patterning_percentile(str seq, list group, int window_size, int count, int seed):
+def patterning_percentile(str seq, list group, int window_size, int count, int seed, return_distribution=False):
     """
     User-facing general-purpose patterning function. Computes the P-value of observing the sequence
     passed by random chance when patterning of residues in group (vs. those residues not in group) are
@@ -43,6 +43,11 @@ def patterning_percentile(str seq, list group, int window_size, int count, int s
 
     seed: int 
         Seed used to initialize C random number generator
+
+    return_distribution : bool
+        Boolean which if set to true means a tuple is returned with patterning value, distribution, and 
+        percentile. If false only the Percentile is returned.
+
 
     Returns
     ------------
@@ -94,11 +99,16 @@ def patterning_percentile(str seq, list group, int window_size, int count, int s
     np.asarray(random_shuffle_pvals).sort(kind='quick')    
 
     # find percentile 
+    return_val = 1.0
     for i in range(count):
         if real_delta < random_shuffle_pvals[i]:
-            return i/count
+            return_val = i/count
+            break
 
-    return 1.0
+    if return_distribution:
+        return (return_val, real_delta, random_shuffle_pvals)
+    else:
+        return return_val
 
 # ....................................................................................................
 #

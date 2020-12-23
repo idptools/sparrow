@@ -2,6 +2,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
+sparrow/patterning.html
 
 # C extensions
 *.so
