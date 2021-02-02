@@ -1,8 +1,9 @@
-from .tools import general_tools, track_tools
+from .tools import general_tools, track_tools, io
 from protfasta import utilities 
 from . import sparrow_exceptions
 from . import calculate_parameters
 from sparrow import data
+from .sequence_analysis import sequence_complexity
 import numpy as np
 
 class Protein:
@@ -362,6 +363,7 @@ class Protein:
             Returns a list with values that correspond to the passed mode
         """
 
+        io.validate_keyword_option(mode, ['FCR','NCPR','aromatic','aliphatic','polar','proline','positive','negative','hydrophobicity'], 'mode')
         name = '%s-%i-%s' %(mode, window_size, end_mode)
 
         if name not in self.__linear_profiles:
@@ -405,13 +407,67 @@ class Protein:
             Returns a list with values that correspond to the passed mode
 
         """
+
+        io.validate_keyword_option(end_mode, ['extend-ends', 'zero-ends', ''], 'end_mode')
         
-        name = "-".join(composition_list)
+        # we sort the composition list to unify how it is saved for memoization
+        try:
+            composition.sort()
+        except AttributeError:
+            raise sparrow_exception('Unable to sort composition_list (%s) - this should be a list'%(str(composition_list)))
+
+        
+            
+        name = "-".join(composition_list) + "-window_size=%i"%(window_size) + "-end_mode=%s"%(end_mode)
 
         if name not in self.__linear_profiles:
             self.__linear_profiles[name] = track_tools.linear_track_composition(self.__seq,  composition_list, window_size, end_mode)
         
         return self.__linear_profiles[name]
+
+
+    def low_complexity_domains(self, mode='holt', **kwargs):
+        """
+
+        mode : 'holt'
+            Function which returns the set of low-complexity tracts as defined by Gutierrez et al [1].
+            Specifically, this returns regions of a sequence where there is a run of minimum_length residues
+            that contain the residues in residue_selector that are uninterrpted by more than max_interription
+            intervenieng residues.
+        
+            For example, if residue_selector = 'Q', minimum_length = 10 and max_interuption = 2, then
+            QQQQQAAQQQQQ and QAQAQAQAQAQAQAQAQAQ would count but QQQQQAAAQQQQQ would not.
+
+            Additional keyword arguments:
+
+                **residue_selector**  : a string of one or more one-letter amino acid codes used to define
+                                        the type of residues to find in LCD. (str)
+
+                **minimum_length**    : an integer that defines the shortes possible LCD (int). Default = 10
+
+                **max_interruption**  : an integer that defines the longest possible interruption allowed.
+                                        Default  = 2
+        
+
+        Returns
+        ---------------
+        list of LCDs:
+            All modes return the same data-structure, a list of lists with zero or more sublists that are defined 
+            as:
+
+            [0] - sequence
+            [1] - start position in sequence (slice numbering, indexing from 0)
+            [2] - end position in sequence (slice numbering, such that seq[start:end] gives you the LCD)
+        
+
+        """
+
+        io.validate_keyword_option(mode, ['holt'], 'mode')
+
+        if mode == 'holt':
+            return sequence_complexity.low_complexity_domains_holt(self.sequence, **kwargs)
+            
+        
         
     @property
     def sequence(self):

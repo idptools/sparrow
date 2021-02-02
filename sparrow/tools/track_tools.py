@@ -103,7 +103,7 @@ def predefined_linear_track(seq, mode, window_size, end_mode):
         def FX(s):
             return protein.Protein(s).hydrophobicity
     else:
-        raise sparrow_exception.SparrowException('Invalid mode passed to linear track: %s' %(mode))
+        raise sparrow_exceptions.SparrowException('Invalid mode passed to linear track: %s' %(mode))
                 
     # finally build track using the specific function
     return build_track(seq, FX, window_size, end_mode)
@@ -199,9 +199,10 @@ def build_track(seq, track_function, window_size=7, end_mode='extend-ends'):
         raise sparrow_exceptions.SparrowException('Windowsize [%i] is larger than sequence [%i]' % (window_size,len(seq)))
 
 
+    slen = len(seq)
     # run through window_size fragments and compute params using the
     # custom passed function
-    end = (len(seq) - window_size)
+    end = (slen - window_size)+1
     track_vals = []
     for i in range(end):
         frag = seq[i:i+window_size]
@@ -214,13 +215,21 @@ def build_track(seq, track_function, window_size=7, end_mode='extend-ends'):
         track_vals = [track_vals[0]]*front + track_vals
 
         end = len(seq) - len(track_vals) 
-        track_vals = [track_vals[-1]]*end + track_vals   
+        track_vals = track_vals + [track_vals[-1]]*end 
 
-    if end_mode == 'zero-ends':
+    elif end_mode == 'zero-ends':
         front = int(window_size/2)
         track_vals = [0]*front + track_vals
+        
         end = len(track_vals) - len(seq)
-        track_vals = [0]*end + track_vals        
+        track_vals = track_vals + [0]*end 
+    elif end_mode == '':
+        pass
+    else:
+        raise sparrow_exceptions.SparrowException('No valid end_mode passed')
+        
+
+
         
     return track_vals
         
