@@ -67,6 +67,7 @@ class Protein:
         self.__IDP_check = None
         self.__f_positive = None
         self.__f_negative = None
+        self.__complexity = None
         self.__linear_profiles = {}
         
             
@@ -179,7 +180,7 @@ class Protein:
     # .................................................................
     #
     @property
-    def aromatic_fractions(self):
+    def fraction_aromatic(self):
         """
         Returns the fraction of aromatic residues in the sequence. Aromatic
         residues are Tyr, Phe, Trp.
@@ -200,7 +201,7 @@ class Protein:
     # .................................................................
     #
     @property
-    def aliphatic_fractions(self):
+    def fraction_aliphatic(self):
         """
         Returns the fraction of aliphatic residues in the sequence. 
         Aliphatic residues are Ala, Leu, Ile, Met, Val. 
@@ -223,7 +224,7 @@ class Protein:
     # .................................................................
     #
     @property
-    def polar_fractions(self):
+    def fraction_polar(self):
         """
         Returns the fraction of polar residues in the sequence. 
         Aliphatic residues are Gly, Ser, Thr, Gln, Asn, His.
@@ -245,7 +246,7 @@ class Protein:
     # .................................................................
     #
     @property
-    def proline_fractions(self):
+    def fraction_proline(self):
         """
         Returns the fraction of proline residues.
 
@@ -267,7 +268,6 @@ class Protein:
         return self.__disorder
 
 
-
     # .................................................................
     #
     @property
@@ -277,6 +277,16 @@ class Protein:
 
         return self.__hydrophobicity 
 
+
+    # .................................................................
+    #
+    @property
+    def complexity(self):
+        if self.__complexity is None:
+            self.__complexity = calculate_parameters.calculate_seg_complexity(self.__seq)
+
+        return self.__complexity
+            
 
     # .................................................................
     #
@@ -300,7 +310,7 @@ class Protein:
         
         """
 
-        f = 0
+        f = 0.0
 
         for i in residue_selector:            
             if i in self.amino_acid_fractions:
@@ -313,7 +323,7 @@ class Protein:
 
     # .................................................................
     #            
-    def linear_sequence_profile(self, mode, window_size=8, end_mode='extend-ends'):
+    def linear_sequence_profile(self, mode, window_size=8, end_mode='extend-ends', smooth=None):
         """
         Function that returns a vectorized representation of local composition/sequence properties, as defined
         by the passed 'mode', which acts as a selector toggle for a large set of pre-defined analyses types.
@@ -327,9 +337,9 @@ class Protein:
         
             'NCPR'              : Net charge per residue
          
-            'aromatic'         : Fraction of aromatic residues
+            'aromatic'          : Fraction of aromatic residues
 
-            'aliphatic'        : Fraction of aliphatic residues
+            'aliphatic'         : Fraction of aliphatic residues
 
             'polar'             : Fraction of polar residues
 
@@ -340,6 +350,8 @@ class Protein:
             'negative'          : Fraction of negative residues
 
             'hydrophobicity'    : Linear hydrophobicity (Kyte-Doolitle)
+
+            'seg-complexity'    : Linear complexity
 
         window_size : int
             Number of residues over which local sequence properties are calculated. A window stepsize of 1
@@ -357,24 +369,30 @@ class Protein:
     
             'zero-ends'     |    Means leading/lagging track values are set to zero.
 
+        smooth : int or None
+            Selector which allows you to smooth the data over a windowsize. Note window
+            must be an odd number (applies a savgol_filter with a 3rd order polynomial
+            which requires an odd number).
+
+
         Returns
         ----------
         list
             Returns a list with values that correspond to the passed mode
         """
 
-        io.validate_keyword_option(mode, ['FCR','NCPR','aromatic','aliphatic','polar','proline','positive','negative','hydrophobicity'], 'mode')
+        io.validate_keyword_option(mode, ['FCR','NCPR','aromatic','aliphatic','polar','proline','positive','negative','hydrophobicity', 'seg-complexity'], 'mode')
         name = '%s-%i-%s' %(mode, window_size, end_mode)
 
         if name not in self.__linear_profiles:
-            self.__linear_profiles[name] = track_tools.predefined_linear_track(self.__seq,  mode, window_size, end_mode)
+            self.__linear_profiles[name] = track_tools.predefined_linear_track(self.__seq,  mode, window_size, end_mode, smooth)
         
         return self.__linear_profiles[name]
 
 
     # .................................................................
     #            
-    def linear_composition_profile(self, composition_list, window_size=8, end_mode='extend-ends'):
+    def linear_composition_profile(self, composition_list, window_size=8, end_mode='extend-ends', smooth=None):
         """
         Function that returns a vectorized representation of local composition/sequence properties, as defined
         by the set of one or more residues passed in composition_list.
@@ -401,6 +419,12 @@ class Protein:
     
             'zero-ends'     |    Means leading/lagging track values are set to zero.
 
+        smooth : int or None
+            Selector which allows you to smooth the data over a windowsize. Note window
+            must be an odd number (applies a savgol_filter with a 3rd order polynomial
+            which requires an odd number).
+
+
         Returns
         ----------
         list
@@ -412,16 +436,18 @@ class Protein:
         
         # we sort the composition list to unify how it is saved for memoization
         try:
-            composition.sort()
+            composition_list = list(set(composition_list))
+            composition_list.sort()
+            
         except AttributeError:
-            raise sparrow_exception('Unable to sort composition_list (%s) - this should be a list'%(str(composition_list)))
+            raise sparrow_exceptions.ProteinException('Unable to sort composition_list (%s) - this should be a list'%(str(composition_list)))
 
         
             
-        name = "-".join(composition_list) + "-window_size=%i"%(window_size) + "-end_mode=%s"%(end_mode)
+        name = "-".join(composition_list) + "-window_size=%i"%(window_size) + "-end_mode=%s"%(end_mode) + "smooth=%s"%(smooth)
 
         if name not in self.__linear_profiles:
-            self.__linear_profiles[name] = track_tools.linear_track_composition(self.__seq,  composition_list, window_size, end_mode)
+            self.__linear_profiles[name] = track_tools.linear_track_composition(self.__seq,  composition_list, window_size=window_size, end_mode=end_mode, smooth=smooth)
         
         return self.__linear_profiles[name]
 
@@ -431,12 +457,38 @@ class Protein:
 
         mode : 'holt'
             Function which returns the set of low-complexity tracts as defined by Gutierrez et al [1].
-            Specifically, this returns regions of a sequence where there is a run of minimum_length residues
-            that contain the residues in residue_selector that are uninterrpted by more than max_interription
-            intervenieng residues.
+            Specifically, this returns regions of a sequence where there is a run that contains minimum_length
+            copies of the residue defined in the residue_selector that are uninterrupted by more than 
+            max_interruption intervening residues.
         
             For example, if residue_selector = 'Q', minimum_length = 10 and max_interuption = 2, then
-            QQQQQAAQQQQQ and QAQAQAQAQAQAQAQAQAQ would count but QQQQQAAAQQQQQ would not.
+            QQQQQAAQQQQQ and QAQAQAQAQAQAQAQAQAQ would count but QQQQQAAAQQQQQ would not. 
+
+            Similarly AAAQAQAQAQAQAQAQAAAA would not count (core here contains 8 Q only. 
+
+            Additional keyword arguments:
+
+                **residue_selector**  : a string of one or more one-letter amino acid codes used to define
+                                        the type of residues to find in LCD. (str)
+
+                **minimum_length**    : an integer that defines the shortes possible LCD (int). Default = 10
+   
+                **max_interruption**  : an integer that defines the longest possible interruption allowed.
+                                        Default  = 2
+
+        mode : 'holt-permissive'
+            Function which returns the set of low-complexity tracts in a slightly more permissive manner than 
+            was defied by Gutierrez et al.
+
+            Specifically, this returns regions of a sequence where there is a run that contains minimum_length
+            residues which conform to a contigous stretch of the residue(s) defined in residue_selector without
+            more that max_interruption intervening residues.
+                    
+            For example, if residue_selector = 'Q', minimum_length = 10 and max_interuption = 2, then
+            QQQQQAAQQQQQ and QAQAQAQAQAQAQAQAQAQ would count but QQQQQAAAQQQQQ would not. 
+
+            Unlike 'holt' mode, now AAAQAQAQAQAQAQAQAAAA WOULD count (while there are 8 Qs here, there is a 
+            region of 13 residues that sit in a Q-rich region with no more than 2 interruptions.
 
             Additional keyword arguments:
 
@@ -462,10 +514,13 @@ class Protein:
 
         """
 
-        io.validate_keyword_option(mode, ['holt'], 'mode')
+        io.validate_keyword_option(mode, ['holt', 'holt-permissive'], 'mode')
 
         if mode == 'holt':
             return sequence_complexity.low_complexity_domains_holt(self.sequence, **kwargs)
+
+        if mode == 'holt-permissive':
+            return sequence_complexity.low_complexity_domains_holt_permissive(self.sequence, **kwargs)
             
         
         

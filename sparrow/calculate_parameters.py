@@ -1,5 +1,6 @@
 from sparrow.data import amino_acids
 import numpy as np
+import math
 
 
 # .................................................................
@@ -35,6 +36,42 @@ def calculate_aa_fractions(s):
 
     return aa_dict
  
+
+
+def calculate_seg_complexity(s, alphabet=amino_acids.VALID_AMINO_ACIDS):
+    """
+    Function to calculate the Wootton-Federhen complexity of a sequence (also called
+    seg complexity, as this the theory used in the classic SEG algorithm.
+
+    Parameters
+    -----------
+    s : str
+        Amino acid sequence
+
+    alphabet : list
+        List of amino acids found in alphabet. Note this does not sanity check in the 
+        case of non-standard amino acids. Default is the standard 20 amino acids
+
+    Returns
+    ----------
+    float
+        Returns a float that corresponds to the compositional complexity associated with 
+        the passed sequence.
+
+    """
+
+    alphabet_size = len(alphabet)
+    seq_len = len(s)
+
+    complexity = 0 
+    for a in alphabet:
+        p = s.count(a)/seq_len
+
+        if p > 0:
+            complexity = p * math.log(p, alphabet_size) + complexity  
+
+    return -complexity
+    
    
 # .................................................................
 #        
