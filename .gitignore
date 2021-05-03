@@ -8,6 +8,8 @@ sparrow/patterning.html
 *.so
 *~
 *.c
+\#*
+\.#*
 
 # Distribution / packaging
 .Python
