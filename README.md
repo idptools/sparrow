@@ -31,8 +31,17 @@ For now (i.e. during development) installation should be done by
 
 		pip install .
 
+4. Then, whenever you want to check for updates simply run
+
+		git pull
+		pip install .
+		
+	The first command (`git pull`) checks the [git repo](https://github.com/holehouse-lab/sparrow) for updates and then the second command installs the updated version.
+
 ## Usage
-`sparrow` gives you a window into protein sequence properties in a lightweight, just-in-time way. Standard pattern is
+
+#### General
+`sparrow` gives you a window into protein sequence properties in a lightweight, just-in-time way. Standard pattern for analysis is:
 
 	from sparrow import Protein
 	
@@ -46,10 +55,20 @@ The object `my_cool_protein` is now available and has a large collection of attr
 
 Much more extensive documentation is coming and for now, to see the functions take a look at the [code directly here](https://github.com/holehouse-lab/sparrow/blob/main/sparrow/protein.py)
 
+In general sparrow is written in a Protein-centric way - i.e. all functions emerge from the Protein object.
+
+#### Reading in FASTA files
+One non-obvious thing is if you have a FASTA file you can read it in to a dictionary of `sparrow.Protein` objects using:
+
+	from sparrow import read_fasta
+	protein_dictionary = read_fasta('my_fasta_file.fasta')
+	
+protein_dictionary is then a dictionary with key/value pairs for the Protein objects. `read_fasta()` accepts the same keyword arguments as [protfasta.read_fasta](https://protfasta.readthedocs.io/en/latest/read_fasta.html) so check that out.
+
 
 ### Copyright
 
-Copyright (c) 2020, Alex Holehouse & Ryan Emenecker, built in the Holehouse lab.
+Copyright (c) 2020-2021, Alex Holehouse & Ryan Emenecker, built in the Holehouse lab. 
 
 
 #### Acknowledgements
