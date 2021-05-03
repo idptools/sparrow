@@ -12,7 +12,6 @@ def show_sequence(seq,
                   bold_positions=[],
                   bold_residues=[],
                   return_raw_string=False):
-
                   
     """
     Function that generates an HTML colored string that either renders in the browser or returns the 
