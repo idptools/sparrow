@@ -1,6 +1,41 @@
 import protfasta
+import urllib3
 from sparrow.protein import Protein
 from sparrow.sparrow_exceptions import SparrowException
+
+
+def uniprot_fetch(uniprot_accession):
+    """
+    Function that pulls down the amino acid sequence associated with a given uniprot ID. Note this
+    actually queries the UniProt website via an HTTP request and SHOULD NOT be used for large scale
+    downloading of sequences. You have be warned - UniProt will block your IP if you use this to fetch
+    large numbers of sequences. 
+
+    Parameters
+    -------------
+    uniprot_accession : str
+        Valid uniprot accession (note that no validation is performed!).
+
+    Returns
+    -----------
+    Str or None
+        If the accession can be downloaded returns a string with the amino acid sequence. If not
+        (for ANY reason) returns None.
+
+    """
+
+    http = urllib3.PoolManager()
+    r = http.request('GET', 'https://www.uniprot.org/uniprot/%s.fasta'%(uniprot_accession))
+    
+    s = "".join(str(r.data).split('\\n')[1:]).replace("'","")
+
+
+    if s.find('Sorry') > -1:
+        return None
+
+    return Protein(s)
+
+
 
 def read_fasta(filename, **kwargs):
     """
