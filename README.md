@@ -10,33 +10,11 @@ sparrow
 Next generation package for sequence parameter calculation. 
 
 ## Installation
-For now (i.e. during development) installation should be done by 
+Installation can be done via `pip` directly from GitHub!!!
 
-1. Creating a local directory where you want the code to live (i.e. somewhere in your directory structure that makes sense, such as 
-
-		/Users/alex/Documents/software/sparrow
-
-	or
+	pip install sparrow@git+git://github.com/holehouse-lab/sparrow.git
 	
-		/Users/alex/Dropbox/software/sparrow
-		
-	It doesn't actually matter where this is but having it somewhere sensible will be useful as this code is continually updated and you can use `git pull` to update as and when new features/fixes are added.
-	
-2. Clone this git repository to your local machine and move into that directory
-
-		git clone git@github.com:holehouse-lab/sparrow.git
-		cd sparrow
-
-3. Install sparrow using `pip`
-
-		pip install .
-
-4. Then, whenever you want to check for updates simply run
-
-		git pull
-		pip install .
-		
-	The first command (`git pull`) checks the [git repo](https://github.com/holehouse-lab/sparrow) for updates and then the second command installs the updated version.
+This can be re-run to update when updates are pushed. What a world we live in!
 
 ## Usage
 
