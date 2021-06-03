@@ -7,13 +7,15 @@ sparrow
 
 # SPARROW: Sequence PARameters of Regions in disOrdered Windows 
 
-Next generation package for sequence parameter calculation. 
+Sparrow is our next generation package for sequence parameter calculation. It's still in development, but, the functionality present works well.
 
 ## Installation
 Installation can be done via `pip` directly from GitHub!!!
 
-	pip install sparrow@git+git://github.com/holehouse-lab/sparrow.git
+	pip install git+ssh://git@github.com/holehouse-lab/sparrow.git
 	
+NOTE that for this to work you must [have set up ssh keys](https://gitlab.com/holehouselab/labbook/-/blob/master/guides/ssh/setting_up_ssh_keys.md) and have [connected your ssh key to GitHub](https://gitlab.com/holehouselab/labbook/-/blob/master/guides/ssh/ssh_keys_for_github.md). This is because **sparrow** is a *private* repository, so installation is limited to those authenticated against the [Holehouse lab GitHub page](https://github.com/holehouse-lab/).
+
 This can be re-run to update when updates are pushed. What a world we live in!
 
 ## Usage
@@ -43,6 +45,8 @@ One non-obvious thing is if you have a FASTA file you can read it in to a dictio
 	
 protein_dictionary is then a dictionary with key/value pairs for the Protein objects. `read_fasta()` accepts the same keyword arguments as [protfasta.read_fasta](https://protfasta.readthedocs.io/en/latest/read_fasta.html) so check that out.
 
+### Roadmap
+We'd like to put an initial public version of sparrow out in the fall of 2021. I'd also love to include as many people from the lab on this as possible, so, if you have ideas for analysis please talk to me and we can set up how to build them in (which will probably involve Alex writing a stub] first and then you adding code).
 
 ### Copyright
 
