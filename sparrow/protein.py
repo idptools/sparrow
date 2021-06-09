@@ -381,7 +381,12 @@ class Protein:
         """
 
         io.validate_keyword_option(mode, ['FCR','NCPR','aromatic','aliphatic','polar','proline','positive','negative','hydrophobicity', 'seg-complexity'], 'mode')
-        name = '%s-%i-%s' %(mode, window_size, end_mode)
+
+        if smooth is not None:
+            name = '%s-%i-%s-%i' %(mode, window_size, end_mode, smooth)
+        else:
+            name = '%s-%i-%s' %(mode, window_size, end_mode)
+
 
         if name not in self.__linear_profiles:
             self.__linear_profiles[name] = track_tools.predefined_linear_track(self.__seq,  mode, window_size, end_mode, smooth)
