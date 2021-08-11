@@ -46,7 +46,15 @@ One non-obvious thing is if you have a FASTA file you can read it in to a dictio
 protein_dictionary is then a dictionary with key/value pairs for the Protein objects. `read_fasta()` accepts the same keyword arguments as [protfasta.read_fasta](https://protfasta.readthedocs.io/en/latest/read_fasta.html) so check that out.
 
 ### Roadmap
-We'd like to put an initial public version of sparrow out in the fall of 2021. I'd also love to include as many people from the lab on this as possible, so, if you have ideas for analysis please talk to me and we can set up how to build them in (which will probably involve Alex writing a stub] first and then you adding code).
+We'd like to put an initial public version of sparrow out in the late fall of 2021. I'd also love to include as many people from the lab on this as possible, so, if you have ideas for analysis please talk to me and we can set up how to build them in (which will probably involve Alex writing a stub] first and then you adding code).
+
+The plan if for sparrow to contain 
+
+1. 'native' sequence analysis tools (where properties, either average or linear) are computed directly from the sequence. Many example of sequence that follow this pattern are currently implemented
+
+2. Deep-learning based sequence analysis, whereby PARROT-trained networks are read in and used to analyze sequence. We haven't yet implemented any of these, but  
+
+### How to add sequence parameter
 
 ### Copyright
 
