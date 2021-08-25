@@ -503,6 +503,10 @@ class Protein:
 
                 **max_interruption**  : an integer that defines the longest possible interruption allowed.
                                         Default  = 2
+
+                **fractional_threshold**  : an fraction between 0 and 1 that defines the longest possible interruption 
+                                        allowed. Default = 0.25
+
         
 
         Returns
