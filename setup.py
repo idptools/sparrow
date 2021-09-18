@@ -15,10 +15,16 @@ import numpy
 
 extensions = [
     Extension(
-        "sparrow.patterning",
-        ["sparrow/patterning.pyx"],
+        "sparrow.patterning.patterning",
+        ["sparrow/patterning/patterning.pyx"],
+        include_dirs=[numpy.get_include()], 
+    ),
+    Extension(
+        "sparrow.patterning.kappa",
+        ["sparrow/patterning/kappa.pyx"],
         include_dirs=[numpy.get_include()], 
     )]
+
 
 # ................................
 

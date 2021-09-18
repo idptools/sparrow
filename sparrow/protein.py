@@ -6,6 +6,8 @@ from .visualize import sequence_visuals
 from sparrow import data
 from .sequence_analysis import sequence_complexity
 import numpy as np
+from .patterning import kappa
+from .data import amino_acids
 
 class Protein:
 
@@ -69,7 +71,11 @@ class Protein:
         self.__f_positive = None
         self.__f_negative = None
         self.__complexity = None
+        self.__kappa = None
+        self.__kappa_x = {}
         self.__linear_profiles = {}
+        
+        
         
             
         
@@ -177,6 +183,35 @@ class Protein:
             self.__NCPR = self.fraction_positive - self.fraction_negative
 
         return self.__NCPR
+
+
+    # .................................................................
+    #
+    @property
+    def kappa(self):
+        """
+        Returns the charge segregation parameter kappa for the sequence
+
+        Returns
+        --------
+        float
+            Float between 0 and 1
+        """
+
+        if self.__kappa is None:
+            if self.fraction_positive == 0:
+                self.__kappa = None
+            elif self.fraction_negative == 0:
+                self.__kappa = None
+            elif len(self.sequence) < 6:
+                self.__kappa = None
+            else:
+
+                k5 = kappa.kappa_x(self.sequence, ['R','K'], ['E','D'], 5)
+                k6 = kappa.kappa_x(self.sequence, ['R','K'], ['E','D'], 6)
+                self.__kappa = (k5+k6)/2
+
+        return self.__kappa
 
     # .................................................................
     #
@@ -318,6 +353,58 @@ class Protein:
                 f = f + self.amino_acid_fractions[i]
 
         return f
+
+    # .................................................................
+    #
+    def compute_kappa_x(self, group1, group2=None, window_size=6):
+        """
+        Returns kappa for an abirtrary set of residues with an arbitrary window size.
+
+        Parameters
+        -------------
+        group1 : list
+            Must be a list of valid amino acid one letter codes. Sanity checking is not 
+            performed here (maybe add this?). This defines one set of residues for which 
+            patterning is computed against. If a second set is not provided, patterning is
+            done via group1 vs. all other residues.
+
+        group2 : list
+            If provided, this defines the SECOND set of residues, such that patterning is 
+            done as residues in group1 vs. group2 in the background of everything else.
+        
+        """
+
+        for i in group1:
+            if i not in amino_acids.VALID_AMINO_ACIDS:
+                raise sparrow_exceptions.ProteinException(f'Amino acid {i} (in group 1) is not a standard amino acid')
+                
+
+        if group2 is None:
+            kappa_x_name = "-".join(group1) + "-" + str(window_size)
+        else:
+            for i in group2:
+                if i not in amino_acids.VALID_AMINO_ACIDS:
+                    raise sparrow_exceptions.ProteinException(f'Amino acid {i} (in group 2) is not a standard amino acid')
+
+            kappa_x_name = "-".join(group1) + "-" + "-".join(group2), str(window_size)
+
+        if kappa_x_name not in self.__kappa_x:
+            if group2 is None:
+                group2=[]
+                for i in amino_acids.VALID_AMINO_ACIDS:
+                    if i in group1:
+                        pass
+                    else:
+                        group2.append(i)
+
+            
+            self.__kappa_x[kappa_x_name] = kappa.kappa_x(self.sequence, group1, group2, window_size)
+
+        return self.__kappa_x[kappa_x_name]
+
+
+
+        
 
 
     # .................................................................

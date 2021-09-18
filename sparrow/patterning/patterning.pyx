@@ -7,7 +7,7 @@ import array
 
 from libc.stdlib cimport rand, srand, RAND_MAX
 
-from . import sparrow_exceptions 
+from .. import sparrow_exceptions 
 
 
 
