@@ -5,6 +5,7 @@ from . import calculate_parameters
 from .visualize import sequence_visuals
 from sparrow import data
 from .sequence_analysis import sequence_complexity
+from .sequence_analysis import physical_properties
 import numpy as np
 from .patterning import kappa
 from .data import amino_acids
@@ -74,8 +75,30 @@ class Protein:
         self.__kappa = None
         self.__kappa_x = {}
         self.__linear_profiles = {}
+        self.__molecular_weight = None
         
         
+
+            
+        
+    # .................................................................
+    #
+    @property
+    def molecular_weight(self):
+        """
+        Returns the molecular weight of the the protein.
+
+        Returns
+        ---------
+        float 
+            The molecular weight
+        
+        """
+
+        if self.__molecular_weight is None:
+            self.__molecular_weight = physical_properties.calculate_molecular_weight(self.sequence)
+
+        return self.__molecular_weight
         
             
         
@@ -401,10 +424,6 @@ class Protein:
             self.__kappa_x[kappa_x_name] = kappa.kappa_x(self.sequence, group1, group2, window_size)
 
         return self.__kappa_x[kappa_x_name]
-
-
-
-        
 
 
     # .................................................................
