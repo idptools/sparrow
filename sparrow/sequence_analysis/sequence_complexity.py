@@ -2,15 +2,19 @@ from sparrow.data import amino_acids
 
 
 
-def low_complexity_domains_holt_permissive(sequence, residue_selector, minimum_length=10, max_interruption=2, fractional_threshold=0.25):
+def low_complexity_domains_holt_permissive(sequence, residue_selector, minimum_length=15, max_interruption=5, fractional_threshold=0.25):
     """
     Function to identify low complexity domains enriched in a specific residues
 
     """
-    return __low_complexity_domains_holt_internal(sequence, residue_selector, minimum_length, max_interruption, permissive=True)
+    return __low_complexity_domains_holt_internal(sequence=sequence, 
+                                                  residue_selector=residue_selector, 
+                                                  minimum_length=minimum_length, 
+                                                  max_interruption=max_interruption, 
+                                                  permissive=True)
 
 
-def low_complexity_domains_holt(sequence, residue_selector, minimum_length=10, max_interruption=2, fractional_threshold=0.25):
+def low_complexity_domains_holt(sequence, residue_selector, minimum_length=15, max_interruption=5, fractional_threshold=0.25):
     return __low_complexity_domains_holt_internal(sequence=sequence, 
                                                   residue_selector=residue_selector, 
                                                   minimum_length=minimum_length, 

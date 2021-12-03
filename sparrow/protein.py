@@ -78,9 +78,6 @@ class Protein:
         self.__molecular_weight = None
         
         
-
-            
-        
     # .................................................................
     #
     @property
@@ -562,31 +559,40 @@ class Protein:
         return self.__linear_profiles[name]
 
 
+    # .................................................................
+    #            
     def low_complexity_domains(self, mode='holt', **kwargs):
         """
+        Function that extracts low complexity domains from a protein sequence. The arguments passed depend on the mode 
+        of extract, as defined below. For now, only 'Holt' is allowed. 
 
         mode : 'holt'
             Function which returns the set of low-complexity tracts as defined by Gutierrez et al [1].
-            Specifically, this returns regions of a sequence where there is a run that contains minimum_length
-            copies of the residue defined in the residue_selector that are uninterrupted by more than 
-            max_interruption intervening residues.
-        
-            For example, if residue_selector = 'Q', minimum_length = 10 and max_interuption = 2, then
-            QQQQQAAQQQQQ and QAQAQAQAQAQAQAQAQAQ would count but QQQQQAAAQQQQQ would not. 
-
-            Similarly AAAQAQAQAQAQAQAQAAAA would not count (core here contains 8 Q only. 
+            Specifically, this returns low complexity sequences defined by four key parameters outlined
+            below. The 
 
             Additional keyword arguments:
 
                 **residue_selector**  : a string of one or more one-letter amino acid codes used to define
-                                        the type of residues to find in LCD. (str)
+                                        the type of residues to find in LCD. (str). For example 'Q' or 'ED' for
+                                        aspartic acid and glutamic acid.
 
-                **minimum_length**    : an integer that defines the shortes possible LCD (int). Default = 10
+                **minimum_length**    : an integer that defines the shortes possible LCD (int). Default = 15. Must 
+                                        be positive.
    
-                **max_interruption**  : an integer that defines the longest possible interruption allowed.
-                                        Default  = 2
+                **max_interruption**  : an integer that defines the longest possible interruption allowed between
+                                        any two residues defined by the residue selector within the LCD. This is 
+                                        related to but independent of the fractional threshold.
+                                        For Gutierrez et al this was 17 (!). Default  = 5. 
+
+                **fractional_threshold**  : a fraction between 0 and 1 that defines the minimum fraction of amino 
+                                            acids  found in the residue selector that can be tolerated in the LCD.
+                                            Default = 0.25.
+
 
         mode : 'holt-permissive'
+
+            DO NOT USE FOR NOW!
             Function which returns the set of low-complexity tracts in a slightly more permissive manner than 
             was defied by Gutierrez et al.
 
@@ -605,7 +611,7 @@ class Protein:
                 **residue_selector**  : a string of one or more one-letter amino acid codes used to define
                                         the type of residues to find in LCD. (str)
 
-                **minimum_length**    : an integer that defines the shortes possible LCD (int). Default = 10
+                **minimum_length**    : an integer that defines the shortes possible LCD (int). Default = 15
 
                 **max_interruption**  : an integer that defines the longest possible interruption allowed.
                                         Default  = 2
@@ -628,7 +634,8 @@ class Protein:
 
         """
 
-        io.validate_keyword_option(mode, ['holt', 'holt-permissive'], 'mode')
+        #io.validate_keyword_option(mode, ['holt', 'holt-permissive'], 'mode')
+        io.validate_keyword_option(mode, ['holt'], 'mode')
 
         if mode == 'holt':
             return sequence_complexity.low_complexity_domains_holt(self.sequence, **kwargs)
