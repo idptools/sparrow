@@ -703,7 +703,7 @@ class Protein:
         Returns
         ----------
         None or str
-            If return_raw_string is set to true then an HTML-compatible string is returned.
+            If return_raw_string is set to True then an HTML-compatible string is returned.
 
 
         Raises
@@ -714,16 +714,19 @@ class Protein:
         """
 
 
-        sequence_visuals.show_sequence(self.sequence, 
-                                       blocksize=blocksize,
-                                       newline=newline,
-                                       fontsize=fontsize,
-                                       font_family=font_family,
-                                       colors=colors,
-                                       header=header,
-                                       bold_positions=bold_positions,
-                                       bold_residues=bold_residues,
-                                       return_raw_string=return_raw_string)
+        r_val = sequence_visuals.show_sequence(self.sequence, 
+                                               blocksize=blocksize,
+                                               newline=newline,
+                                               fontsize=fontsize,
+                                               font_family=font_family,
+                                               colors=colors,
+                                               header=header,
+                                               bold_positions=bold_positions,
+                                               bold_residues=bold_residues,
+                                               return_raw_string=return_raw_string)
+        
+        if return_raw_string:
+            return r_val
 
         
 
