@@ -226,6 +226,16 @@ def build_track(seq, track_function, window_size=7, end_mode='extend-ends', smoo
     if len(seq) < window_size:
         raise sparrow_exceptions.SparrowException('Windowsize [%i] is larger than sequence [%i]' % (window_size,len(seq)))
 
+    # validate smoothing param. Note we do this first because true is cast to 1 by int so have to check explicitly! 
+    if type(smooth) is bool:
+        raise sparrow_exceptions.SparrowException('If smooth provided, it should be a number that corresponds to the smoothing window')
+    else:
+        try:
+            smooth = int(smooth)
+        except Exception:
+            raise sparrow_exceptions.SparrowException(f'Could not convert smooth parameter to an integer ({smooth}).')
+            
+
 
     slen = len(seq)
     # run through window_size fragments and compute params using the
@@ -261,8 +271,7 @@ def build_track(seq, track_function, window_size=7, end_mode='extend-ends', smoo
         try:
             track_vals = savgol_filter(track_vals, smooth, 3)
         except Exception as e:
-            print('Invalid smoothing parameter passed (%s). Must be an integer between 3 and the length of the sequence')
-            raise(e)
+            raise sparrow_exceptions.SparrowException(f'Invalid smoothing parameter passed [smooth={smooth}]. Must be an integer between 3 and the length of the sequence')
         
     return track_vals
         
