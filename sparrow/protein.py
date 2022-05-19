@@ -9,6 +9,7 @@ from .sequence_analysis import physical_properties
 import numpy as np
 from .patterning import kappa
 from .data import amino_acids
+from sparrow.predictors import Predictor
 
 class Protein:
 
@@ -67,7 +68,6 @@ class Protein:
         self.__aro = None
         self.__ali = None
         self.__polar = None
-        self.__disorder = None
         self.__IDP_check = None
         self.__f_positive = None
         self.__f_negative = None
@@ -76,6 +76,7 @@ class Protein:
         self.__kappa_x = {}
         self.__linear_profiles = {}
         self.__molecular_weight = None
+        self.__predictor_object = None
         
         
     # .................................................................
@@ -314,15 +315,6 @@ class Protein:
         return self.amino_acid_fractions['P']
 
 
-    # .................................................................
-    #
-    @property
-    def disorder(self):
-        if self.__disorder is None:
-            self.__disorder = calculate_parameters.calculate_disorder(self.__seq)
-
-        return self.__disorder
-
 
     # .................................................................
     #
@@ -343,19 +335,6 @@ class Protein:
 
         return self.__complexity
             
-
-    # .................................................................
-    #
-    @property
-    def is_IDP(self):
-        if self.__IDP_check is None:
-            if np.mean(self.disorder) >= data.configs.DISORDER_THRESHOLD:
-                self.__IDP_check = True
-            else:
-                self.__IDP_check = False
-
-        return self.__IDP_check
-
 
     # .................................................................
     #
@@ -729,6 +708,28 @@ class Protein:
             return r_val
 
         
+
+    @property
+    def predictor(self):
+        """
+        Returns a sparrow.Predictor object which provides programatic access 
+        to the various different sequence-based predictors implemented in
+        sparrow.
+
+        Note that each predictor performance necessary imports at runtime on
+        the first execution for the first protein, minimizing unecessary 
+        overhead.
+
+        Currently available predictors are:
+
+            * disorder : predict per-residue disorder
+            * dssp : predict per-residue DSSP score (0,1,or 2)
+            * transmembrane_region : predict binary classification of transmembrane region 
+        
+        """
+        if self.__predictor_object is None:
+            self.__predictor_object = Predictor(self)
+        return self.__predictor_object
 
         
 

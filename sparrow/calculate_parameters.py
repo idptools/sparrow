@@ -73,29 +73,6 @@ def calculate_seg_complexity(s, alphabet=amino_acids.VALID_AMINO_ACIDS):
     return -complexity
     
    
-# .................................................................
-#        
-def calculate_disorder(s):
-    """
-    Standalone function that uses metapredict to calculate the per-residue.
-    
-    Parameters
-    --------------
-    s : str
-        Amino acid sequence
-
-    Returns
-    -------------
-        np.array returns an array with per-residue disorder score as per
-        calculated by metapredict.
-
-
-    """
-    # local import
-    from metapredict import meta
-
-    return meta.predict_disorder(s)
-
 
 # .................................................................
 #

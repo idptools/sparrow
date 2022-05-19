@@ -12,6 +12,7 @@ Welcome to sparrow's documentation!
 
    getting_started
    api
+   predictors
 
 
 

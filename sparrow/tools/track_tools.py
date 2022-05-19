@@ -227,13 +227,15 @@ def build_track(seq, track_function, window_size=7, end_mode='extend-ends', smoo
         raise sparrow_exceptions.SparrowException('Windowsize [%i] is larger than sequence [%i]' % (window_size,len(seq)))
 
     # validate smoothing param. Note we do this first because true is cast to 1 by int so have to check explicitly! 
-    if type(smooth) is bool:
-        raise sparrow_exceptions.SparrowException('If smooth provided, it should be a number that corresponds to the smoothing window')
-    else:
-        try:
-            smooth = int(smooth)
-        except Exception:
-            raise sparrow_exceptions.SparrowException(f'Could not convert smooth parameter to an integer ({smooth}).')
+
+    if smooth is not None:
+        if type(smooth) is bool:
+            raise sparrow_exceptions.SparrowException('If smooth provided, it should be a number that corresponds to the smoothing window')
+        else:
+            try:
+                smooth = int(smooth)
+            except Exception:
+                raise sparrow_exceptions.SparrowException(f'Could not convert smooth parameter to an integer ({smooth}).')
             
 
 
