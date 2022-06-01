@@ -211,7 +211,10 @@ class Protein:
     @property
     def kappa(self):
         """
-        Returns the charge segregation parameter kappa for the sequence
+        Returns the charge segregation parameter kappa for the sequence. 
+        If kappa cannot be calculated (i.e. sequence lacks both positively
+        and negatively charged residues, or sequence length is less than 6, 
+        then this function returns -1)
 
         Returns
         --------
@@ -221,11 +224,11 @@ class Protein:
 
         if self.__kappa is None:
             if self.fraction_positive == 0:
-                self.__kappa = None
+                self.__kappa = -1
             elif self.fraction_negative == 0:
-                self.__kappa = None
+                self.__kappa = -1
             elif len(self.sequence) < 6:
-                self.__kappa = None
+                self.__kappa = -1
             else:
 
                 k5 = kappa.kappa_x(self.sequence, ['R','K'], ['E','D'], 5)
