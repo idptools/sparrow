@@ -101,6 +101,20 @@ class <RelevantName>Predictor():
         # assuming the file is there, we next read in the parameeter file. Note that we force this to be CPU mainly because
         # we know everyone has a CPU... 
         loaded_model = torch.load(saved_weights, map_location=torch.device('cpu'))
+
+        ## DELETE ME PROBABLY
+        # this block of code is relevant ONLY if the trained network has this straneg
+        # appended 'module.' text at the start of every keyword. This may happen in older
+        # version of PARROT (see DSSP predictor as an example of where its needed) but in
+        # 2022 trained networks didn't need this. As such, this can PROBABLY be deleted but
+        # in case you're using an older network we've kept this to make things simple
+        
+        #for i in range(len(loaded_model)):
+        #    key, value = loaded_model.popitem(last=False)
+        #    new_key = key[7:]
+        #    loaded_model[new_key] = value
+        ## END OF DELETE ME PROBABLY
+
       
         # Dynamically calculate the hyperparameters used to train the network. 
         ## NOTE:

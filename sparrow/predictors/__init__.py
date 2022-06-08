@@ -55,6 +55,7 @@ class Predictor:
         # predictor operates using some stateless master function (e.g. metapredict)
         self.__transmembrane_predictor_object = None
         self.__dssp_predictor_object = None
+        self.__mitochondrial_targeting_predictor_object  = None
 
 
 
@@ -97,7 +98,7 @@ class Predictor:
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = self.__transmembrane_predictor_object.predict_transmebrane_regions(self.__protein.sequence)
 
-
+        
         return self.__precomputed[selector] 
 
 
@@ -176,6 +177,7 @@ class Predictor:
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = self.__dssp_predictor_object.predict_dssp(self.__protein.sequence)
 
+        # note DSSP 0 = helical
         return np.array(np.array(self.__precomputed[selector]) == 0, dtype=int).tolist()
 
     # .................................................................
@@ -213,6 +215,7 @@ class Predictor:
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = self.__dssp_predictor_object.predict_dssp(self.__protein.sequence)
 
+        # note DSSP 2 = coil
         return np.array(np.array(self.__precomputed[selector]) == 2, dtype=int).tolist()
 
     # .................................................................
@@ -250,7 +253,46 @@ class Predictor:
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = self.__dssp_predictor_object.predict_dssp(self.__protein.sequence)
 
+        # note DSSP 1 = extended
         return np.array(np.array(self.__precomputed[selector]) == 1, dtype=int).tolist()
+
+
+    # .................................................................
+    #
+    def mitochondrial_targeting_sequence(self, recompute=False):
+
+        """
+        Returns per-residue binary classification as to if the sequence
+        includes a mitochondrial targeting sequence. Note this can ONLY
+        be found in the N-terminal 
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        list
+            Returns a list with  per-residue binary score for whether
+            or not a residue is predicted to be in a mitochondrial targeting
+            sequence or not
+
+        """
+
+        selector = 'mitochondrial-targeting-sequence'
+
+        
+        if self.__mitochondrial_targeting_predictor_object is None:
+            from .mitochondrial_targeting.mitochondrial_targeting_predictor import MitochondrialTargetingPredictor
+            self.__mitochondrial_targeting_predictor_object = MitochondrialTargetingPredictor()
+
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__mitochondrial_targeting_predictor_object.predict_mitochondrial_targeting(self.__protein.sequence)
+
+        return self.__precomputed[selector]
 
 
 
