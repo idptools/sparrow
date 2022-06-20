@@ -4,10 +4,21 @@ sparrow
 [![GitHub Actions Build Status](https://github.com/REPLACE_WITH_OWNER_ACCOUNT/sparrow/workflows/CI/badge.svg)](https://github.com/REPLACE_WITH_OWNER_ACCOUNT/sparrow/actions?query=workflow%3ACI)
 [![codecov](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/sparrow/branch/master/graph/badge.svg)](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/sparrow/branch/master)
 
+# SPARROW
 
-# SPARROW: Sequence PARameters of Regions in disOrdered Windows 
 
-Sparrow is our next generation package for sequence parameter calculation. It's still in development, but, the functionality present works well.
+## Overview
+SPARROW (Sequence PARameters for RegiOns in Windows) is our next generation package for calculating and predicting amino acid sequence features. It is meant as a light-weight object-oriented framework for working with protein sequences that integrates both direct sequence calculations and per-residue predictions from deep learning models trained using [PARROT](https://elifesciences.org/articles/70576). 
+
+Our goal is for SPARROW to be easy for anyone to add new sequence analysis plugins into, creating a simple, extendable framework for de novo sequence feature characterization.
+
+SPARROW is in *active* development. **We do not recommend using SPARROW at this time**. If you need to use it in your code or analysis PLEASE reach out to us and let us know, because things are changing rapidly.
+
+## Use and distribution
+We plan to finish up SPARROW and publish sometime in fall of 2022. Until that time the code is provided under the Creative Commons Attribution NonCommercial NoDerivs (CC-NC-ND) license (see LICSENE). This is – deliberately – an extremely restrictive license which we are using ONLY until the code is actually released (at which point we'll transition to a GNU-style license). 
+
+The reason for this is to try and discourage you from incorporating code that may change dramatic over the next few months
+
 
 ## Installation
 Installation can be done via `pip` directly from GitHub!!!
@@ -46,19 +57,14 @@ One non-obvious thing is if you have a FASTA file you can read it in to a dictio
 protein_dictionary is then a dictionary with key/value pairs for the Protein objects. `read_fasta()` accepts the same keyword arguments as [protfasta.read_fasta](https://protfasta.readthedocs.io/en/latest/read_fasta.html) so check that out.
 
 ### Roadmap
-We'd like to put an initial public version of sparrow out in the late fall of 2021. I'd also love to include as many people from the lab on this as possible, so, if you have ideas for analysis please talk to me and we can set up how to build them in (which will probably involve Alex writing a stub] first and then you adding code).
+An initial public version of SPARROW is released in June 2022 to enable existing tools developed by the Holehouse lab to use this code. This version is not meant for those outside the Holehouse lab to take and use (see **Use and distribution** for their own safety!).
 
-The plan if for sparrow to contain 
+A full public release is planned for Fall of 2022.
 
-1. 'native' sequence analysis tools (where properties, either average or linear) are computed directly from the sequence. Many example of sequence that follow this pattern are currently implemented
-
-2. Deep-learning based sequence analysis, whereby PARROT-trained networks are read in and used to analyze sequence. We haven't yet implemented any of these, but  
-
-### How to add sequence parameter
 
 ### Copyright
 
-Copyright (c) 2020-2021, Alex Holehouse & Ryan Emenecker, built in the Holehouse lab. 
+Copyright (c) 2020-2022, Alex Holehouse & Ryan Emenecker, built in the Holehouse lab. Currently shared under a CC BY-NC-ND license. 
 
 
 #### Acknowledgements
