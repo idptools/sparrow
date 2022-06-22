@@ -10,8 +10,26 @@ import versioneer
 # ................................
 # added for cython compilation
 from setuptools.extension import Extension
-from Cython.Build import cythonize
-import numpy
+
+try:
+    from Cython.Build import cythonize
+except ModuleNotFoundError:
+    print('########################################\n')
+    print('Error: Please install cython first:\n\npip install cython\n')
+    print('########################################\n')
+    exit(1)
+
+try:
+    import numpy
+except ModuleNotFoundError:
+
+    print('########################################\n')
+    print('Error: Please install numpy first:\n\npip install numpy\n')
+    print('########################################\n')
+    exit(1)
+
+
+    
 
 extensions = [
     Extension(
@@ -73,7 +91,8 @@ setup(
         "numpy>=1.14.0",
         "cython",
         "protfasta",
-        "metapredict",
+        "metapredict>2",
+        "ipython",
     ],
 
 
