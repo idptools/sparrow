@@ -93,6 +93,7 @@ setup(
         "protfasta",
         "metapredict>2",
         "ipython",
+        "idptools-parrot"
     ],
 
 

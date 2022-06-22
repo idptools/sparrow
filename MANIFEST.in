@@ -7,3 +7,4 @@ graft sparrow
 global-exclude *.py[cod] __pycache__ *.so
 
 recursive-include sparrow/data *
+
