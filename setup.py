@@ -95,6 +95,8 @@ setup(
         "ipython",
         "idptools-parrot"
     ],
+    
+    python_requires=">=3.7,<=3.8.21",          # Python version restrictions
 
 
     # Allows `setup.py test` to work correctly with pytest
