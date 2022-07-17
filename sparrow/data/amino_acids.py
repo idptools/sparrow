@@ -13,6 +13,31 @@ CHARGE = ['E','D','R','K']
 POS = ['R','K']
 NEG = ['E','D']
 
+AA_THREE_TO_ONE = {'ALA':'A',
+                   'CYS':'C',
+                   'ASP':'D',
+                   'GLU':'E',
+                   'PHE':'F',
+                   'GLY':'G',
+                   'HIS':'H',
+                   'ILE':'I',
+                   'LYS':'K',
+                   'LEU':'L',
+                   'MET':'M',
+                   'ASN':'N',
+                   'PRO':'P',
+                   'GLN':'Q',
+                   'ARG':'R',
+                   'SER':'S',
+                   'THR':'T',
+                   'VAL':'V',
+                   'TRP':'W',
+                   'TYR':'Y'}
+
+AA_ONE_TO_THREE = {}
+for x in AA_THREE_TO_ONE:
+    AA_ONE_TO_THREE[AA_THREE_TO_ONE[x]] = x
+
 
 AA_MOLECULAR_WEIGHT = {'A': 89.1,
                       'C': 121.2,
