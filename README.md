@@ -15,7 +15,7 @@ Our goal is for SPARROW to be easy for anyone to add new sequence analysis plugi
 SPARROW is in *active* development. **We do not recommend using SPARROW at this time**. If you need to use it in your code or analysis PLEASE reach out to us and let us know, because things are changing rapidly.
 
 ## Use and distribution
-We plan to finish up SPARROW and publish sometime in fall of 2022. Until that time the code is provided under the Creative Commons Attribution NonCommercial NoDerivs (CC-NC-ND) license (see LICSENE). This is – deliberately – an extremely restrictive license which we are using ONLY until the code is actually released (at which point we'll transition to a GNU-style license). 
+We plan to finish up SPARROW and publish sometime in fall of 2022. Until that time the code is provided under the Creative Commons Attribution NonCommercial NoDerivs (CC-NC-ND) license (see LICENSE). This is – deliberately – an extremely restrictive license which we are using ONLY until the code is actually released (at which point we'll transition to a GNU-style license). 
 
 The reason for this is to try and discourage you from incorporating code that may change dramatic over the next few months
 
@@ -23,11 +23,8 @@ The reason for this is to try and discourage you from incorporating code that ma
 ## Installation
 Installation can be done via `pip` directly from GitHub!!!
 
-	pip install git+ssh://git@github.com/holehouse-lab/sparrow.git
+	pip install git+ssh://git@github.com/idptools/sparrow.git
 	
-NOTE that for this to work you must [have set up ssh keys](https://gitlab.com/holehouselab/labbook/-/blob/master/guides/ssh/setting_up_ssh_keys.md) and have [connected your ssh key to GitHub](https://gitlab.com/holehouselab/labbook/-/blob/master/guides/ssh/ssh_keys_for_github.md). This is because **sparrow** is a *private* repository, so installation is limited to those authenticated against the [Holehouse lab GitHub page](https://github.com/holehouse-lab/).
-
-This can be re-run to update when updates are pushed. What a world we live in!
 
 ## Usage
 
