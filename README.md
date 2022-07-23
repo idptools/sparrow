@@ -1,10 +1,10 @@
-sparrow
-==============================
-[//]: # (Badges)
-[![GitHub Actions Build Status](https://github.com/REPLACE_WITH_OWNER_ACCOUNT/sparrow/workflows/CI/badge.svg)](https://github.com/REPLACE_WITH_OWNER_ACCOUNT/sparrow/actions?query=workflow%3ACI)
-[![codecov](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/sparrow/branch/master/graph/badge.svg)](https://codecov.io/gh/REPLACE_WITH_OWNER_ACCOUNT/sparrow/branch/master)
+# sparrow
 
-# SPARROW
+
+#### sparrow is a Python library for analyzing sequence features and predicting annotations using protein sequence information as input.
+
+
+### Major version 0.1
 
 
 ## Overview
@@ -60,6 +60,12 @@ protein_dictionary is then a dictionary with key/value pairs for the Protein obj
 An initial public version of SPARROW is released in June 2022 to enable existing tools developed by the Holehouse lab to use this code. This version is not meant for those outside the Holehouse lab to take and use (see **Use and distribution** for their own safety!).
 
 A full public release is planned for Fall of 2022.
+
+## Changelog
+
+#### July 2022
+* Moved to idptools
+* Updated requirement for Python 3.7 or 3.8
 
 
 ### Copyright
