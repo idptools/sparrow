@@ -64,7 +64,11 @@ A full public release is planned for Fall of 2022.
 ## Changelog
 
 #### July 2022
-* Moved to idptools
+* Moved to idptools! If you had previously cloned sparrow, you can update your git remote location using:
+
+		git remote set-url origin git@github.com:idptools/sparrow.git
+
+
 * Updated requirement for Python 3.7 or 3.8
 
 
