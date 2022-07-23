@@ -1,7 +1,4 @@
-# sparrow
-
-
-#### sparrow is a Python library for analyzing sequence features and predicting annotations using protein sequence information as input.
+# sparrow: a tool for integrative analysis and prediction from protein sequence data 
 
 
 ### Major version 0.1
