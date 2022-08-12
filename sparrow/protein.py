@@ -7,7 +7,7 @@ from sparrow import data
 from .sequence_analysis import sequence_complexity
 from .sequence_analysis import physical_properties
 import numpy as np
-from .patterning import kappa
+from .patterning import kappa, iwd
 from .data import amino_acids
 from sparrow.predictors import Predictor
 
@@ -15,17 +15,21 @@ class Protein:
 
     def __init__(self, s, validate=False):
         """
-        Construct for Protein object. Requires only a single sequence as input. Note that construction
-        does not trigger any sequence parameters to be calculated, all of which are caculated as needed.
+        Construct for Protein object. Requires only a single sequence as 
+        input. Note that construction does not trigger any sequence 
+        parameters to be calculated, all of which are caculated as needed.
+        
         Parameters
         -------------
         s :  str
             Amino acid sequence
 
         validate : bool
-            Flag that can be set if sequence should be validated to ensure it's a good
-            amino acid sequence. Generally not necessary to sometimes useful. If set, the
-            function constructor will automatically convert non-standard amino acids to standard
+            Flag that can be set if sequence should be validated to ensure 
+            it's a good amino acid sequence. Generally not necessary to 
+            sometimes useful. If set, the function constructor will 
+            automatically convert non-standard amino acids to standard
+            
             amino acids according to the standard rule.
 
             * ``B -> N``
@@ -105,14 +109,17 @@ class Protein:
     @property
     def amino_acid_fractions(self):
         """
-        Returns a dictionary where keys are each of the twenty standard amino
-        acids and the values are the fraction of that amino acid in the sequence.
-
+        Returns a dictionary where keys are each of the twenty standard 
+        amino acids and the values are the fraction of that amino acid 
+        in the sequence.
+        
         Returns
         ---------
         dict 
-            Returns a 20-position dictionary that includes single-letter codes for
-            each amino acid the corresponding fraction of those residues
+            Returns a 20-position dictionary that includes single-letter 
+            codes for each amino acid the corresponding fraction of those 
+            residues
+            
         
         """
 
@@ -126,8 +133,8 @@ class Protein:
     @property
     def FCR(self):
         """
-        Returns the fraction of charged residues (FCR) in the sequence. Charged
-        residues are Asp, Glu, Lys and Arg.
+        Returns the fraction of charged residues (FCR) in the sequence. 
+        Charged residues are Asp, Glu, Lys and Arg.
 
         Returns
         --------
@@ -147,8 +154,8 @@ class Protein:
     @property
     def fraction_positive(self):
         """
-        Returns the fraction of positively charges residues in the sequence. Positive
-        residues are Arg and Lys (not His at physiological pH). 
+        Returns the fraction of positively charges residues in the sequence. 
+        Positive residues are Arg and Lys (not His at physiological pH). 
 
         Returns
         --------
@@ -169,8 +176,8 @@ class Protein:
     @property
     def fraction_negative(self):
         """
-        Returns the fraction of positively charges residues in the sequence. Negative
-        residues are Asp and Glu.
+        Returns the fraction of positively charges residues in the 
+        sequence. Negative residues are Asp and Glu.
 
         Returns
         --------
@@ -191,8 +198,8 @@ class Protein:
     @property
     def NCPR(self):
         """
-        Returns the net charge per residue of the sequence. Net charge is 
-        defined as (fraction positive) - (fraction negative)
+        Returns the net charge per residue of the sequence. Net 
+        charge is  defined as (fraction positive) - (fraction negative)
 
         Returns
         --------
@@ -343,8 +350,8 @@ class Protein:
     #
     def compute_residue_fractions(self, residue_selector):
         """
-        residue_selector is a list of one or more residue types which are used to query
-        the sequence
+        residue_selector is a list of one or more residue types 
+        which are used to query the sequence        
         
         """
 
@@ -360,20 +367,21 @@ class Protein:
     #
     def compute_kappa_x(self, group1, group2=None, window_size=6):
         """
-        Returns kappa for an abirtrary set of residues with an arbitrary window size.
+        Returns kappa for an arbitrary set of residues with an arbitrary window size.
 
         Parameters
         -------------
         group1 : list
-            Must be a list of valid amino acid one letter codes. Sanity checking is not 
-            performed here (maybe add this?). This defines one set of residues for which 
-            patterning is computed against. If a second set is not provided, patterning is
-            done via group1 vs. all other residues.
+            Must be a list of valid amino acid one letter codes. 
+            This defines one set of residues for which patterning 
+            is computed against. If a second set is not provided, 
+            patterning is done via group1 vs. all other residues.
 
         group2 : list
-            If provided, this defines the SECOND set of residues, such that patterning is 
-            done as residues in group1 vs. group2 in the background of everything else.
-        
+            If provided, this defines the SECOND set of residues, 
+            such that patterning is done as residues in group1 vs. 
+            group2 in the background of everything else.
+
         """
 
         for i in group1:
@@ -405,6 +413,32 @@ class Protein:
         return self.__kappa_x[kappa_x_name]
 
 
+    # .................................................................
+    #
+    def compute_iwd(self, target_residues):
+        """
+        Returns the inverse weighted distance (IWD), a metric for 
+        residue clustering
+
+        Parameters
+        -------------
+        target_residues : list
+            Must be a list of valid amino acid one letter codes. 
+            Sanity checking is not performed here (maybe add this?). 
+            This defines one set of residues for which patterning 
+            is computed against. If a second set is not provided, 
+            patterning is done via group1 vs. all other residues.
+
+        """
+
+        # ensure valid amino acids are used
+        for i in target_residues:
+            if i not in amino_acids.VALID_AMINO_ACIDS:
+                raise sparrow_exceptions.ProteinException(f'Amino acid {i} (in target_residues) is not a standard amino acid')
+
+        return iwd.calculate_average_inverse_distance_from_sequence(self.sequence, target_residues)
+
+        
     # .................................................................
     #            
     def linear_sequence_profile(self, mode, window_size=8, end_mode='extend-ends', smooth=None):
@@ -545,7 +579,8 @@ class Protein:
     #            
     def low_complexity_domains(self, mode='holt', **kwargs):
         """
-        Function that extracts low complexity domains from a protein sequence. The arguments passed depend on the mode 
+        Function that extracts low complexity domains from a protein sequence. 
+        The arguments passed depend on the mode 
         of extract, as defined below. For now, only 'Holt' is allowed. 
 
         mode : 'holt'
@@ -728,6 +763,7 @@ class Protein:
             * disorder : predict per-residue disorder
             * dssp : predict per-residue DSSP score (0,1,or 2)
             * transmembrane_region : predict binary classification of transmembrane region 
+            * mitochondrial targeting
         
         """
         if self.__predictor_object is None:
