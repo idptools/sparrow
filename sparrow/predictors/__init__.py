@@ -56,6 +56,7 @@ class Predictor:
         self.__transmembrane_predictor_object = None
         self.__dssp_predictor_object = None
         self.__mitochondrial_targeting_predictor_object  = None
+        self.__pscore_predictor_object = None
 
 
 
@@ -459,4 +460,50 @@ class Predictor:
                 pass
 
         return binary_scores
+
+    # .................................................................
+    #
+    def pscore(self, recompute=False, normalized=True):
+        """
+        Predictor that returns per-residue predictions for PScore scores.
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+
+        normalized : bool
+            Flag which, if set to true, means returned pscore falls between 0 and 1
+
+        Returns
+        -----------
+        list
+            An list of len(seq) with per-residue predictions
+
+        """
+
+        if normalized:
+            selector = 'pscore-normalized'
+        else:
+            selector = 'pscore'
+
+
+        if self.__pscore_predictor_object is None:
+            from .pscore.pscore_predictor import PScorePredictor
+            self.__pscore_predictor_object = PScorePredictor()
+
+        if selector not in self.__precomputed or recompute is True:
+            if normalized:
+
+                min_pscore = 3.0               
+                max_pscore = 9.0
+
+                score = self.__pscore_predictor_object.predict_pscore(self.__protein.sequence)
+                self.__precomputed[selector] = np.clip((score + min_pscore)/(max_pscore+min_pscore), 0.0, 1.0)
+
+            else:
+                self.__precomputed[selector] = self.__pscore_predictor_object.predict_pscore(self.__protein.sequence)
+
+        return self.__precomputed[selector] 
 

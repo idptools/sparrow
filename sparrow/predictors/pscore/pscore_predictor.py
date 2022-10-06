@@ -58,15 +58,15 @@ And have it work!
 
 # NOTE - this is where you can define the version number that is read by default. If you add a new network MAKE SURE you update
 # this default if you want that new network to be used by default
-DEFAULT_VERSION="1"
+DEFAULT_VERSION="2"
 
 
 ## CHANGE class name
-class <RelevantName>Predictor():
+class PScorePredictor():
     """
 
-    Class that loads in a network such that predict_<RELEVANT_NAME>() can be called to predict
-    <RELEVANT THING> from a sequence.
+    Class that loads in a network such that predict_pscore() can be called to predict
+    PScore propensity from a sequence.
 
     """
     def __init__(self, version=None):
@@ -78,7 +78,7 @@ class <RelevantName>Predictor():
         and is MOSTLY going to be the right option. However, to preserve backwards compatibility we provide
         the ability to pass a string as version. This string is inserted at position <X> in the filename
 
-            <RelevantName>_network_v<X>.pt
+            pscore_predictor_network_v<X>.pt
 
         i.e. no need to include the "v" part or the .pt extension
 
@@ -92,7 +92,7 @@ class <RelevantName>Predictor():
 
         # CHANGE THIS!! Make sure oyu change the <DIRECTORY_NAME> and <PREDICTOR_NAME> to the appropriate
         # paths. Keep the network_v{version}.pt because this is how a version-specific string is selected
-        saved_weights = sparrow.get_data(f'networks/<DIRECTORY_NAME>/<PREDICTOR_NAME>_network_v{version}.pt')
+        saved_weights = sparrow.get_data(f'networks/pscore/pscore_predictor_network_v{version}.pt')
 
         if not os.path.isfile(saved_weights):
             raise SparrowException('Error: could not find saved weights file [%s] for %s predictor' %( saved_weights, type(self).__name__))
@@ -109,10 +109,10 @@ class <RelevantName>Predictor():
         # 2022 trained networks didn't need this. As such, this can PROBABLY be deleted but
         # in case you're using an older network we've kept this to make things simple
         
-        #for i in range(len(loaded_model)):
-        #    key, value = loaded_model.popitem(last=False)
-        #    new_key = key[7:]
-        #    loaded_model[new_key] = value
+        for i in range(len(loaded_model)):
+            key, value = loaded_model.popitem(last=False)
+            new_key = key[7:]
+            loaded_model[new_key] = value
         ## END OF DELETE ME PROBABLY
 
       
@@ -138,6 +138,7 @@ class <RelevantName>Predictor():
             except KeyError:
                 break
                         
+
         number_of_classes = np.shape(loaded_model['fc.bias'])[0]
 
         # hard coded because we always use one-hot encoding, note that if you trained a specific
@@ -161,7 +162,7 @@ class <RelevantName>Predictor():
 
 
     ## CHANGE FUNCTION NAME
-    def predict_<SOMETHING_RELEVANT>(self, seq):
+    def predict_pscore(self, seq):
         """
         
         Prediction function. seq should be a valid amino acid sequence.
@@ -196,22 +197,17 @@ class <RelevantName>Predictor():
         ## CLASSIFICATION CODE BLOCK        
         # The block below should be kept if we're doing a classification
         # based prediction! if not, comment this out or delete it
-        prediction = self.network(seq_vector.float()).detach().numpy()
-        int_vals = []
-        for row in prediction[0]:
-            int_vals.append(np.argmax(row))
+        #prediction = self.network(seq_vector.float()).detach().numpy()
+        #int_vals = []
+        #for row in prediction[0]:
+        #    int_vals.append(np.argmax(row))
 
-        prediction = int_vals
+        #prediction = int_vals
 
         ## REGRESSION CODE BLOCK
         # This block should be kept if we're doing a regression-based
         # prediction. If not, comment this out or delete it
         prediction = self.network(seq_vector.float()).detach().numpy().flatten()
-
-
-        ## CLIP
-        # IF we want to ensure we have a value between 0 and 1 the clipping here 
-        # will do that. If not leave commented
-        # prediction = np.clip(prediction, 0.0, 1.0)
+        
 
         return prediction
