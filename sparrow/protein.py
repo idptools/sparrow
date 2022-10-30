@@ -371,13 +371,13 @@ class Protein:
 
         Parameters
         -------------
-        group1 : list
-            Must be a list of valid amino acid one letter codes. 
+        group1 : str
+            Must be a string of valid amino acid one letter codes. 
             This defines one set of residues for which patterning 
             is computed against. If a second set is not provided, 
             patterning is done via group1 vs. all other residues.
 
-        group2 : list
+        group2 : str
             If provided, this defines the SECOND set of residues, 
             such that patterning is done as residues in group1 vs. 
             group2 in the background of everything else.
@@ -387,17 +387,23 @@ class Protein:
         for i in group1:
             if i not in amino_acids.VALID_AMINO_ACIDS:
                 raise sparrow_exceptions.ProteinException(f'Amino acid {i} (in group 1) is not a standard amino acid')
-                
 
+            # make sure order is always consistent
+            group1 = "".join(sorted(group1))
+                
         if group2 is None:
-            kappa_x_name = "-".join(group1) + "-" + str(window_size)
+            kappa_x_name = group1 + "-" + str(window_size)
         else:
             for i in group2:
                 if i not in amino_acids.VALID_AMINO_ACIDS:
                     raise sparrow_exceptions.ProteinException(f'Amino acid {i} (in group 2) is not a standard amino acid')
+                
+            # make sure order is always consistent
+            group2 = "".join(sorted(group2))
+                
+            kappa_x_name = group1 + "-" + group2 + str(window_size)
 
-            kappa_x_name = "-".join(group1) + "-" + "-".join(group2), str(window_size)
-
+        # after set up, calculate kappa_x
         if kappa_x_name not in self.__kappa_x:
             if group2 is None:
                 group2=[]
@@ -408,7 +414,7 @@ class Protein:
                         group2.append(i)
 
             
-            self.__kappa_x[kappa_x_name] = kappa.kappa_x(self.sequence, group1, group2, window_size)
+            self.__kappa_x[kappa_x_name] = kappa.kappa_x(self.sequence, list(group1), list(group2), window_size)
 
         return self.__kappa_x[kappa_x_name]
 
