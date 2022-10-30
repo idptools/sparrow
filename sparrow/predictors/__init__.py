@@ -328,6 +328,185 @@ class Predictor:
         return self.__precomputed[selector].disorder
 
 
+
+
+    # .................................................................
+    #
+    def low_complexity_domains(self, residue_selector, minimum_length=15, max_interruption=5, fractional_threshold=0.25):
+        """
+        Function that returns a binary classifier as to if a residue is in a 
+        low-complexity regions. Specifically, low-complexity domains here are
+        defined based on their amino acid composition, defined by the residues
+        passed in the residue_selector.
+
+        Parameters
+        -------------
+        
+        residue_selector : str
+            A string of one or more one-letter amino acid codes used to define
+            the type of residues to find in LCD. (str). For example 'Q' or 'ED' for
+            aspartic acid and glutamic acid.
+
+        minimum_length : int
+            An integer that defines the shortes possible LCD (int). Must be a 
+            positive integer greater than 0. Default=15
+            
+        max_interruption : int
+            An integer that defines the longest possible interruption allowed between
+            any two residues defined by the residue selector within the LCD. This is 
+            related to but independent of the fractional threshold. Default = 5.
+
+        fractional_threshold : float
+            A fraction between 0 and 1 that defines the minimum fraction of amino 
+            acids  found in the residue selector that can be tolerated in the LCD.
+            Default = 0.25.
+
+        return domains  : bool
+         
+
+        Return
+        -------------
+        list 
+
+        """
+        
+        
+        boundaries = self.__protein.low_complexity_domains(mode='holt',
+                                                           residue_selector=residue_selector,
+                                                           minimum_length=minimum_length,
+                                                           max_interruption=max_interruption,
+                                                           fractional_threshold=fractional_threshold)
+        
+        # this is where we construct our binary mask - may be a more efficient way to do this, but I think this scales
+        # as O(n*m) where n=number of residues in sequence and m is number domains and given m is typically < 10 this
+        # basically scales as a for loop over n which is not bad...
+        lcd_pos = []
+        for i in range(0,len(self.__protein.sequence)):
+
+            found = False
+            for d in boundaries:
+
+                # if i is within this IDR
+                if i >= d[1] and i < d[2]:
+                    lcd_pos.append(1)
+                    found = True
+                    break
+
+                # domains are ordered so if the position i is smaller than
+                # the end of the current domain the remaining domains are
+                # irrelevant
+                if i < d[2]:
+                    break
+
+            if found is False:
+                lcd_pos.append(0)
+
+        return lcd_pos
+
+
+        
+
+
+
+
+    # .................................................................
+    #
+    def disorder_domains(self, recompute=False, return_boundaries=False):
+
+        """
+        Returns per-residue binary classification for if a residue is 
+        predicted to be in an IDR (1) or not 0. Note this uses metapredicts'
+        disorder domain prediction which is more sophisticated than just 
+        taking the binary classification of each 
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+
+        return_boundaries : bool
+            Flag which, if provdied, means this function returns a nested list, where
+            each sub-element contains the start and end indices of IDRs in the
+            sequence, e.g. [[0,10], [40,80]]. 
+
+        Returns
+        -------------
+        list
+            Returns a list with 1s or 0s as to if a region is in an IDR or not. NOTE
+            if you want the actual boundaries these can be obtained in a hacky way 
+
+        """
+
+        selector = 'metapredict-disorder'
+
+        # local import
+        from metapredict import meta
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = meta.predict_disorder_domains(self.__protein.sequence, return_numpy=False)
+
+        if return_boundaries:
+            return self.__precomputed[selector].disordered_domain_boundaries
+
+        # this is where we construct our binary mask - may be a more efficient way to do this, but I think this scales
+        # as O(n*m) where n=number of residues in sequence and m is number domains and given m is typically < 10 this
+        # basically scales as a for loop over n which is not bad...
+        idr_pos = []
+        for i in range(0,len(self.__protein.sequence)):
+
+            found = False
+            for d in self.__precomputed[selector].disordered_domain_boundaries:
+
+                # if i is within this IDR
+                if i >= d[0] and i < d[1]:
+                    idr_pos.append(1)
+                    found = True
+                    break
+
+                # domains are ordered so if the position i is smaller than
+                # the end of the current domain the remaining domains are
+                # irrelevant
+                if i < d[1]:
+                    break
+
+            if found is False:
+                idr_pos.append(0)
+
+        return idr_pos
+
+
+    # .................................................................
+    #
+    def pLDDT(self, recompute=False):
+
+        """
+        Returns per-residue predicted pLDDT score - a prediction of what
+        AlphaFold2 will predict
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        list
+            Returns a list with per-residue pLDDT scores
+
+        """
+
+        selector = 'metapredict-pLDDT'
+        # local import
+        from metapredict import meta
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = meta.predict_pLDDT(self.__protein.sequence, normalized=True, )
+
+        return self.__precomputed[selector]
+    
+
     # .................................................................
     #
     def binary_disorder(self, 
@@ -496,6 +675,7 @@ class Predictor:
         if selector not in self.__precomputed or recompute is True:
             if normalized:
 
+                
                 min_pscore = 3.0               
                 max_pscore = 9.0
 

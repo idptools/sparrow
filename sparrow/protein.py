@@ -782,6 +782,9 @@ class Protein:
         return len(self.__seq)
         
     def __repr__(self):
-        return "Protein = %i  " % (len(self))
+        s = self.__seq[0:5]
+        if len(s) < 5:
+            s = s + "."*(5-len(s))
+        return f"Protein|L = {len(self)}]|{s}..."
 
 
