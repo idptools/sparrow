@@ -38,6 +38,8 @@ def predefined_linear_track(seq, mode, window_size, end_mode, smooth=None):
 
         'seg-complexity'    : Linear complexity
 
+        'kappa'             : Linear charge patterning 
+
     
 
     window_size : int
@@ -119,6 +121,10 @@ def predefined_linear_track(seq, mode, window_size, end_mode, smooth=None):
         def FX(s):
             return protein.Protein(s).complexity
 
+    elif mode == 'kappa':
+        def FX(s):
+            return protein.Protein(s).kappa
+        
     else:
         raise sparrow_exceptions.SparrowException('Invalid mode passed to linear track: %s' %(mode))
                 
@@ -240,6 +246,7 @@ def build_track(seq, track_function, window_size=7, end_mode='extend-ends', smoo
 
 
     slen = len(seq)
+    
     # run through window_size fragments and compute params using the
     # custom passed function
     end = (slen - window_size)+1

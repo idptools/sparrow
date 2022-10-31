@@ -477,6 +477,8 @@ class Protein:
 
             'seg-complexity'    : Linear complexity
 
+            'kappa'             : Linear charge patterning 
+
         window_size : int
             Number of residues over which local sequence properties are calculated. A window stepsize of 1
             is always used
@@ -505,7 +507,7 @@ class Protein:
             Returns a list with values that correspond to the passed mode
         """
 
-        io.validate_keyword_option(mode, ['FCR','NCPR','aromatic','aliphatic','polar','proline','positive','negative','hydrophobicity', 'seg-complexity'], 'mode')
+        io.validate_keyword_option(mode, ['FCR','NCPR','aromatic','aliphatic','polar','proline','positive','negative','hydrophobicity', 'seg-complexity','kappa'], 'mode')
 
         if smooth is not None:
             name = '%s-%i-%s-%i' %(mode, window_size, end_mode, smooth)
