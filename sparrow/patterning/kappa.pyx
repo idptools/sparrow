@@ -11,17 +11,141 @@ from .. import sparrow_exceptions
 
 
 
+def calculate_sigma(str seq, list group1, list group2):
+    """
+    User-facing function to calculate the sigma parameter. Sigma captures
+    the asymmetry between two groups of residues in a sequence, and is 
+    defined as 
+
+    (fraction group 1 - fraction group 2)^2 / (fraction group 1 + fraction group 2)
+
+    For more information see Das & Pappu 2013, who define sigma in terms
+    of charged residues, i.e. group1 = ['K','R'] and group2 = ['E','D'].
+    
+    NB: sigma is used to calulate kappa, but we have a more efficient
+    implementation for actually doing the kappa calculation, so if you
+    wish to calculate kappa we recommend using kappa_x() in this 
+    module.
+
+    Parameters
+    --------------
+    seq : str
+        Amino acid sequence. Note that, comparison here is done between
+        residues in seq and those in group1 and group1.
+
+    group1 : list
+        A list of one or more single amnino acids compared for calculating
+        delta.
+
+    group2 : list
+        A list of one or more single amnino acids compared for calculating
+        delta.
+
+    Returns
+    ----------
+    float
+        delta is returned as a positive float
+
+    """
+
+    total_count = 0
+    net_count = 0
+    seqlen = len(seq)
+    
+    for i in seq:
+        
+        if i in group1:
+            total_count = total_count + 1
+            net_count   = net_count + 1
+            
+        if i in group2:
+            total_count = total_count + 1
+            net_count   = net_count - 1
+
+    if total_count == 0:
+        return 0
+
+    net_count = net_count/seqlen
+    total_count = total_count/seqlen
+    
+    return (net_count**2) / total_count
+
+
+
+def calculate_delta(str seq, list group1, list group2, int window_size):
+    """
+    User-facing function to calculate the delta parameter. Delta captures
+    the local deviation in sequence patterning on the lengthscale defined
+    by window_size compared to the overal sequence assymetry. i.e., how 
+    different, on average, are the window_size regions of the sequence in
+    terms of assymetry to one another vs. the overall sequence average.
+
+    For more information see Das & Pappu 2013, who define delta in terms
+    of charged residues, i.e. group1 = ['K','R'] and group2 = ['E','D'].
+    
+    NB: delta is used to calulate kappa, but we have a more efficient
+    implementation for actually doing the kappa calculation, so if you
+    wish to calculate kappa we recommend using kappa_x() in this 
+    module, which takes in the same input as this function signature.
+
+    Parameters
+    --------------
+    seq : str
+        Amino acid sequence. Note that, comparison here is done between
+        residues in seq and those in group1 and group1.
+
+    group1 : list
+        A list of one or more single amnino acids compared for calculating
+        delta.
+
+    group2 : list
+        A list of one or more single amnino acids compared for calculating
+        delta.
+
+    window_size : int
+        Size of sliding window used to calculate the local sequence assymmetry
+
+    Returns
+    ----------
+    float
+        delta is returned as a positive float
+
+    """
+
+    delta = 0
+
+    sigma = calculate_sigma(seq, group1, group2)
+    nblobs = (len(seq)-window_size)+1
+
+    for i in range(0, nblobs):
+        blob = seq[i:i+window_size]
+
+        blob_sigma = calculate_sigma(blob, group1, group2)
+
+        delta = delta + ( ((sigma - blob_sigma)**2) / nblobs)
+
+    return delta
+    
+
+    
+
 # ....................................................................................................
 #
 def kappa_x(str seq, list group1, list group2, int window_size):
     """
-    User-facing general-purpose patterning function. Computes the P-value of observing the sequence
-    passed by random chance when patterning of residues in group (vs. those residues not in group) are
-    assessed.
+    User-facing high-performance implementation for generic calculation of kappa_x. We use this
+    for calculating real kappa (where group1 and group2 are ['E','D'] and ['R','K'], respectively
+    but the function can be used to calculate arbitrary kappa-based patterning.
 
-    Returns a value between 0 and 1, where 0 means the real sequence is much more evenly patterned than
-    expected by random chance, while 1 means the real sequence is much more blocky than expected by
-    random chance.
+    NOTE this implementation differs very slightly from the canonical kappa reference implementation;
+    it adds non-contributing 'wings' of the windowsize onto the N- and C-termini of the sequence. This
+    means residue clusters at the end contribute to the overall sequence patterning as much as those in
+    the middle, and also ensures we can analytically determine the deltamax sequence for arbitrary
+    windowsizes.
+
+    This both addresses a previous (subtle) limitation in kappa, but also buys a ~100x speedup compared
+    to previous reference implementations. As a final note, I (Alex) wrote the original reference 
+    implementation in localCIDER, so feel comfortable criticising it's flaws!
 
     Parameters
     -----------
@@ -54,7 +178,6 @@ def kappa_x(str seq, list group1, list group2, int window_size):
 
     wing_size = int(window_size)*2
     
-
     winged_string_length = wing_size*2 + string_length
 
     cdef array.array seq_ternary_winged = array.array('i', [0]*(winged_string_length))
@@ -193,7 +316,7 @@ cdef float patterning_asymmetry(array.array seq_ternary_winged,
                                 int winged_string_length): 
     """
     Function that takes a ternary sequence (ternary_seq) and computes the compositional patterning compared to the
-    overall sequence assymetry.
+    overall sequence asymetry.
 
     Parameters
     ------------

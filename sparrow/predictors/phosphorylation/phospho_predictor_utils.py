@@ -74,7 +74,6 @@ def return_hits(seq, phospho_probability, target_res, windowsize=4, threshold=0.
         raise SparrowException(f'Cannot predict phosphosites when the sequence length is less than 1+{2*windowsize}. NB: length = {seqlen}')
 
     # for each residue
-    print(seq)
     for idx, res in enumerate(seq):
 
         # if this is a low-probablity residue skip and move on
@@ -86,7 +85,6 @@ def return_hits(seq, phospho_probability, target_res, windowsize=4, threshold=0.
         if idx < windowsize:
             slice_start = 0
             current_slice = seq[slice_start:idx+windowsize]
-
 
         # while in the 'middle' of the sequence
         elif idx >= windowsize and idx <= (seqlen - (windowsize+1)):

@@ -244,6 +244,11 @@ class Protein:
 
         return self.__kappa
 
+    @property
+    def SCD(self):
+
+        return self.compute_SCD_x()
+
     # .................................................................
     #
     @property
@@ -443,6 +448,50 @@ class Protein:
                 raise sparrow_exceptions.ProteinException(f'Amino acid {i} (in target_residues) is not a standard amino acid')
 
         return iwd.calculate_average_inverse_distance_from_sequence(self.sequence, target_residues)
+
+
+    
+    def compute_SCD_x(self, group1=['E','D'], group2=['R','K']):
+        
+        total = 0
+        
+        for m in range(1, len(self)):
+            
+            m_val = m + 1
+            
+            for n in range(0, m-1):
+                
+                n_val = n+1
+
+                cur_m_res = sequence[m]
+                cur_n_res = sequence[n]
+                
+                if cur_m_res in group1:
+                    cur_m_charge = -1
+                    
+                elif cur_m_res in group2:
+                    cur_m_charge = 1
+                    
+                else:
+                    cur_m_charge = 0
+
+                if cur_n_res in group1:
+                    cur_n_charge = -1
+                    
+                elif cur_n_res in group2:
+                    cur_n_charge = 1
+                    
+                else:
+                    cur_n_charge = 0
+
+                charge_val = cur_m_charge * cur_n_charge
+                
+                final_val = charge_val * (math.sqrt((m_val)-(n_val)))
+
+                total = total + final_val
+
+        return round(total * (1/len(self)), 5)
+
 
         
     # .................................................................
