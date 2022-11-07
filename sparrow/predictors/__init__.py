@@ -27,6 +27,7 @@
 #
 
 import numpy as np
+from sparrow.sparrow_exceptions import SparrowException
 
 class Predictor:
 
@@ -56,7 +57,13 @@ class Predictor:
         self.__transmembrane_predictor_object = None
         self.__dssp_predictor_object = None
         self.__mitochondrial_targeting_predictor_object  = None
+        self.__nes_predictor_object  = None
+        self.__nls_predictor_object  = None
         self.__pscore_predictor_object = None
+        self.__ser_phos_predictor_object = None
+        self.__thr_phos_predictor_object = None
+        self.__tyr_phos_predictor_object = None
+        self.__tad_predictor_object = None
 
 
 
@@ -296,6 +303,115 @@ class Predictor:
         return self.__precomputed[selector]
 
 
+    # .................................................................
+    #
+    def nuclear_export_signal(self, recompute=False):
+
+        """
+        Returns per-residue probability score as to if the sequence
+        includes a nuclear export sequence sequence. 
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        list
+            Returns a list with  per-residue probability scores for whether
+            or not a residue is predicted to be in a nuclear export 
+            signal
+
+        """
+
+        selector = 'nes'
+
+        
+        if self.__nes_predictor_object is None:
+            from .nes.nuclear_export_signal_predictor import NESPredictor
+            self.__nes_predictor_object = NESPredictor()
+
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__nes_predictor_object.predict_nuclear_export_signal(self.__protein.sequence)
+
+        return self.__precomputed[selector]
+
+
+    # .................................................................
+    #
+    def transactivation_domains(self, recompute=False):
+
+        """
+        Returns per-residue probability score as to if the sequence
+        includes a transactivation domain. 
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        list
+            Returns a list with  per-residue probability scores for whether
+            or not a residue is predicted to be in a nuclear export 
+            signal
+
+        """
+
+        selector = 'tad'
+
+        
+        if self.__tad_predictor_object is None:
+            from .tad.transactivation_domain_predictor import TADPredictor
+            self.__tad_predictor_object = TADPredictor()
+
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__tad_predictor_object.predict_transactivation_domains(self.__protein.sequence)
+
+        return self.__precomputed[selector]
+    
+
+    # .................................................................
+    #
+    def nuclear_import_signal(self, recompute=False):
+
+        """
+        Returns per-residue probability score as to if the sequence
+        includes a nuclear import sequence sequence. 
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        list
+            Returns a list with  per-residue probability scores for whether
+            or not a residue is predicted to be in a nuclear import 
+            signal
+
+        """
+
+        selector = 'nls'
+        
+        if self.__nls_predictor_object is None:
+            from .nls.nuclear_import_signal_predictor import NLSPredictor
+            self.__nls_predictor_object = NLSPredictor()
+
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__nls_predictor_object.predict_nuclear_import_signal(self.__protein.sequence)
+
+        return self.__precomputed[selector]
+    
 
     # .................................................................
     #
@@ -687,3 +803,201 @@ class Predictor:
 
         return self.__precomputed[selector] 
 
+
+    # .................................................................
+    #    
+    def serine_phosphorylation(self, recompute=False, raw_values=False, return_sites_only=False):
+        """
+        Function for predicting serine phosphorylation from sequence
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+        
+        raw_values : bool
+            By default, this function takes an initial per-residue probility profile and
+            breaks that into dicrete residues that are predicted to be phosphorylated.
+            If you just want the raw per-residue phosphoprofile then raw_values can be 
+            set to true, and the function will return an array with values between 0 
+            and 1 per residue
+
+        return_sites_only : bool
+            Flag which, if set to true, means the function returns a list of sites 
+            (using 0 indexing) instead of a residue mask
+
+        Returns
+        ------------
+        np.ndarray or list
+        
+            By default, returns an np.ndarray mask where 1 = predicted phosphosite
+            and 0 is not.
+
+            If raw_values is set to true, instead the array elements contain 
+            probabilities between 0 and 1
+
+            if retrn_sites_only is set to True then instead a list with index
+            positions of phosphosites is provided.
+
+        """
+
+        if raw_values and return_sites_only:
+            raise SparrowException('When calling the serine_phosphorylation() predictor you cannot request both raw_valus and return_sites only')
+        
+        if raw_values is True:
+            selector = 'ser-phosphorylation-raw-vals'
+        elif return_sites_only is True:
+            selector = 'ser-phosphorylation-sites'
+        else:
+            selector = 'ser-phosphorylation'
+        
+        if self.__ser_phos_predictor_object is None:
+            from .phosphorylation.ser_phosphorylation_predictor import SerPhosphorylationPredictor
+            self.__ser_phos_predictor_object = SerPhosphorylationPredictor()
+
+
+        if selector not in self.__precomputed or recompute is True:
+            if selector == 'ser-phosphorylation':
+                self.__precomputed[selector]  = self.__ser_phos_predictor_object.predict_ser_phosphorylation(self.__protein.sequence)
+                
+            elif selector == 'ser-phosphorylation-sites':
+                self.__precomputed[selector]  = self.__ser_phos_predictor_object.predict_ser_phosphorylation(self.__protein.sequence, return_sites_only=True)
+                
+            elif selector == 'ser-phosphorylation-raw-vals':
+                self.__precomputed[selector]  = self.__ser_phos_predictor_object.predict_ser_phosphorylation(self.__protein.sequence, raw_values=True)
+
+        return self.__precomputed[selector] 
+
+
+
+    # .................................................................
+    #    
+    def threonine_phosphorylation(self, recompute=False, raw_values=False, return_sites_only=False):
+        """
+        Function for predicting threonine phosphorylation from sequence
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+        
+        raw_values : bool
+            By default, this function takes an initial per-residue probility profile and
+            breaks that into dicrete residues that are predicted to be phosphorylated.
+            If you just want the raw per-residue phosphoprofile then raw_values can be 
+            set to true, and the function will return an array with values between 0 
+            and 1 per residue
+
+        return_sites_only : bool
+            Flag which, if set to true, means the function returns a list of sites 
+            (using 0 indexing) instead of a residue mask
+
+        Returns
+        ------------
+        np.ndarray or list
+        
+            By default, returns an np.ndarray mask where 1 = predicted phosphosite
+            and 0 is not.
+
+            If raw_values is set to true, instead the array elements contain 
+            probabilities between 0 and 1
+
+            if retrn_sites_only is set to True then instead a list with index
+            positions of phosphosites is provided.
+
+        """
+
+        if raw_values and return_sites_only:
+            raise SparrowException('When calling the serine_phosphorylation() predictor you cannot request both raw_valus and return_sites only')
+        
+        if raw_values is True:
+            selector = 'thr-phosphorylation-raw-vals'
+        elif return_sites_only is True:
+            selector = 'thr-phosphorylation-sites'
+        else:
+            selector = 'thr-phosphorylation'
+        
+        if self.__thr_phos_predictor_object is None:
+            from .phosphorylation.thr_phosphorylation_predictor import ThrPhosphorylationPredictor
+            self.__thr_phos_predictor_object = ThrPhosphorylationPredictor()
+
+        if selector not in self.__precomputed or recompute is True:
+            if selector == 'thr-phosphorylation':
+                self.__precomputed[selector]  = self.__thr_phos_predictor_object.predict_thr_phosphorylation(self.__protein.sequence)
+                
+            elif selector == 'thr-phosphorylation-sites':
+                self.__precomputed[selector]  = self.__thr_phos_predictor_object.predict_thr_phosphorylation(self.__protein.sequence, return_sites_only=True)
+                
+            elif selector == 'thr-phosphorylation-raw-vals':
+                self.__precomputed[selector]  = self.__thr_phos_predictor_object.predict_thr_phosphorylation(self.__protein.sequence, raw_values=True)
+
+        return self.__precomputed[selector] 
+
+
+
+    # .................................................................
+    #    
+    def tyrosine_phosphorylation(self, recompute=False, raw_values=False, return_sites_only=False):
+        """
+        Function for predicting tyrosine phosphorylation from sequence
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+        
+        raw_values : bool
+            By default, this function takes an initial per-residue probility profile and
+            breaks that into dicrete residues that are predicted to be phosphorylated.
+            If you just want the raw per-residue phosphoprofile then raw_values can be 
+            set to true, and the function will return an array with values between 0 
+            and 1 per residue
+
+        return_sites_only : bool
+            Flag which, if set to true, means the function returns a list of sites 
+            (using 0 indexing) instead of a residue mask
+
+        Returns
+        ------------
+        np.ndarray or list
+        
+            By default, returns an np.ndarray mask where 1 = predicted phosphosite
+            and 0 is not.
+
+            If raw_values is set to true, instead the array elements contain 
+            probabilities between 0 and 1
+
+            if retrn_sites_only is set to True then instead a list with index
+            positions of phosphosites is provided.
+
+        """
+
+        if raw_values and return_sites_only:
+            raise SparrowException('When calling the serine_phosphorylation() predictor you cannot request both raw_valus and return_sites only')
+        
+        if raw_values is True:
+            selector = 'tyr-phosphorylation-raw-vals'
+        elif return_sites_only is True:
+            selector = 'tyr-phosphorylation-sites'
+        else:
+            selector = 'tyr-phosphorylation'
+        
+        if self.__tyr_phos_predictor_object is None:
+            from .phosphorylation.tyr_phosphorylation_predictor import TyrPhosphorylationPredictor
+            self.__tyr_phos_predictor_object = TyrPhosphorylationPredictor()
+
+        if selector not in self.__precomputed or recompute is True:
+            if selector == 'tyr-phosphorylation':
+                self.__precomputed[selector]  = self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(self.__protein.sequence)
+                
+            elif selector == 'tyr-phosphorylation-sites':
+                self.__precomputed[selector]  = self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(self.__protein.sequence, return_sites_only=True)
+                
+            elif selector == 'tyr-phosphorylation-raw-vals':
+                self.__precomputed[selector]  = self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(self.__protein.sequence, raw_values=True)
+
+        return self.__precomputed[selector] 
+    

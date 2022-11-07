@@ -1,3 +1,4 @@
+from IPython import display
 from IPython.core.display import display, HTML
 from sparrow.data.amino_acids import AA_COLOR
 from sparrow.sparrow_exceptions import SparrowException
