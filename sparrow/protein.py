@@ -463,8 +463,8 @@ class Protein:
                 
                 n_val = n+1
 
-                cur_m_res = sequence[m]
-                cur_n_res = sequence[n]
+                cur_m_res = self.sequence[m]
+                cur_n_res = self.sequence[n]
                 
                 if cur_m_res in group1:
                     cur_m_charge = -1
@@ -486,7 +486,7 @@ class Protein:
 
                 charge_val = cur_m_charge * cur_n_charge
                 
-                final_val = charge_val * (math.sqrt((m_val)-(n_val)))
+                final_val = charge_val * (np.sqrt((m_val)-(n_val)))
 
                 total = total + final_val
 
