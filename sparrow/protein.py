@@ -440,6 +440,11 @@ class Protein:
             is computed against. If a second set is not provided, 
             patterning is done via group1 vs. all other residues.
 
+        Returns
+        --------
+        float
+            Float that is positive
+
         """
 
         # ensure valid amino acids are used
@@ -449,8 +454,70 @@ class Protein:
 
         return iwd.calculate_average_inverse_distance_from_sequence(self.sequence, target_residues)
 
+    # .................................................................
+    #
+    def compute_iwd_charged_weighted(self, charge=['-','+']):
+        """
+        Returns the a weighted inverse weighted distance (IWD) for either Possitive 
+        or Negative residues in the sequence, a metric for residue clustering weighted 
+        by the NCPR of each target residue.  
 
-    
+        Parameters
+        -------------
+
+        charge : ['-','+']
+            Pass '-' to quantify the clustering of negitive residues.
+            Pass '+' to quantify the clustering of positive residues.
+
+        Returns
+        --------
+        float
+            Float that is positive
+        """
+
+        # ensure valid charge is passed 
+        if charge not in ['-','+']:
+            raise sparrow_exceptions.ProteinException(f'Passed charge {charge} is not a valid option. Pass "-" for negitive residues and "+" for positive residues.')
+
+        # calculate or retrieve mask of NCPR for sequence
+        if 'NCPR-8-extend-ends' not in self.__linear_profiles:
+            self.__linear_profiles['NCPR-8-extend-ends'] = track_tools.predefined_linear_track(self.__seq, 'NCPR', 8, 'extend-ends', None)
+
+        linear_NCPR = self.__linear_profiles['NCPR-8-extend-ends']
+
+        return iwd.calculate_average_inverse_distance_charge(linear_NCPR, self.sequence, charge)
+
+    # .................................................................
+    #
+    def compute_bivariate_iwd_charged_weighted(self):
+        """
+        Returns the a weighted bivariate inverse weighted distance (IWD) for
+        between Possitive and Negative residues in the sequence, a metric for 
+        residue clustering weighted by the difference in NCPR of the target residues.  
+
+        Parameters
+        -------------
+
+        self 
+
+        Returns
+        --------
+        float
+            Float that is positive
+        """
+
+        # calculate or retrieve mask of NCPR for sequence
+        if 'NCPR-8-extend-ends' not in self.__linear_profiles:
+            self.__linear_profiles['NCPR-8-extend-ends'] = track_tools.predefined_linear_track(self.__seq, 'NCPR', 8, 'extend-ends', None)
+
+        linear_NCPR = self.__linear_profiles['NCPR-8-extend-ends']
+
+        return iwd.calculate_average_bivariate_inverse_distance_charge(linear_NCPR, self.sequence)
+
+
+
+    # .................................................................
+    #
     def compute_SCD_x(self, group1=['E','D'], group2=['R','K']):
         
         total = 0
