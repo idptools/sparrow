@@ -154,7 +154,7 @@ class Protein:
     @property
     def fraction_positive(self):
         """
-        Returns the fraction of positively charges residues in the sequence. 
+        Returns the fraction of positively charged residues in the sequence. 
         Positive residues are Arg and Lys (not His at physiological pH). 
 
         Returns
@@ -176,7 +176,7 @@ class Protein:
     @property
     def fraction_negative(self):
         """
-        Returns the fraction of positively charges residues in the 
+        Returns the fraction of negatively charged residues in the 
         sequence. Negative residues are Asp and Glu.
 
         Returns
@@ -199,7 +199,7 @@ class Protein:
     def NCPR(self):
         """
         Returns the net charge per residue of the sequence. Net 
-        charge is  defined as (fraction positive) - (fraction negative)
+        charge is defined as (fraction positive) - (fraction negative)
 
         Returns
         --------
@@ -335,6 +335,16 @@ class Protein:
     #
     @property
     def hydrophobicity(self):
+        """
+        Returns the linear hydrophobicity from sequence 
+        using the Kyte-Doolitle scale.
+
+        Returns
+        ----------
+        list 
+            List of values that correspond to per-residue
+            hydrophobicity based on a given hydrophobicity scale
+        """
         if self.__hydrophobicity is None:
             self.__hydrophobicity = calculate_parameters.calculate_hydrophobicity(self.__seq)
 
@@ -345,6 +355,16 @@ class Protein:
     #
     @property
     def complexity(self):
+        """
+        Calculates the Wootton-Federhen complexity of a sequence (also called
+        seg complexity, as this the theory used in the classic SEG algorithm.
+
+        Returns
+        ----------
+        float
+            Returns a float that corresponds to the compositional complexity 
+            associated with the passed sequence.
+        """
         if self.__complexity is None:
             self.__complexity = calculate_parameters.calculate_seg_complexity(self.__seq)
 
@@ -386,6 +406,9 @@ class Protein:
             If provided, this defines the SECOND set of residues, 
             such that patterning is done as residues in group1 vs. 
             group2 in the background of everything else.
+        
+        window_size : int
+            The window size used for the computation of kappa, by default 6
 
         """
 
@@ -458,9 +481,9 @@ class Protein:
     #
     def compute_iwd_charged_weighted(self, charge=['-','+']):
         """
-        Returns the a weighted inverse weighted distance (IWD) for either Possitive 
-        or Negative residues in the sequence, a metric for residue clustering weighted 
-        by the NCPR of each target residue.  
+        Returns the weighted inverse weighted distance (IWD) for either Positive 
+        or Negative residues in the sequence. This is a metric for residue clustering
+        weighted by the NCPR of each target residue.  
 
         Parameters
         -------------
@@ -494,11 +517,6 @@ class Protein:
         Returns the a weighted bivariate inverse weighted distance (IWD) for
         between Possitive and Negative residues in the sequence, a metric for 
         residue clustering weighted by the difference in NCPR of the target residues.  
-
-        Parameters
-        -------------
-
-        self 
 
         Returns
         --------
@@ -886,8 +904,13 @@ class Protein:
 
             * disorder : predict per-residue disorder
             * dssp : predict per-residue DSSP score (0,1,or 2)
-            * transmembrane_region : predict binary classification of transmembrane region 
+            * nes : nuclear export signal
+            * nis : nuclear import signal
+            * phosphorylation
+            * pscore
+            * tad
             * mitochondrial targeting
+            * transmembrane_region : predict binary classification of transmembrane region 
         
         """
         if self.__predictor_object is None:
