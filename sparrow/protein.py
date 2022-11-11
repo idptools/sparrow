@@ -888,7 +888,6 @@ class Protein:
             return r_val
 
         
-
     @property
     def predictor(self):
         """
