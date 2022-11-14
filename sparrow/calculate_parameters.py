@@ -1,7 +1,7 @@
 from sparrow.data import amino_acids
 import numpy as np
 import math
-
+from . import sparrow_exceptions
 
 # .................................................................
 #
@@ -142,6 +142,6 @@ def calculate_linear_hydrophobicity(s, mode='KD', normalize=False):
             else:
                 return [amino_acids.AA_hydro_KD[r] for r in s]
         except KeyError:
-            raise CalculationException('Invalid residue found in %s' %(s))
+            raise sparrow_exceptions.CalculationException('Invalid residue found in %s' %(s))
     else:
-        raise CalculationException('Invalid mode passed: %s' %(mode))
+        raise sparrow_exceptions.CalculationException('Invalid mode passed: %s' %(mode))

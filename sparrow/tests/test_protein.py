@@ -45,6 +45,7 @@ def test_protein_code_coverage():
     assert P.fraction_polar == 0.6721311475409836
     assert P.fraction_proline == 0.04918032786885246
 
+    assert np.mean(P.predictor.disorder()) == 0.8636131147540983
     assert P.hydrophobicity == 3.052459016393442
     assert P.compute_residue_fractions(['P','E','K','R','D']) == 0.09836065573770492
 

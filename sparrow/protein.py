@@ -56,7 +56,7 @@ class Protein:
                 fixed = utilities.convert_to_valid(s)
 
                 if general_tools.is_valid_protein_sequence(fixed) is False:                
-                    raise sparrow_exception('Invalid amino acid')
+                    raise sparrow_exceptions.SparrowException('Invalid amino acid')
 
                 self.__seq = fixed
             else:
@@ -157,7 +157,7 @@ class Protein:
     @property
     def fraction_positive(self):
         """
-        Returns the fraction of positively charges residues in the sequence. 
+        Returns the fraction of positively charged residues in the sequence. 
         Positive residues are Arg and Lys (not His at physiological pH). 
 
         Returns
@@ -179,7 +179,7 @@ class Protein:
     @property
     def fraction_negative(self):
         """
-        Returns the fraction of positively charges residues in the 
+        Returns the fraction of negatively charged residues in the 
         sequence. Negative residues are Asp and Glu.
 
         Returns
@@ -202,7 +202,7 @@ class Protein:
     def NCPR(self):
         """
         Returns the net charge per residue of the sequence. Net 
-        charge is  defined as (fraction positive) - (fraction negative)
+        charge is defined as (fraction positive) - (fraction negative)
 
         Returns
         --------
@@ -356,6 +356,16 @@ class Protein:
     #
     @property
     def hydrophobicity(self):
+        """
+        Returns the linear hydrophobicity from sequence 
+        using the Kyte-Doolitle scale.
+
+        Returns
+        ----------
+        list 
+            List of values that correspond to per-residue
+            hydrophobicity based on a given hydrophobicity scale
+        """
         if self.__hydrophobicity is None:
             self.__hydrophobicity = calculate_parameters.calculate_hydrophobicity(self.__seq)
 
@@ -366,6 +376,16 @@ class Protein:
     #
     @property
     def complexity(self):
+        """
+        Calculates the Wootton-Federhen complexity of a sequence (also called
+        seg complexity, as this the theory used in the classic SEG algorithm.
+
+        Returns
+        ----------
+        float
+            Returns a float that corresponds to the compositional complexity 
+            associated with the passed sequence.
+        """
         if self.__complexity is None:
             self.__complexity = calculate_parameters.calculate_seg_complexity(self.__seq)
 
@@ -448,6 +468,9 @@ class Protein:
             If provided, this defines the SECOND set of residues, 
             such that patterning is done as residues in group1 vs. 
             group2 in the background of everything else.
+        
+        window_size : int
+            The window size used for the computation of kappa, by default 6
 
         window_size : int
             Size over which local sequence patterning will be 
@@ -519,6 +542,11 @@ class Protein:
             is computed against. If a second set is not provided, 
             patterning is done via group1 vs. all other residues.
 
+        Returns
+        --------
+        float
+            Float that is positive
+
         """
 
         # ensure valid amino acids are used
@@ -527,9 +555,9 @@ class Protein:
                 raise sparrow_exceptions.ProteinException(f'Amino acid {i} (in target_residues) is not a standard amino acid')
 
         return iwd.calculate_average_inverse_distance_from_sequence(self.sequence, target_residues)
-
-
     
+    # .................................................................
+    #
     def compute_SCD_x(self, group1, group2):
         """
         Function that computes the sequence charge decoration (SCD) 
@@ -559,11 +587,66 @@ class Protein:
         Sawle, L., & Ghosh, K. (2015). A theoretical method to compute 
         sequence dependent configurational properties in charged polymers 
         and proteins. The Journal of Chemical Physics, 143(8), 085101.
-        
-        
-
         """
+
         scd.compute_SCD_x(self.sequence, group1=group1, group2=group2)
+    
+    # .................................................................
+    #
+    def compute_iwd_charged_weighted(self, charge=['-','+']):
+        """
+        Returns the weighted inverse weighted distance (IWD) for either Positive 
+        or Negative residues in the sequence. This is a metric for residue clustering
+        weighted by the NCPR of each target residue.  
+
+        Parameters
+        -------------
+
+        charge : ['-','+']
+            Pass '-' to quantify the clustering of negitive residues.
+            Pass '+' to quantify the clustering of positive residues.
+
+        Returns
+        --------
+        float
+            Float that is positive
+        """
+
+        # ensure valid charge is passed 
+        if charge not in ['-','+']:
+            raise sparrow_exceptions.ProteinException(f'Passed charge {charge} is not a valid option. Pass "-" for negitive residues and "+" for positive residues.')
+
+        # calculate or retrieve mask of NCPR for sequence
+        if 'NCPR-8-extend-ends' not in self.__linear_profiles:
+            self.__linear_profiles['NCPR-8-extend-ends'] = track_tools.predefined_linear_track(self.__seq, 'NCPR', 8, 'extend-ends', None)
+
+        linear_NCPR = self.__linear_profiles['NCPR-8-extend-ends']
+
+        return iwd.calculate_average_inverse_distance_charge(linear_NCPR, self.sequence, charge)
+
+    # .................................................................
+    #
+    def compute_bivariate_iwd_charged_weighted(self):
+        """
+        Returns the a weighted bivariate inverse weighted distance (IWD) for
+        between Possitive and Negative residues in the sequence, a metric for 
+        residue clustering weighted by the difference in NCPR of the target residues.  
+
+        Returns
+        --------
+        float
+            Float that is positive
+        """
+
+        # calculate or retrieve mask of NCPR for sequence
+        if 'NCPR-8-extend-ends' not in self.__linear_profiles:
+            self.__linear_profiles['NCPR-8-extend-ends'] = track_tools.predefined_linear_track(self.__seq, 'NCPR', 8, 'extend-ends', None)
+
+        linear_NCPR = self.__linear_profiles['NCPR-8-extend-ends']
+
+        return iwd.calculate_average_bivariate_inverse_distance_charge(linear_NCPR, self.sequence)
+
+
 
         
     # .................................................................
@@ -875,7 +958,6 @@ class Protein:
             return r_val
 
         
-
     @property
     def predictor(self):
         """
@@ -891,8 +973,13 @@ class Protein:
 
             * disorder : predict per-residue disorder
             * dssp : predict per-residue DSSP score (0,1,or 2)
-            * transmembrane_region : predict binary classification of transmembrane region 
+            * nes : nuclear export signal
+            * nis : nuclear import signal
+            * phosphorylation
+            * pscore
+            * tad
             * mitochondrial targeting
+            * transmembrane_region : predict binary classification of transmembrane region 
         
         """
         if self.__predictor_object is None:
