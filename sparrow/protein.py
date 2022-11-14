@@ -6,10 +6,13 @@ from .visualize import sequence_visuals
 from sparrow import data
 from .sequence_analysis import sequence_complexity
 from .sequence_analysis import physical_properties
+
+
 import numpy as np
-from .patterning import kappa, iwd
+from .patterning import kappa, iwd, scd
 from .data import amino_acids
 from sparrow.predictors import Predictor
+
 
 class Protein:
 
@@ -49,7 +52,6 @@ class Protein:
         if validate:
             s = s.upper()
             if general_tools.is_valid_protein_sequence(s) is False:
-
                 
                 fixed = utilities.convert_to_valid(s)
 
@@ -77,6 +79,7 @@ class Protein:
         self.__f_negative = None
         self.__complexity = None
         self.__kappa = None
+        self.__scd = None
         self.__kappa_x = {}
         self.__linear_profiles = {}
         self.__molecular_weight = None
@@ -219,35 +222,53 @@ class Protein:
     def kappa(self):
         """
         Returns the charge segregation parameter kappa for the sequence. 
-        If kappa cannot be calculated (i.e. sequence lacks both positively
-        and negatively charged residues, or sequence length is less than 6, 
-        then this function returns -1)
+        If kappa cannot be calculated (e.g. sequence is shorter than
+        5 residues or a sequence with no charged residues) returns a -1.
+
+        Note that kappa defaults to flattening kappa values above 1 to
+        1, but this can be turned off with calculate_kappa_x() functio
 
         Returns
         --------
         float
-            Float between 0 and 1
+            Float between 0 and 1, or -1
         """
 
         if self.__kappa is None:
-            if self.fraction_positive == 0:
-                self.__kappa = -1
-            elif self.fraction_negative == 0:
-                self.__kappa = -1
-            elif len(self.sequence) < 6:
+            if len(self.sequence) < 6:
                 self.__kappa = -1
             else:
 
-                k5 = kappa.kappa_x(self.sequence, ['R','K'], ['E','D'], 5)
-                k6 = kappa.kappa_x(self.sequence, ['R','K'], ['E','D'], 6)
+                k5 = kappa.kappa_x(self.sequence, ['R','K'], ['E','D'], 5, 1)
+                k6 = kappa.kappa_x(self.sequence, ['R','K'], ['E','D'], 6, 1)
                 self.__kappa = (k5+k6)/2
 
         return self.__kappa
 
     @property
     def SCD(self):
+        """
+        Returns the default sequence charge decoration (SCD) parameter 
+        as defined by Sawle and Ghosh [1]
 
-        return self.compute_SCD_x()
+        Returns
+        --------
+        float
+            Returns a float that reports on the sequence charge decoration 
+
+        Reference
+        --------
+        Sawle, L., & Ghosh, K. (2015). A theoretical method to compute sequence 
+        dependent configurational properties in charged polymers and proteins. 
+        The Journal of Chemical Physics, 143(8), 085101.
+
+        
+
+        """
+        if self.__scd is None:
+            self.__scd = scd.compute_SCD_x(self.sequence, group1=['E','D'], group2=['R','K'])
+            
+        return self.__scd 
 
     # .................................................................
     #
@@ -370,9 +391,50 @@ class Protein:
 
     # .................................................................
     #
-    def compute_kappa_x(self, group1, group2=None, window_size=6):
+    def compute_kappa_x(self, group1, group2=None, window_size=6, flatten=True):
         """
-        Returns kappa for an arbitrary set of residues with an arbitrary window size.
+        User-facing high-performance implementation for generic calculation of 
+        kappa_x. We use this for calculating real kappa (where group1 and 
+        group2 are ['E','D'] and ['R','K'], respectively but the function can 
+        be used to calculate arbitrary kappa-based patterning.
+
+        NB1: kappa will return as -1 if 
+
+        1. the sequece is shorter than the windowsize
+        2. There are no residues from either group1 or group2
+
+        The function will raise an exception if the windowsize is < 2
+
+        NB2: kappa is defined as comparing the ratio of delta with deltamax, 
+        where *in this implementation* deltamax refers to the delta associated
+        with the most segregated sequece; e.g::
+
+            (AAA)n-(XXX)m-(BBB)p
+    
+        Sometimes, when the charge asymmetry is VERY highly skewed, this most
+        highly segregated sequence does not give the highest delta value, such
+        that we can get a kappa greater than 1. This only occurs in situations
+        where kappa is probably not a useful metric anyway (i.e 100x excess of 
+        one group residue vs. another). We recommend setting the 'flatten'
+        keyword to True, which means kappa values over 1 will be flatteed to 1.
+
+        NB3: this implementation differs very slightly from the canonical 
+        kappa reference implementation; it adds non-contributing 'wings' of 
+        the windowsize onto the N- and C-termini of the sequence. This
+        means residue clusters at the end contribute to the overall sequence 
+        patterning as much as those in the middle, and also ensures we can 
+        analytically determine the deltamax sequence for arbitrary    
+        windowsizes.
+
+        This both addresses a previous (subtle) limitation in kappa, but also 
+        buys a ~100x speedup compared to previous reference implementations. 
+        As a final note, I (Alex) wrote the original reference implementation 
+        in localCIDER, so feel comfortable criticising it's flaws!
+
+        NB4: If no residues are provided in group2 then the function assumes
+        all residues not defined in group1 are in group2 and the function
+        becomes a binary patterning function instead of a ternary pattering
+        function.
 
         Parameters
         -------------
@@ -387,6 +449,23 @@ class Protein:
             such that patterning is done as residues in group1 vs. 
             group2 in the background of everything else.
 
+        window_size : int
+            Size over which local sequence patterning will be 
+            calculated. Default = 6.
+
+        flatten : bool
+            Flag which, if set to True, means if kappa is above 1 the 
+            function will flatten the value to 1. Default = True.
+
+        Returns
+        -------------
+        float
+            Returns a value associated with the generalized kappa. If 
+            flatten is True this is guarenteed to be between 0 and 1 
+            unless it's -1 (see above). If flatten is set to False its 
+            VERY likeli this will be between 0 and 1 and if it's above
+            1 the parameter is probably not useful to use.
+
         """
 
         for i in group1:
@@ -395,9 +474,11 @@ class Protein:
 
             # make sure order is always consistent
             group1 = "".join(sorted(group1))
-                
+
+
+        # now deal with group 2
         if group2 is None:
-            kappa_x_name = group1 + "-" + str(window_size)
+            group2 = ''
         else:
             for i in group2:
                 if i not in amino_acids.VALID_AMINO_ACIDS:
@@ -405,22 +486,20 @@ class Protein:
                 
             # make sure order is always consistent
             group2 = "".join(sorted(group2))
-                
+
+        if flatten:
+            kappa_x_name = group1 + "-" + group2 + str(window_size) + 'flat'
+        else:
             kappa_x_name = group1 + "-" + group2 + str(window_size)
 
         # after set up, calculate kappa_x
         if kappa_x_name not in self.__kappa_x:
-            if group2 is None:
-                group2=[]
-                for i in amino_acids.VALID_AMINO_ACIDS:
-                    if i in group1:
-                        pass
-                    else:
-                        group2.append(i)
-
             
-            self.__kappa_x[kappa_x_name] = kappa.kappa_x(self.sequence, list(group1), list(group2), window_size)
-
+            if flatten:
+                self.__kappa_x[kappa_x_name] = kappa.kappa_x(self.sequence, list(group1), list(group2), window_size, 1)
+            else:
+                self.__kappa_x[kappa_x_name] = kappa.kappa_x(self.sequence, list(group1), list(group2), window_size, 0)
+                
         return self.__kappa_x[kappa_x_name]
 
 
@@ -451,47 +530,40 @@ class Protein:
 
 
     
-    def compute_SCD_x(self, group1=['E','D'], group2=['R','K']):
+    def compute_SCD_x(self, group1, group2):
+        """
+        Function that computes the sequence charge decoration (SCD) 
+        parameter of Sawle and Ghosh. This is an alternative sequence 
+        patterning parameter which we provide here generalized such 
+        that it determines the patterning between any two groups of
+        residues. 
+
+        Parameters
+        --------------
+
+        group1 : str or list
+            Collection of amino acids to be used for defining "negatively
+            charged" residues.
+
+        group2 : str or list
+            Collection of amino acids to be used for defining "positively
+            charged" residues.
+
+        Returns
+        -----------
+        float
+            Returns the  
+
+        Reference
+        -------------
+        Sawle, L., & Ghosh, K. (2015). A theoretical method to compute 
+        sequence dependent configurational properties in charged polymers 
+        and proteins. The Journal of Chemical Physics, 143(8), 085101.
         
-        total = 0
         
-        for m in range(1, len(self)):
-            
-            m_val = m + 1
-            
-            for n in range(0, m-1):
-                
-                n_val = n+1
 
-                cur_m_res = self.sequence[m]
-                cur_n_res = self.sequence[n]
-                
-                if cur_m_res in group1:
-                    cur_m_charge = -1
-                    
-                elif cur_m_res in group2:
-                    cur_m_charge = 1
-                    
-                else:
-                    cur_m_charge = 0
-
-                if cur_n_res in group1:
-                    cur_n_charge = -1
-                    
-                elif cur_n_res in group2:
-                    cur_n_charge = 1
-                    
-                else:
-                    cur_n_charge = 0
-
-                charge_val = cur_m_charge * cur_n_charge
-                
-                final_val = charge_val * (np.sqrt((m_val)-(n_val)))
-
-                total = total + final_val
-
-        return round(total * (1/len(self)), 5)
-
+        """
+        scd.compute_SCD_x(self.sequence, group1=group1, group2=group2)
 
         
     # .................................................................
