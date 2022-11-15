@@ -57,6 +57,15 @@ A full public release is planned for spring of 2023.
 
 ## Changelog
 
+#### Nov 2022 (0.
+* Major set of updates to fix errors in how kappa is calculated
+* Added SCD and SHD functions
+* Added some tests
+* Moved `scd.py` into `sparrow.patterning`
+* Updated IWD for bivariate charge clustering (h/t Garrett Ginell)
+* Fixed some tests(h/t Jeff Lotthammer)
+* Improved docstrings
+
 #### July 2022
 * Moved to idptools! If you had previously cloned sparrow, you can update your git remote location using:
 
