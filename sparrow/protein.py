@@ -80,6 +80,7 @@ class Protein:
         self.__complexity = None
         self.__kappa = None
         self.__scd = None
+        self.__shd = None
         self.__kappa_x = {}
         self.__linear_profiles = {}
         self.__molecular_weight = None
@@ -270,6 +271,32 @@ class Protein:
             
         return self.__scd 
 
+
+    @property
+    def SHD(self):
+        """
+        Returns the default sequence charge decoration (SCD) parameter 
+        as defined by Sawle and Ghosh [1]
+
+        Returns
+        --------
+        float
+            Returns a float that reports on the sequence charge decoration 
+
+        Reference
+        --------
+        Sawle, L., & Ghosh, K. (2015). A theoretical method to compute sequence 
+        dependent configurational properties in charged polymers and proteins. 
+        The Journal of Chemical Physics, 143(8), 085101.
+
+        
+
+        """
+        if self.__shd is None:
+            self.__shd = scd.compute_shd(self.sequence, hydro_dict=False)
+            
+        return self.__shd 
+    
     # .................................................................
     #
     @property
@@ -580,7 +607,11 @@ class Protein:
         Returns
         -----------
         float
-            Returns the  
+            Returns the custom sequence charge decoration.
+
+        See also
+        ---------
+        sparrow.protein.scd
 
         Reference
         -------------
@@ -590,7 +621,44 @@ class Protein:
         """
 
         scd.compute_SCD_x(self.sequence, group1=group1, group2=group2)
-    
+
+
+    # .................................................................
+    #
+    def compute_SHD_custom(self, hydro_dict):
+        """
+        Function takes in a sequence and returns Sequence 
+        Hydropathy Decoration (SHD), IE. patterning of hydrophobic 
+        residues in the sequence. This is computed as define in ref 1
+
+        To define the hydrophobicity values used the user should pass
+        a hydrophobicity dictionary (hydro_dict) which maps amino 
+        acid residues to hydrophobicity scores.
+
+        Parameters
+        --------------
+
+        hydro : dict
+            Dictionary that maps amino acid to hydrophobicity score. 
+            Note that every amino acid in the sequence must exist in the
+            hydro dict or the function raise an exception.
+
+        Returns
+        -----------
+        float
+            Returns the customized sequence hydroph
+
+        Reference
+        -------------
+        Zheng, W., Dignon, G. L., Brown, M., Kim, Y. C., & Mittal, J. (2020). 
+        Hydropathy Patterning Complements Charge Patterning to Describe 
+        Conformational Preferences of Disordered Proteins. Journal of 
+        Physical Chemistry Letters. https://doi.org/10.1021/acs.jpclett.0c00288
+
+        """
+
+        scd.compute_shd(self.sequence, hydro_dict=hydro_dict)
+        
     # .................................................................
     #
     def compute_iwd_charged_weighted(self, charge=['-','+']):
