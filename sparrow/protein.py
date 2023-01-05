@@ -12,6 +12,7 @@ import numpy as np
 from .patterning import kappa, iwd, scd
 from .data import amino_acids
 from sparrow.predictors import Predictor
+from sparrow.polymer import Polymeric
 
 
 class Protein:
@@ -85,6 +86,7 @@ class Protein:
         self.__linear_profiles = {}
         self.__molecular_weight = None
         self.__predictor_object = None
+        self.__polymeric_object = None
         
         
     # .................................................................
@@ -1054,6 +1056,20 @@ class Protein:
             self.__predictor_object = Predictor(self)
         return self.__predictor_object
 
+    @property
+    def polymeric(self):
+        """
+        Returns a sparrow.Polymeric object which provides programatic access 
+        to the various different predicted polymer properties for the sequence.
+
+        Note that, of course, many of these would only be valid if the sequence
+        behaved as an intrinsically disordered or unfolded polypeptide. 
+        
+        """
+        if self.__polymeric_object is None:
+            self.__polymeric_object = Polymeric(self)
+        return self.__polymeric_object
+    
         
 
 

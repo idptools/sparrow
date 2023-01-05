@@ -3,7 +3,7 @@ from sparrow.data.amino_acids import VALID_AMINO_ACIDS
 from sparrow.sparrow_exceptions import SparrowException
 
 
-def compute_scd(sequence, group1=['E','D'], group2=['R','K']):
+def compute_scd_x(sequence, group1=['E','D'], group2=['R','K']):
     """
     Backend function for computing the sequence charge decoration
     (SCD) parameter, generalized to two residue groups. The default
