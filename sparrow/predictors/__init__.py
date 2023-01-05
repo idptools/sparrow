@@ -792,11 +792,11 @@ class Predictor:
             if normalized:
 
                 
-                min_pscore = 3.0               
-                max_pscore = 9.0
+                min_pscore = 0
+                max_pscore = 6.0
 
                 score = self.__pscore_predictor_object.predict_pscore(self.__protein.sequence)
-                self.__precomputed[selector] = np.clip((score + min_pscore)/(max_pscore+min_pscore), 0.0, 1.0)
+                self.__precomputed[selector] = np.clip((score - min_pscore)/(max_pscore - min_pscore), 0.0, 1.0)
 
             else:
                 self.__precomputed[selector] = self.__pscore_predictor_object.predict_pscore(self.__protein.sequence)
