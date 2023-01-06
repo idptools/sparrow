@@ -31,7 +31,7 @@ def compute_nu_zheng2020(seq):
     """
 
     SHD = scd.compute_shd(seq)
-    SCD = scd.compute_scd(seq)
+    SCD = scd.compute_scd_x(seq)
         
     # calculate Nu from SHD and SCD
     nu = (-0.0423*SHD)+(0.0074*SCD)+0.701

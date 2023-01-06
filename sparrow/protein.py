@@ -269,7 +269,7 @@ class Protein:
 
         """
         if self.__scd is None:
-            self.__scd = scd.compute_SCD_x(self.sequence, group1=['E','D'], group2=['R','K'])
+            self.__scd = scd.compute_scd_x(self.sequence, group1=['E','D'], group2=['R','K'])
             
         return self.__scd 
 
@@ -622,7 +622,7 @@ class Protein:
         and proteins. The Journal of Chemical Physics, 143(8), 085101.
         """
 
-        scd.compute_SCD_x(self.sequence, group1=group1, group2=group2)
+        return scd.compute_scd_x(self.sequence, group1=group1, group2=group2)
 
 
     # .................................................................
