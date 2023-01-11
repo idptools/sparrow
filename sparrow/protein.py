@@ -1049,6 +1049,7 @@ class Protein:
             * pscore
             * tad
             * mitochondrial targeting
+            * rg : radius of gyration
             * transmembrane_region : predict binary classification of transmembrane region 
         
         """

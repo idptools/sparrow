@@ -64,7 +64,7 @@ class Predictor:
         self.__thr_phos_predictor_object = None
         self.__tyr_phos_predictor_object = None
         self.__tad_predictor_object = None
-
+        self.__rg_predictor_object = None
 
 
         # this __precomputed dictionary is where predictions made can be scored so that
@@ -1001,3 +1001,33 @@ class Predictor:
 
         return self.__precomputed[selector] 
     
+    def radius_of_gyration(self, recompute=False):
+
+        """
+        Returns the predicted radius of gyration as of the sequence
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        float
+            Returns the predicted radius of gyration as of the sequence
+
+        """
+
+        selector = 'rg'
+        
+        if self.__rg_predictor_object is None:
+            from .rg.radius_of_gyration_predictor import RgPredictor
+            
+            self.__rg_predictor_object = RgPredictor()
+
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__rg_predictor_object.predict_rg(self.__protein.sequence)
+
+        return self.__precomputed[selector]
