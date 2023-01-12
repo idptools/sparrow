@@ -6,7 +6,7 @@ from .visualize import sequence_visuals
 from sparrow import data
 from .sequence_analysis import sequence_complexity
 from .sequence_analysis import physical_properties
-
+from .sequence_analysis import elm
 
 import numpy as np
 from .patterning import kappa, iwd, scd
@@ -87,7 +87,7 @@ class Protein:
         self.__molecular_weight = None
         self.__predictor_object = None
         self.__polymeric_object = None
-        
+        self.__elms = None
         
     # .................................................................
     #
@@ -1070,9 +1070,20 @@ class Protein:
             self.__polymeric_object = Polymeric(self)
         return self.__polymeric_object
     
-        
+    @property
+    def elms(self):
+        """Returns a list of NamedTuples containing each of the 
+        elm annotations for the given sequence.
 
-
+        Returns
+        -------
+        List[NamedTuple]
+            A list of NamedTuples containing all possible elms in a given sequence.
+    
+        """
+        if self.__elms is None:
+            self.__elms = elm.find_all_elms(self.sequence)
+        return self.__elms
         
     @property
     def sequence(self):
