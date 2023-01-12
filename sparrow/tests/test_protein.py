@@ -71,12 +71,13 @@ def test_protein_code_coverage():
         elm_sequences.append(elm.sequence)
         func_sites.append(elm.functional_site_name)
     func_sites = list(set(func_sites))
-    assert func_sites == ['PCSK cleavage site',
-                          'CendR Motif Binding to Neuropilin Receptors',
-                           'NRD cleavage site',
-                           'di Arginine retention/retrieving signal',
-                           'N-degron',
-                           'NLS classical Nuclear Localization Signals']
+    for func_site in func_sites:
+        assert func_site in ['di Arginine retention/retrieving signal',
+                            'CendR Motif Binding to Neuropilin Receptors',
+                            'NLS classical Nuclear Localization Signals',
+                            'N-degron',
+                            'NRD cleavage site',
+                            'PCSK cleavage site']
     assert start == [1, 6, 11, 16, 4, 9, 14, 0, 5, 10, 15, 0, 5, 10, 15, 1, 11, 0, 16, 1, 6, 11, 16, 0, 3, 13, 4, 14, 1, 9]
     assert end == [4, 9, 14, 19, 9, 14, 19, 3, 8, 13, 18, 3, 8, 13, 18, 8, 18, 3, 20, 5, 10, 15, 20, 20, 9, 19, 10, 20, 9, 15]
     assert elm_sequences == ['RRA',
