@@ -29,7 +29,7 @@ def generate_elm_df(file : str) -> pd.DataFrame:
                 columns = line.strip().split("\t")
                 columns = [col.replace('"','') for col in columns]
             else: 
-                elm_data.append(line.strip().split("\t"))
+                elm_data.append(line.replace('"','').strip().split("\t"))
     df = pd.DataFrame(elm_data,columns=columns)
     return df
 
@@ -60,5 +60,3 @@ def find_all_elms(sequence : str) -> List[NamedTuple]:
             elm = elm_motif(regex, mapper[regex], start, end, sequence[start:end]) 
             elms.append(elm)
     return elms
-
-
