@@ -60,8 +60,56 @@ def test_protein_code_coverage():
     assert np.isclose(np.mean(P.linear_sequence_profile('hydrophobicity')),3.0450819672131146)
     assert np.mean(P.linear_composition_profile(['E','K'])) == 0.012295081967213115
 
-
-        
+    P = Protein("KRRARKRRARKRRARKRRAR")
+    elms = P.elms
+    func_sites = []
+    elm_sequences = []
+    start, end = [],[]
+    for elm in elms:
+        start.append(elm.start)
+        end.append(elm.end)
+        elm_sequences.append(elm.sequence)
+        func_sites.append(elm.functional_site_name)
+    func_sites = list(set(func_sites))
+    for func_site in func_sites:
+        assert func_site in ['di Arginine retention/retrieving signal',
+                            'CendR Motif Binding to Neuropilin Receptors',
+                            'NLS classical Nuclear Localization Signals',
+                            'N-degron',
+                            'NRD cleavage site',
+                            'PCSK cleavage site']
+    assert start == [1, 6, 11, 16, 4, 9, 14, 0, 5, 10, 15, 0, 5, 10, 15, 1, 11, 0, 16, 1, 6, 11, 16, 0, 3, 13, 4, 14, 1, 9]
+    assert end == [4, 9, 14, 19, 9, 14, 19, 3, 8, 13, 18, 3, 8, 13, 18, 8, 18, 3, 20, 5, 10, 15, 20, 20, 9, 19, 10, 20, 9, 15]
+    assert elm_sequences == ['RRA',
+                            'RRA',
+                            'RRA',
+                            'RRA',
+                            'RKRRA',
+                            'RKRRA',
+                            'RKRRA',
+                            'KRR',
+                            'KRR',
+                            'KRR',
+                            'KRR',
+                            'KRR',
+                            'KRR',
+                            'KRR',
+                            'KRR',
+                            'RRARKRR',
+                            'RRARKRR',
+                            'KRR',
+                            'RRAR',
+                            'RRAR',
+                            'RRAR',
+                            'RRAR',
+                            'RRAR',
+                            'KRRARKRRARKRRARKRRAR',
+                            'ARKRRA',
+                            'ARKRRA',
+                            'RKRRAR',
+                            'RKRRAR',
+                            'RRARKRRA',
+                            'RKRRAR']
 
         
         

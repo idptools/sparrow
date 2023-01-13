@@ -21,5 +21,3 @@ def is_valid_protein_sequence(sequence):
             return False
 
     return True
-        
-    
