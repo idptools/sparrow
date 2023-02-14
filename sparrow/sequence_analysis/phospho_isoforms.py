@@ -153,28 +153,37 @@ def _build_phosphoSeqome(sequence, phosphosites, phospho_rate=1):
 ## -----------------------------------
 ##
 def get_phosphoisoforms(sequence, mode="all", phospho_rate=1, phosphosites=None):
-    """Build phospho-isoforms sequences based on provided the provided method
+    """Phosphosites are replaced with the phosphomimetic 'E', enabling approximate calculation 
+    of charge based sequence features with the presence of a phosphorylated residues.
 
     Parameters
     ----------
     sequence : str
         Valid amino acid sequence
+
     mode : str, optional
         Defition for how the phosphosites should be determined, by default "all"
-        Other options include:
-            predict = calls _predict_all_phosphosites
-            custom = uses inputed 'phosphosites' parameter as indices for phosphosites
+
+        'all'       : Assumes all S/T/Y residues are potential phosphosites
+
+        'predict'   : Leverages PARROT trained predictors via _predict_all_phosphosites
+                        to predict phosphorylated sites based on sequence.
+    
+        'custom'    : uses the 'phosphosites' parameter as indices for phosphosites.
+        
     phospho_rate : int, optional
         Value between 0 and 1 which defines the maximum percent of phosphosites 
         can be 'phosphorylated' a each sequence, by default 1 (IE all sites can be 
         phosphorylated)
+
     phosphosites : list, optional
         Custom list of indices for valid phosphosite positions, by default None
 
     Returns
     -------
     list
-        list of sequences for possible phospho-isoforms based off the selected method
+        list of sequences for the possible phosphoisoforms based off the selected method.
+        Phosphorylatable amino acids are replaced with 'E'.    
     """
 
     # get phosphosite positions
