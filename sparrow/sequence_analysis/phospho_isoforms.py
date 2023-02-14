@@ -85,11 +85,11 @@ def _get_all_phosphosites(sequence):
 
     """ 
     sites = []
-    idx = 1
+    idx = 0
     for i in sequence:
         if i in ["Y", "S", "T"]:
             sites.append(idx)
-        idx = idx 
+        idx = idx + 1
     return sites
 
 ## -----------------------------------
