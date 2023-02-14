@@ -152,47 +152,37 @@ def _build_phosphoSeqome(sequence, phosphosites, phospho_rate=1):
 
 ## -----------------------------------
 ##
-def get_phosphoisoforms(sequence, mode=['all', 'predict', 'custom'], phospho_rate=1, 
-    phosphosites=None):
-    """
-    build all phospho-isoforms based on provided phosphosites
+def get_phosphoisoforms(sequence, mode="all", phospho_rate=1, phosphosites=None):
+    """Build phospho-isoforms sequences based on provided the provided method
 
     Parameters
-    ------------
+    ----------
     sequence : str
         Valid amino acid sequence
-
-    mode : str
-        Defition for how the phosphosites should be determined 
-
-        all = calls _get_all_phosphosites
-
-        predict = calls _predict_all_phosphosites
-
-        custom = uses inputed 'phosphosites' parameter as phosphosites 
-                 To use custom phosphosites must be defined
-    
-    phospho_rate : float 
+    mode : str, optional
+        Defition for how the phosphosites should be determined, by default "all"
+        Other options include:
+            predict = calls _predict_all_phosphosites
+            custom = uses inputed 'phosphosites' parameter as indices for phosphosites
+    phospho_rate : int, optional
         Value between 0 and 1 which defines the maximum percent of phosphosites 
-        can be 'phosphorylated' a each sequence. Defult is 1 (IE all sites can be 
+        can be 'phosphorylated' a each sequence, by default 1 (IE all sites can be 
         phosphorylated)
+    phosphosites : list, optional
+        Custom list of indices for valid phosphosite positions, by default None
 
-    phosphosites : list
-        custom inputed list of valid phosphosite positions
-    
     Returns
-    ------------
+    -------
     list
-        list of sequences for all posible phospho-isoforms 
-        based off of the list of phosphosites 
+        list of sequences for possible phospho-isoforms based off the selected method
     """
 
     # get phosphosite positions
-    if mode is 'all':
+    if mode == 'all':
         _phosphosites = _get_all_phosphosites(sequence)
-    elif mode is 'predict':
+    elif mode == 'predict':
         _phosphosites = _predict_all_phosphosites(sequence)
-    elif mode is 'custom':
+    elif mode == 'custom':
         if phosphosites != None:
             _phosphosites = phosphosites
         else:
