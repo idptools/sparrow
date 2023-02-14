@@ -5,6 +5,7 @@ from . import calculate_parameters
 from .visualize import sequence_visuals
 from sparrow import data
 from .sequence_analysis import sequence_complexity
+from .sequence_analysis import phospho_isoforms
 from .sequence_analysis import physical_properties
 from .sequence_analysis import elm
 
@@ -716,8 +717,44 @@ class Protein:
 
         return iwd.calculate_average_bivariate_inverse_distance_charge(linear_NCPR, self.sequence)
 
+    ## .................................................................
+    ##
+    def generate_phosphoisoforms(self, mode=['all', 'predict', 'custom'], phospho_rate=1, phosphosites=None):
+        """
+        Calls sequence_analysis.phospho_isoforms module and to get a list
+        of possible phosphoisoforms sequences. See module header for more documentation.
 
+        Phosphosites are then returned 'E' in amino acid sequence enabling aproximate calculation 
+        charge based sequence features with the presence of a phosphosite.
 
+        Parameters
+        ------------
+        sequence : str
+            Valid amino acid sequence
+
+        mode : str
+            Defition for how the phosphosites should be determined 
+            all = calls _get_all_phosphosites
+            predict = calls _predict_all_phosphosites
+            custom = uses inputed 'phosphosites' parameter as phosphosites 
+                     To use custom phosphosites must be defined
+        
+        phospho_rate : float 
+            Value between 0 and 1 which defines the maximum percent of phosphosites which
+            can be 'phosphorylated' in each sequence. Defult is 1 (IE all sites can be 
+            phosphorylated)
+
+        phosphosites : list
+            custom inputed list of valid phosphosite positions
+        
+        Returns
+        ------------
+        list
+            list of sequences for all posible phosphoisoforms where phosphosites amino acids are
+            replaced with 'E'. 
+        """
+        return phospho_isoforms.get_phosphoisoforms(self.sequence, mode=mode, phospho_rate=phospho_rate, 
+            phosphosites=phosphosites)
         
     # .................................................................
     #            
