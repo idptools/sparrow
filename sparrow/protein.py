@@ -5,8 +5,9 @@ from . import calculate_parameters
 from .visualize import sequence_visuals
 from sparrow import data
 from .sequence_analysis import sequence_complexity
+from .sequence_analysis import phospho_isoforms
 from .sequence_analysis import physical_properties
-
+from .sequence_analysis import elm
 
 import numpy as np
 from .patterning import kappa, iwd, scd
@@ -87,7 +88,7 @@ class Protein:
         self.__molecular_weight = None
         self.__predictor_object = None
         self.__polymeric_object = None
-        
+        self.__elms = None
         
     # .................................................................
     #
@@ -716,8 +717,47 @@ class Protein:
 
         return iwd.calculate_average_bivariate_inverse_distance_charge(linear_NCPR, self.sequence)
 
+    ## .................................................................
+    ##
+    def generate_phosphoisoforms(self, mode='all', phospho_rate=1, phosphosites=None):
+        """
+        Calls sequence_analysis.phospho_isoforms module to get a list
+        of possible phosphoisoforms sequences. See module header for more documentation.
 
+        Phosphosites are replaced with the phosphomimetic 'E', enabling approximate calculation 
+        of charge based sequence features with the presence of a phosphorylated residues.
 
+        Parameters
+        ----------
+        sequence : str
+            Valid amino acid sequence
+
+        mode : str, optional
+            Defition for how the phosphosites should be determined, by default "all"
+
+            'all'       : Assumes all S/T/Y residues are potential phosphosites
+
+            'predict'   : Leverages PARROT trained predictors via _predict_all_phosphosites
+                            to predict phosphorylated sites based on sequence.
+        
+            'custom'    : uses the 'phosphosites' parameter as indices for phosphosites.
+         
+        phospho_rate : int, optional
+            Value between 0 and 1 which defines the maximum percent of phosphosites 
+            can be 'phosphorylated' a each sequence, by default 1 (IE all sites can be 
+            phosphorylated)
+
+        phosphosites : list, optional
+            Custom list of indices for valid phosphosite positions, by default None
+
+        Returns
+        -------
+        list
+            list of sequences for the possible phosphoisoforms based off the selected method.
+            Phosphorylatable amino acids are replaced with 'E'.    
+        """
+        return phospho_isoforms.get_phosphoisoforms(self.sequence, mode=mode, phospho_rate=phospho_rate, 
+            phosphosites=phosphosites)
         
     # .................................................................
     #            
@@ -1071,9 +1111,20 @@ class Protein:
             self.__polymeric_object = Polymeric(self)
         return self.__polymeric_object
     
-        
+    @property
+    def elms(self):
+        """Returns a list of NamedTuples containing each of the 
+        elm annotations for the given sequence.
 
-
+        Returns
+        -------
+        List[NamedTuple]
+            A list of NamedTuples containing all possible elms in a given sequence.
+    
+        """
+        if self.__elms is None:
+            self.__elms = elm.find_all_elms(self.sequence)
+        return self.__elms
         
     @property
     def sequence(self):
