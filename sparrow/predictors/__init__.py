@@ -65,6 +65,10 @@ class Predictor:
         self.__tyr_phos_predictor_object = None
         self.__tad_predictor_object = None
         self.__rg_predictor_object = None
+        self.__re_predictor_object = None
+        self.__prefactor_predictor_object = None
+        self.__scaling_exponent_predictor_object = None
+        self.__asphericity_predictor_object = None
 
 
         # this __precomputed dictionary is where predictions made can be scored so that
@@ -1004,7 +1008,7 @@ class Predictor:
     def radius_of_gyration(self, recompute=False):
 
         """
-        Returns the predicted radius of gyration as of the sequence
+        Returns the predicted radius of gyration of the sequence
 
         Parameters
         --------------
@@ -1015,7 +1019,7 @@ class Predictor:
         Returns
         -------------
         float
-            Returns the predicted radius of gyration as of the sequence
+            Returns the predicted radius of gyration of the sequence
 
         """
 
@@ -1029,5 +1033,67 @@ class Predictor:
 
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = self.__rg_predictor_object.predict_rg(self.__protein.sequence)
+
+        return self.__precomputed[selector]
+    
+    def end_to_end_distance(self, recompute=False):
+
+        """
+        Returns the predicted end_to_end_distance of the sequence
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        float
+            Returns the predicted end_to_end distance of the sequence
+
+        """
+
+        selector = 're'
+        
+        if self.__re_predictor_object is None:
+            from .re.end_to_end_distance_predictor import RePredictor
+            
+            self.__re_predictor_object = RePredictor()
+
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__re_predictor_object.predict_re(self.__protein.sequence)
+
+        return self.__precomputed[selector]
+
+    def asphericity(self, recompute=False):
+
+        """
+        Returns the predicted asphericity of the sequence
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        float
+            Returns the predicted asphericity of the sequence
+
+        """
+
+        selector = 'asph'
+        
+        if self.__asphericity_predictor_object is None:
+            from .asphericity.asphericity_predictor import AsphericityPredictor
+            
+            self.__re_predictor_object = AsphericityPredictor()
+
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__asphericity_predictor_object.predict_asphericity(self.__protein.sequence)
 
         return self.__precomputed[selector]
