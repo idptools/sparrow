@@ -64,6 +64,9 @@ class Predictor:
         self.__thr_phos_predictor_object = None
         self.__tyr_phos_predictor_object = None
         self.__tad_predictor_object = None
+
+        # polymeric property predictors parameterized 
+        # from single chain IDR LAMMPS simulations
         self.__rg_predictor_object = None
         self.__re_predictor_object = None
         self.__prefactor_predictor_object = None
@@ -1095,5 +1098,67 @@ class Predictor:
 
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = self.__asphericity_predictor_object.predict_asphericity(self.__protein.sequence)
+
+        return self.__precomputed[selector]
+    
+    def prefactor(self, recompute=False):
+
+        """
+        Returns the predicted prefactor of the sequence
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        float
+            Returns the predicted prefactor of the sequence
+
+        """
+
+        selector = 'prefactor'
+        
+        if self.__prefactor_predictor_object is None:
+            from .prefactor.prefactor_predictor import PrefactorPredictor
+            
+            self.__prefactor_predictor_object = PrefactorPredictor()
+
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__prefactor_predictor_object.predict_prefactor(self.__protein.sequence)
+
+        return self.__precomputed[selector]
+
+    def scaling_exponent(self, recompute=False):
+
+        """
+        Returns the predicted prefactor of the sequence
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        float
+            Returns the predicted prefactor of the sequence
+
+        """
+
+        selector = 'scaling_exponent'
+        
+        if self.__scaling_exponent_predictor_object is None:
+            from .scaling_exponent.scaling_exponent_predictor import ScalingExponentPredictor
+            
+            self.__scaling_exponent_predictor_object = ScalingExponentPredictor()
+
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__scaling_exponent_predictor_object.predict_scaling_exponent(self.__protein.sequence)
 
         return self.__precomputed[selector]
