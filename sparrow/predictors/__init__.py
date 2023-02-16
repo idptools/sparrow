@@ -1042,7 +1042,7 @@ class Predictor:
     def end_to_end_distance(self, recompute=False):
 
         """
-        Returns the predicted end_to_end_distance of the sequence
+        Returns the predicted end_to_end distance of the sequence
 
         Parameters
         --------------
@@ -1135,7 +1135,7 @@ class Predictor:
     def scaling_exponent(self, recompute=False):
 
         """
-        Returns the predicted prefactor of the sequence
+        Returns the predicted scaling exponent of the sequence
 
         Parameters
         --------------
@@ -1146,7 +1146,7 @@ class Predictor:
         Returns
         -------------
         float
-            Returns the predicted prefactor of the sequence
+            Returns the predicted scaling exponent of the sequence
 
         """
 
