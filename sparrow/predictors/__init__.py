@@ -1090,7 +1090,7 @@ class Predictor:
         if self.__asphericity_predictor_object is None:
             from .asphericity.asphericity_predictor import AsphericityPredictor
             
-            self.__re_predictor_object = AsphericityPredictor()
+            self.__asphericity_predictor_object = AsphericityPredictor()
 
 
         if selector not in self.__precomputed or recompute is True:
