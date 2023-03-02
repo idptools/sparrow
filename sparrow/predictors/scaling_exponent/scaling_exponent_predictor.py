@@ -109,10 +109,10 @@ class ScalingExponentPredictor():
         # 2022 trained networks didn't need this. As such, this can PROBABLY be deleted but
         # in case you're using an older network we've kept this to make things simple
         
-        for i in range(len(loaded_model)):
-           key, value = loaded_model.popitem(last=False)
-           new_key = key[7:]
-           loaded_model[new_key] = value
+        # for i in range(len(loaded_model)):
+        #    key, value = loaded_model.popitem(last=False)
+        #    new_key = key[7:]
+        #    loaded_model[new_key] = value
         ## END OF DELETE ME PROBABLY
 
       
