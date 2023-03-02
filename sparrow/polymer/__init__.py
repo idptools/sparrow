@@ -80,7 +80,7 @@ class Polymeric:
     @property
     def predicted_rg(self):
         """
-        This function returns the predicted radius of gyration (rg) for a given sequence
+        This function returns the mean predicted radius of gyration (rg) for a given sequence
         based off of the PARROT trained sparrow networks for predicting polymeric properties.
 
         Returns
@@ -96,7 +96,7 @@ class Polymeric:
     @property
     def predicted_re(self):
         """
-        This function returns the predicted end-to-end distance (re) for a given sequence
+        This function returns the mean predicted end-to-end distance (re) for a given sequence
         based off of the PARROT trained sparrow networks for predicting polymeric properties.
 
         Returns
@@ -112,7 +112,7 @@ class Polymeric:
     @property
     def predicted_asphericity(self):
         """
-        This function returns the predicted asphericity (δ) for a given sequence
+        This function returns the mean predicted asphericity (δ) for a given sequence
         based off of the PARROT trained sparrow networks for predicting polymeric properties.
 
         Returns
@@ -206,7 +206,7 @@ class Polymeric:
                 
             return np.random.choice(self.__p_of_Re_R, dist_size, p=self.__p_of_Re_P)
 
-
+    #################  EMPIRICAL FUNCTIONS FROM PAPERS BELOW HERE  #################
     def nu(self, mode='zheng2020'):
         """Computes the scaling exponent (nu) for the given sequence as parameterized by the
         equation from zheng2020 via the Sequence Hydropathy Decoration (SHD)

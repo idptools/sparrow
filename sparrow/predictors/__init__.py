@@ -1040,7 +1040,6 @@ class Predictor:
         return self.__precomputed[selector]
     
     def end_to_end_distance(self, recompute=False):
-
         """
         Returns the predicted end_to_end distance of the sequence
 
