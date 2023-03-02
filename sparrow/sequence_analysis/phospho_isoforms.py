@@ -23,16 +23,11 @@ BASIC workflow is as followed:
 
     Protein(sequence).my_parameter_of_choice 
 """
-
-from sparrow.predictors.phosphorylation import ser_phosphorylation_predictor
-from sparrow.predictors.phosphorylation import thr_phosphorylation_predictor
-from sparrow.predictors.phosphorylation import tyr_phosphorylation_predictor
 import itertools
-
 
 ## -----------------------------------------
 ##
-def _predict_all_phosphosites(sequence):
+def _predict_all_phosphosites(protein):
     """
     Gets list of predicted phosphosites 
 
@@ -42,8 +37,9 @@ def _predict_all_phosphosites(sequence):
 
     Parameters
     ------------
-    seq : str
-        Valid amino acid sequence
+    protein : sparrow.Protein
+        sparrow Protein object
+
 
     Returns:
     ----------
@@ -52,9 +48,11 @@ def _predict_all_phosphosites(sequence):
         Note positions are returned as indexed from 0
 
     """
-    pS = ser_phosphorylation_predictor.SerPhosphorylationPredictor().predict_ser_phosphorylation(sequence, return_sites_only=True)
-    pT = thr_phosphorylation_predictor.ThrPhosphorylationPredictor().predict_thr_phosphorylation(sequence, return_sites_only=True)
-    pY = tyr_phosphorylation_predictor.TyrPhosphorylationPredictor().predict_tyr_phosphorylation(sequence, return_sites_only=True)
+
+    # predict phosphosites
+    pS = protein.predictor.serine_phosphorylation(return_sites_only=True)
+    pT = protein.predictor.threonine_phosphorylation(return_sites_only=True)
+    pY = protein.predictor.tyrosine_phosphorylation(return_sites_only=True)
 
     return list(pS + pT + pY)
 
@@ -62,11 +60,6 @@ def _predict_all_phosphosites(sequence):
 ##
 def _get_all_phosphosites(sequence):
     """
-
-    BASED OFF OF:
-
-     localcider.sequenceParameters.SequenceParameters().get_all_phosphorylatable_sites 
-
     Function which returns a list of all the positions which *could* be
     phosphorylated (i.e. are T/S/Y). NOTE this does not use any kind of
     smart lookup, metadata, or analysis. It's literally, where are the Y/T/S
@@ -152,14 +145,14 @@ def _build_phosphoSeqome(sequence, phosphosites, phospho_rate=1):
 
 ## -----------------------------------
 ##
-def get_phosphoisoforms(sequence, mode="all", phospho_rate=1, phosphosites=None):
+def get_phosphoisoforms(protein, mode="all", phospho_rate=1, phosphosites=None):
     """Phosphosites are replaced with the phosphomimetic 'E', enabling approximate calculation 
     of charge based sequence features with the presence of a phosphorylated residues.
 
     Parameters
     ----------
-    sequence : str
-        Valid amino acid sequence
+    protein : sparrow.Protein 
+        sparrow Protein object
 
     mode : str, optional
         Defition for how the phosphosites should be determined, by default "all"
@@ -188,9 +181,9 @@ def get_phosphoisoforms(sequence, mode="all", phospho_rate=1, phosphosites=None)
 
     # get phosphosite positions
     if mode == 'all':
-        _phosphosites = _get_all_phosphosites(sequence)
+        _phosphosites = _get_all_phosphosites(protein.sequence)
     elif mode == 'predict':
-        _phosphosites = _predict_all_phosphosites(sequence)
+        _phosphosites = _predict_all_phosphosites(protein)
     elif mode == 'custom':
         if phosphosites != None:
             _phosphosites = phosphosites
@@ -200,4 +193,4 @@ def get_phosphoisoforms(sequence, mode="all", phospho_rate=1, phosphosites=None)
         raise Exception('Please specify mode to compute phosphosites')
 
     # generate all phospho-Isoforms
-    return _build_phosphoSeqome(sequence, _phosphosites, phospho_rate=phospho_rate)
+    return _build_phosphoSeqome(protein.sequence, _phosphosites, phospho_rate=phospho_rate)
