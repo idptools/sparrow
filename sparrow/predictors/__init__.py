@@ -1123,7 +1123,7 @@ class Predictor:
         selector = 'scaled_re'
         
         if self.__scaled_re_predictor_object is None:
-            from .scaled_re.scaled_end_to_end_distance import ScaledRePredictor
+            from .scaled_re.scaled_end_to_end_distance_predictor import ScaledRePredictor
             
             self.__scaled_re_predictor_object = ScaledRePredictor()
 
