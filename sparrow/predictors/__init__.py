@@ -72,6 +72,8 @@ class Predictor:
         self.__prefactor_predictor_object = None
         self.__scaling_exponent_predictor_object = None
         self.__asphericity_predictor_object = None
+        self.__scaled_rg_predictor_object = None
+        self.__scaled_re_predictor_object = None
 
 
         # this __precomputed dictionary is where predictions made can be scored so that
