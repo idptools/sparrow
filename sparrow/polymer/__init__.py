@@ -29,10 +29,10 @@ class Polymeric:
         """
         self.__protein = protein_obj
         self.__NuDepSAW = None
+        self.__afrc = None
         self.__saw = None
         self.__wlc = None
         self.__wlc2 = None
-
         
         # bin width parameter
         self.__p_of_r_resolution = p_of_r_resolution
@@ -58,6 +58,10 @@ class Polymeric:
         # 2) the corresponding probability distribution
         self.__p_of_Rg_R = None
         self.__p_of_Rg_P = None
+
+        # dictionary where computations can be memoized so that the Polymeric class 
+        # avoids needing to recompute (potentially expensive) predictions
+        self.__precomputed = {}
 
     @property
     def predicted_nu(self):
@@ -166,6 +170,60 @@ class Polymeric:
 
         return self.__p_of_Re_R, self.__p_of_Re_P
 
+    def get_afrc_end_to_end_distribution(self, recompute=False):
+        selector = "afrc-re-dist"
+        if self.__afrc is None: 
+            from afrc import AnalyticalFRC
+            self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__afrc.end_to_end_distribution()
+
+        return self.__precomputed[selector]
+    
+    def get_afrc_radius_of_gyration_distribution(self, recompute=False):
+        selector = "afrc-rg-dist"
+        if self.__afrc is None: 
+            from afrc import AnalyticalFRC
+            self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__afrc.get_radius_of_gyration_distribution()
+
+        return self.__precomputed[selector]
+
+    def get_mean_afrc_end_to_end_distance(self, recompute=False):
+        selector = "afrc-mean-re"
+        if self.__afrc is None: 
+            from afrc import AnalyticalFRC
+            self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__afrc.get_mean_end_to_end_distance()
+
+        return self.__precomputed[selector]
+    
+    def get_mean_afrc_radius_of_gyration(self, recompute=False):
+        selector = "afrc-mean-rg"
+        if self.__afrc is None: 
+            from afrc import AnalyticalFRC
+            self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__afrc.get_mean_radius_of_gyration()
+
+        return self.__precomputed[selector]
+    
+    def get_afrc_internal_scaling(self, recompute=False):
+        selector = "afrc-internal-scaling"
+        if self.__afrc is None: 
+            from afrc import AnalyticalFRC
+            self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__afrc.get_internal_scaling()
+
+        return self.__precomputed[selector]
 
     #################  EMPIRICAL FUNCTIONS FROM PAPERS BELOW HERE  #################
     def empirical_nu(self, mode='zheng2020'):
