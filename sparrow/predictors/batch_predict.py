@@ -20,6 +20,26 @@ from .scaled_rg.scaled_radius_of_gyration_predictor import ScaledRgPredictor
 from ..sparrow_exceptions import SparrowException
 
 def prepare_model(network,version):
+    """Given a predictor name and version, load the network weights and parameters to the appropriate device
+
+    Parameters
+    ----------
+    network : str
+        Name of the network you want to predict
+    version : int
+        The version of the network you want to use for predictions
+
+    Returns
+    -------
+    tuple
+        returns the available device and the appropriately versioned network model.
+
+    Raises
+    ------
+    SparrowException
+        An exception is raised if there is no weights file corresponding to the 
+        network and version requested.
+    """
     saved_weights = sparrow.get_data(f'networks/{network}/{network}_network_v{version}.pt')
 
     if not os.path.isfile(saved_weights):
@@ -53,9 +73,43 @@ def prepare_model(network,version):
     model = brnn_architecture.BRNN_MtO(input_size, hidden_vector_size, num_layers, number_of_classes, device)
     model.load_state_dict(loaded_model)
 
-    return device, model
+    return (device, model)
 
-def batch_predict(protein_objs : List[sparrow.Protein], batch_size : int, network=None,version=1) -> dict:
+def batch_predict(protein_objs : List[sparrow.Protein], batch_size : int, network : str = None, version : int = 1) -> dict:
+    """Perform batch predictions with a PARROT network in sparrow.
+
+    Parameters
+    ----------
+    protein_objs : List[sparrow.Protein]
+        A list of sparrow.Protein objects. 
+    batch_size : int
+        The batch size to use for network forward pass. 
+        This should be <= the batch size used during training.
+    network : str, optional
+        The name of the network you wish to predict, by default None
+        Currently implemented options include:
+
+            "re",
+            "prefactor",
+            "asphericity",
+            "scaling_exponent", 
+            "scaled_re", 
+            "scaled_rg"
+        
+    version : int, optional
+        Network version number, by default 1
+
+    Returns
+    -------
+    dict
+        sequence, value(s) mapping for the requested predictor.
+
+    Raises
+    ------
+    SparrowException
+        An exception is raised if the requested network is not one of the available options.
+    """
+    
     if network not in ["rg", "re", "prefactor", "asphericity", "scaling_exponent", "scaled_re", "scaled_rg"]:
         raise SparrowException("Please choose a valid network for batch predictions")
     
