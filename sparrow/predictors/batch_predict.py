@@ -31,7 +31,7 @@ def prepare_model(network,version):
     else:
         device = torch.device("cpu")
     
-    loaded_model = torch.load(saved_weights, map_location=torch.device(device))
+    loaded_model = torch.load(saved_weights)
 
     # count number of network layers
     num_layers = 0
@@ -60,6 +60,7 @@ def batch_predict(protein_objs : List[sparrow.Protein], batch_size : int, networ
         raise SparrowException("Please choose a valid network for batch predictions")
     
     device, model = prepare_model(network,version)
+    model.to(device)
    
     pred_dict = {}
     sequences = [protein_obj.sequence for _, protein_obj in protein_objs.items()]
