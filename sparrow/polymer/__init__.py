@@ -1,5 +1,8 @@
 import numpy as np
 
+# from afrc.polymer_models.saw import SAW
+# from afrc.polymer_models.wlc import WormLikeChain
+# from afrc.polymer_models.wlc2 import WormLikeChain2
 
 from . import scaling_parameters
 
@@ -25,19 +28,14 @@ class Polymeric:
             Bin width for building the probability distributions, defined in Angstroms, by default 0.05.
         """
         self.__protein = protein_obj
+        self.__NuDepSAW = None
+        self.__saw = None
+        self.__wlc = None
+        self.__wlc2 = None
+
         
         # bin width parameter
         self.__p_of_r_resolution = p_of_r_resolution
-
-        # gamma definition copy-pasta'd from AFRC 
-        # set gamma - orginally defined in
-        # Le Guillou, J. C., & Zinn-Justin, J. (1977). Critical Exponents for the n-Vector
-        # Model in Three Dimensions from Field Theory. Physical Review Letters, 39(2), 95–98.
-        # for the case of n=0 (polymer), and raised in this context in the Soranno form
-        # of the Zheng et al nu-dependent polymer model (see eq 9b in Soranno, A. (2020).
-        # Physical basis of the disorder-order transition. Archives of Biochemistry and
-        # Biophysics, 685, 108305.
-        self.gamma = 1.1615
 
         # by default, predicted polymer properties are defined as unset class variables so that
         # they're only computed upon request.
@@ -141,10 +139,11 @@ class Polymeric:
             self.__predicted_prefactor = self.__protein.predictor.prefactor()
         return self.__predicted_prefactor
 
-    def get_predicted_end_to_end_distribution(self):
+
+    def get_predicted_nu_dep_end_to_end_distribution(self):
         """
         Function that returns the predicted end-to-end distance distribution 
-        based on the predicted scaling exponent.
+        based on the predicted scaling exponent and the nu-dependent SAW model.
 
         Returns
         -------
@@ -152,62 +151,24 @@ class Polymeric:
             2D numpy array in which the first column is the distance (in angstroms) 
             and the second column is the probablity.
         """
-
-        # in AFRC they don't use memoization because nu and the prefactor
-        # can change; however, I don't think (?) this is a problem here because 
-        # we're working with a Polymeric model per sequence - check with Alex 
-        # -JML (feb 2023)
-
+        if self.__NuDepSAW is None:
+            from afrc.polymer_models.nudep_saw import NuDepSAW
+            self.__NuDepSAW = NuDepSAW(self.__protein.sequence)
+        
         prefactor = self.predicted_prefactor 
         nu = self.predicted_nu
 
         # insert some sort of error handling on predicted prefactor / nu values
         # to ensure the predicted values are reasonable!
 
-        if self.__p_of_Re_R is None:
-            self.__compute_end_to_end_distribution(prefactor=prefactor, nu=nu)
+        if self.__p_of_Re_R is None or self.__p_of_Re_P is None:
+            self.__p_of_Re_R, self.__p_of_Re_P = self.__NuDepSAW.get_end_to_end_distribution(nu=nu,prefactor=prefactor)
 
-        return (self.__p_of_Re_R, self.__p_of_Re_P)
+        return self.__p_of_Re_R, self.__p_of_Re_P
 
-    def __compute_end_to_end_distribution(self, nu, prefactor):
-        """_summary_
-
-        Parameters
-        ----------
-        nu : float
-            flory apparent scaling exponent
-        prefactor : float
-            prefactor from flory.
-        """
-        gamma = self.gamma
-        g = (gamma - 1) / nu
-        delta = 1 / (1 - nu)
-        A1 = self.__compute_A1(delta, g)
-        A2 = self.__compute_A2(delta, g)
-        
-        # self.__p_of_Re_R = 
-        # self.__p_of_Re_P = 
-
-    def __compute_A1(self,delta, g):
-        pass
-
-    def __compute_A2(self,delta, g):
-        pass
-    
-    def sample_predicted_end_to_end_distribution(self, dist_size=3000):
-        """
-        Function to randomly sample from the end-to-end distance distribution
-        """
-        if len(self.__protein) == 0:
-            return np.repeat(0.0, dist_size)
-        else:
-            if self.__p_of_Re_R is None:
-                self.__compute_end_to_end_distribution()
-                
-            return np.random.choice(self.__p_of_Re_R, dist_size, p=self.__p_of_Re_P)
 
     #################  EMPIRICAL FUNCTIONS FROM PAPERS BELOW HERE  #################
-    def nu(self, mode='zheng2020'):
+    def empirical_nu(self, mode='zheng2020'):
         """Computes the scaling exponent (nu) for the given sequence as parameterized by the
         equation from zheng2020 via the Sequence Hydropathy Decoration (SHD)
         and Sequence Charge Decoration (SCD)
@@ -233,7 +194,7 @@ class Polymeric:
         return scaling_parameters.compute_nu_zheng2020(self.__protein.sequence)
 
     
-    def radius_of_gyration(self, mode='zheng2020'):
+    def empirical_radius_of_gyration(self, mode='zheng2020'):
         """Function that takes in an amino acid sequence and computes the expected 
         radius of gyration using the nu-dependent Rg as developed by Zheng et al.
 
