@@ -153,7 +153,7 @@ class Polymeric:
         """
         if self.__NuDepSAW is None:
             from afrc.polymer_models.nudep_saw import NuDepSAW
-            self.__NuDepSAW = NuDepSAW(self.__protein.sequence, self.p_of_r_resolution)
+            self.__NuDepSAW = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
         
         prefactor = self.predicted_prefactor 
         nu = self.predicted_nu
