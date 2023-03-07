@@ -91,7 +91,6 @@ class Protein:
         self.__polymeric_object = None
         self.__elms = None
 
-        self.__gpu = ["cuda" if torch.cuda.is_available() else "cpu"][0]
         
     # .................................................................
     #
