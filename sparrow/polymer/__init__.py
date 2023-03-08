@@ -28,7 +28,7 @@ class Polymeric:
             Bin width for building the probability distributions, defined in Angstroms, by default 0.05.
         """
         self.__protein = protein_obj
-        self.__NuDepSAW = None
+        self.__nudepsaw = None
         self.__afrc = None
         self.__saw = None
         self.__wlc = None
@@ -157,7 +157,7 @@ class Polymeric:
         """
         if self.__NuDepSAW is None:
             from afrc.polymer_models.nudep_saw import NuDepSAW
-            self.__NuDepSAW = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
+            self.__nudepsaw = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
         
         prefactor = self.predicted_prefactor 
         nu = self.predicted_nu
@@ -166,9 +166,12 @@ class Polymeric:
         # to ensure the predicted values are reasonable!
 
         if self.__p_of_Re_R is None or self.__p_of_Re_P is None:
-            self.__p_of_Re_R, self.__p_of_Re_P = self.__NuDepSAW.get_end_to_end_distribution(nu=nu,prefactor=prefactor)
+            self.__p_of_Re_R, self.__p_of_Re_P = self.__nudepsaw.get_end_to_end_distribution(nu=nu,prefactor=prefactor)
 
         return self.__p_of_Re_R, self.__p_of_Re_P
+
+
+    ##########################  AFRC PACKAGE FUNCTIONS  ##########################
 
     def get_afrc_end_to_end_distribution(self, recompute=False):
         selector = "afrc-re-dist"
@@ -222,6 +225,85 @@ class Polymeric:
 
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = self.__afrc.get_internal_scaling()
+
+        return self.__precomputed[selector]
+
+
+    def get_saw_end_to_end_distribution(self, prefactor=5.5, recompute=False):
+        selector = "saw-re-dist"
+        if self.__saw is None: 
+            from afrc.polymer_models.saw import SAW
+            self.__saw = SAW(self.__protein.sequence, self.__p_of_r_resolution)
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__saw.end_to_end_distribution(prefactor)
+
+        return self.__precomputed[selector]
+
+    # not implemented    
+    # def get_saw_radius_of_gyration_distribution(self, recompute=False):
+    #     selector = "saw-rg-dist"
+    #     if self.__saw is None: 
+    #         from afrc.polymer_models.saw import SAW
+    #         self.__saw = SAW(self.__protein.sequence, self.__p_of_r_resolution)
+
+    #     if selector not in self.__precomputed or recompute is True:
+    #         self.__precomputed[selector] = self.__afrc.get_radius_of_gyration_distribution()
+
+    #     return self.__precomputed[selector]
+
+    def get_mean_saw_end_to_end_distance(self,prefactor=5.5, recompute=False):
+        selector = "saw-mean-re"
+        if self.__saw is None: 
+            from afrc.polymer_models.saw import SAW
+            self.__saw = SAW(self.__protein.sequence, self.__p_of_r_resolution)
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__saw.get_mean_end_to_end_distance(prefactor)
+
+        return self.__precomputed[selector]
+    
+    def get_mean_saw_radius_of_gyration(self, prefactor=5.5, recompute=False):
+        selector = "saw-mean-rg"
+        if self.__saw is None: 
+            from afrc.polymer_models.saw import SAW
+            self.__saw = SAW(self.__protein.sequence, self.__p_of_r_resolution)
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__saw.get_mean_radius_of_gyration(prefactor)
+
+        return self.__precomputed[selector]
+
+    def get_nudep_saw_end_to_end_distribution(self, nu=0.5,prefactor=5.5, recompute=False):
+        selector = "nudep-saw-re-dist"
+        if self.__NuDepSAW is None:
+            from afrc.polymer_models.nudep_saw import NuDepSAW
+            self.__nudepsaw = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__nudepsaw.end_to_end_distribution(nu=nu,prefactor=prefactor)
+
+        return self.__precomputed[selector]
+
+    def get_mean_nudep_saw_end_to_end_distance(self,nu=0.5, prefactor=5.5, recompute=False):
+        selector = "nudep-saw-mean-re"
+        if self.__NuDepSAW is None:
+            from afrc.polymer_models.nudep_saw import NuDepSAW
+            self.__nudepsaw = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__nudepsaw.get_mean_end_to_end_distance(nu=nu,prefactor=prefactor)
+
+        return self.__precomputed[selector]
+    
+    def get_mean_nudep_saw_radius_of_gyration(self, nu=0.5, prefactor=5.5, recompute=False):
+        selector = "nudep-saw-mean-rg"
+        if self.__NuDepSAW is None:
+            from afrc.polymer_models.nudep_saw import NuDepSAW
+            self.__nudepsaw = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__nudepsaw.get_mean_radius_of_gyration(nu=nu,prefactor=prefactor)
 
         return self.__precomputed[selector]
 
