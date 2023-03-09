@@ -177,9 +177,9 @@ class ScaledRePredictor():
 
         Returns
         ----------
-        np.ndarray
-            Returns a 1D np.ndarray where the position is the
-            predicted value for the length scaled, (Re / sqrt(N), end-to-end distance
+        float
+            Returns a float where the predicted value is
+            the length scaled, (Re / sqrt(N), end-to-end distance
 
         """
 
@@ -210,7 +210,7 @@ class ScaledRePredictor():
         ## REGRESSION CODE BLOCK
         # This block should be kept if we're doing a regression-based
         # prediction. If not, comment this out or delete it
-        prediction = self.network(seq_vector.float()).detach().numpy().flatten()
+        prediction = self.network(seq_vector.float()).detach().numpy().flatten()[0]
 
 
         ## CLIP
