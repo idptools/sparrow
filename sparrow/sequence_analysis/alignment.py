@@ -4,8 +4,6 @@ from sparrow.protein import Protein
 from sparrow import read_fasta
 from sparrow.visualize.sequence_visuals import show_sequence
 
-from IPython import embed
-
 
 def __encode_string(string_to_encode, encoding="utf-8"):
     return string_to_encode.encode(f"{encoding}")
