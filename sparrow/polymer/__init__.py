@@ -174,6 +174,17 @@ class Polymeric:
     ##########################  AFRC PACKAGE FUNCTIONS  ##########################
 
     def get_afrc_end_to_end_distribution(self, recompute=False):
+        """
+        Function that returns the predicted end-to-end distance distribution 
+        based on the Analytical Flory Random Coil (AFRC). For more information
+        see https://github.com/idptools/afrc
+
+        Returns
+        -------
+        np.ndarray 
+            2D numpy array in which the first column is the distance (in angstroms) 
+            and the second column is the probablity.
+        """
         selector = "afrc-re-dist"
         if self.__afrc is None: 
             from afrc import AnalyticalFRC
@@ -185,6 +196,23 @@ class Polymeric:
         return self.__precomputed[selector]
     
     def get_afrc_radius_of_gyration_distribution(self, recompute=False):
+        """
+        Function that returns the predicted radius of gyration distribution 
+        based on the Analytical Flory Random Coil (AFRC). For more information
+        see https://github.com/idptools/afrc
+
+        Internally uses:
+
+        Equation 3 from "A simple model for polymeric fractals in a good solvent
+        and an improved version of the Flory approximation" by 
+        Daniel Lhuillier, J. Phys. France 49 (1988) 705-710.
+
+        Returns
+        -------
+        np.ndarray 
+            2D numpy array in which the first column is the distance (in angstroms) 
+            and the second column is the probablity.
+        """
         selector = "afrc-rg-dist"
         if self.__afrc is None: 
             from afrc import AnalyticalFRC
@@ -195,41 +223,140 @@ class Polymeric:
 
         return self.__precomputed[selector]
 
-    def get_mean_afrc_end_to_end_distance(self, recompute=False):
+    def get_mean_afrc_end_to_end_distance(self, mode="scaling law",recompute=False):
+        """
+        Function that returns the predicted mean end-to-end distance
+        based on the Analytical Flory Random Coil (AFRC). For more information
+        see https://github.com/idptools/afrc
+
+        Parameters
+        ----------
+        mode : str, optional
+            defines the mode in which the average is calculated, and can be 
+            set to either 'scaling law' (default) or 'distribution'. If 'distribution' is used
+            then the complete Re distribution is used to calculate the expected value. If the
+            'scaling law' is used then the standard Re = R0 * N^{0.5} is used, 
+            by default "scaling law"
+
+        recompute : bool, optional
+            recompute the mean end-to-end distance, by default False
+        
+        Returns
+        -------
+        float
+            Value equal to the average end-to-end distance (as defined by ``mode``).
+        """
+    
         selector = "afrc-mean-re"
         if self.__afrc is None: 
             from afrc import AnalyticalFRC
             self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__afrc.get_mean_end_to_end_distance()
+            self.__precomputed[selector] = self.__afrc.get_mean_end_to_end_distance(calculation_mode=mode)
 
         return self.__precomputed[selector]
     
-    def get_mean_afrc_radius_of_gyration(self, recompute=False):
+    def get_mean_afrc_radius_of_gyration(self, mode="distribution", recompute=False):
+        """
+        Function that returns the predicted mean radius of gyration
+        based on the Analytical Flory Random Coil (AFRC). For more 
+        information see https://github.com/idptools/afrc
+
+        Parameters
+        ----------
+        mode : str, optional
+            mode defines the mode in which the average is calculated, and can be 
+            set to either 'scaling law' (default) or 'distribution'. If 'distribution' is used
+            then the complete Rg distribution is used to calculate the expected value. If the
+            'scaling law' is used then the standard Rg = R0 * N^{0.5} is used. 
+
+        recompute : bool, optional
+            recompute the mean end-to-end distance, by default False
+        
+        Returns
+        -------
+        float
+            Value equal to the average end-to-end distance (as defined by ``mode``).
+        """
         selector = "afrc-mean-rg"
         if self.__afrc is None: 
             from afrc import AnalyticalFRC
             self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__afrc.get_mean_radius_of_gyration()
+            self.__precomputed[selector] = self.__afrc.get_mean_radius_of_gyration(calculation_mode=mode)
 
         return self.__precomputed[selector]
-    
-    def get_afrc_internal_scaling(self, recompute=False):
+
+
+    def get_afrc_internal_scaling(self,mode="scaling law",recompute=False):
+        """
+        Returns the internal scaling profile - a [2 by n] matrix that reports on the average
+        distance between all residues that are n positions apart ( where n  is | i - j | ). 
+
+        Distances are in angstroms and are measured from the residue center of mass.
+
+        A linear log-log fit of this data gives a gradient of 0.5 (:math:`\\nu^{app} = 0.5`).
+        
+        Parameters
+        ----------
+        mode : str, optional
+            mode to compute internal scaling profile, by default "scaling law"
+        recompute : bool, optional
+            whether or not to recompute the internal scaling profile 
+            if it's already been computed, by default False.
+
+        Returns
+        -------
+        np.ndarray
+           An [2 x n] matrix (where n = length of the amino acid sequence). The first column
+           is the set of | i-j | distances, and the second defines the average inter-residue 
+           distances between every pair of residues that are | i-j | residues apart in sequnce 
+           space.                
+        
+        """
         selector = "afrc-internal-scaling"
         if self.__afrc is None: 
             from afrc import AnalyticalFRC
             self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__afrc.get_internal_scaling()
+            self.__precomputed[selector] = self.__afrc.get_internal_scaling(calculation_mode=mode)
 
         return self.__precomputed[selector]
 
 
     def get_saw_end_to_end_distribution(self, prefactor=5.5, recompute=False):
+        """
+        Defines the end-to-end distribution based on the SAW as defined by:
+
+        O’Brien, E. P., Morrison, G., Brooks, B. R., & Thirumalai, D. (2009). 
+        How accurate are polymer models in the analysis of Forster resonance 
+        energy transfer experiments on proteins? The Journal of Chemical Physics, 
+        130(12), 124903.
+
+        This is a composition independent model for which the end-to-end distance depends
+        solely on the number of amino acids. It is included here as an additional reference 
+        model.
+
+        Parameters
+        ------------
+        prefactor : float
+            Prefactor is a number that tunes the SAW dimensions. 5 angstroms is in the right ballpark
+            but this number should be tuned to match EV sims, by default 5.5 A.
+        
+        recompute : bool, optional
+            whether or not to recompute the internal scaling profile 
+            if it's already been computed, by default False.
+        
+        Returns
+        -------
+        tuple of arrays
+           A 2-pair tuple of numpy arrays where the first is the distance (in Angstroms) and 
+           the second array is the probability of that distance.
+        """
+        
         selector = "saw-re-dist"
         if self.__saw is None: 
             from afrc.polymer_models.saw import SAW
@@ -253,6 +380,29 @@ class Polymeric:
     #     return self.__precomputed[selector]
 
     def get_mean_saw_end_to_end_distance(self,prefactor=5.5, recompute=False):
+        """
+        Returns the mean end-to-end distance (:math:`R_e`). As calculated 
+        from the SAW model as defined https://aip.scitation.org/doi/10.1063/1.3082151. 
+
+        By default this uses a prefactor of 5.5 A (0.55 nanometers).
+        
+        Parameters
+        ------------
+        prefactor : float
+            Prefactor is a number that tunes the SAW dimensions. 5 angstroms is in the right ballpark
+            but this number should be tuned to match EV sims, by default 5.5 A.
+        
+        recompute : bool, optional
+            whether or not to recompute the internal scaling profile 
+            if it's already been computed, by default False.
+
+        Returns
+        -------
+        float
+           Returns the value equal to the mean end-to-end distance.
+
+        """
+
         selector = "saw-mean-re"
         if self.__saw is None: 
             from afrc.polymer_models.saw import SAW
@@ -264,6 +414,28 @@ class Polymeric:
         return self.__precomputed[selector]
     
     def get_mean_saw_radius_of_gyration(self, prefactor=5.5, recompute=False):
+        """
+        Returns the mean radius of gyration (:math:`R_g`). As calculated 
+        from the SAW model as defined https://aip.scitation.org/doi/10.1063/1.3082151. 
+
+        By default this uses a prefactor of 5.5 A (0.55 nanometers).
+        
+        Parameters
+        ------------
+        prefactor : float
+            Prefactor is a number that tunes the SAW dimensions. 5 angstroms is in the right ballpark
+            but this number should be tuned to match EV sims, by default 5.5 A.
+        
+        recompute : bool, optional
+            whether or not to recompute the internal scaling profile 
+            if it's already been computed, by default False.
+
+        Returns
+        -------
+        float
+           Value equal to the mean radius of gyration.
+
+        """
         selector = "saw-mean-rg"
         if self.__saw is None: 
             from afrc.polymer_models.saw import SAW
@@ -274,7 +446,28 @@ class Polymeric:
 
         return self.__precomputed[selector]
 
-    def get_nudep_saw_end_to_end_distribution(self, nu=0.5,prefactor=5.5, recompute=False):
+    def get_nudep_saw_end_to_end_distribution(self, nu=0.5, prefactor=5.5, recompute=False):
+        """
+        Defines the end-to-end distribution based on the nu-dependent SAW model.
+
+        This is a composition independent model for which the end-to-end distance depends
+        solely on the number of amino acids. Both nu and the prefactor can be varied 
+        
+        Parameters
+        ------------
+        nu : float
+            Flory scaling exponent. Should fall between 0.33 and 0.6
+
+        prefactor : float
+            Prefactor is a number that tunes the SAW dimensions. Default is 5.5 A.
+
+        Returns
+        -------
+        tuple of arrays
+           A 2-pair tuple of numpy arrays where the first is the distance (in Angstroms) and 
+           the second array is the probability of that distance.
+
+        """
         selector = "nudep-saw-re-dist"
         if self.__NuDepSAW is None:
             from afrc.polymer_models.nudep_saw import NuDepSAW
@@ -286,6 +479,27 @@ class Polymeric:
         return self.__precomputed[selector]
 
     def get_mean_nudep_saw_end_to_end_distance(self,nu=0.5, prefactor=5.5, recompute=False):
+        """
+        Returns the mean end-to-end distance (:math:`R_e`). As calculated 
+        from the nu-dependent SAW model.
+
+        Parameters
+        ------------
+        nu : float
+            Flory scaling exponent. Should fall between 0.33 and 0.6
+
+        prefactor : float
+            Prefactor is a number that tunes the SAW dimensions, by default 5.5 A.
+        
+        recompute : bool, optional
+            whether or not to recompute the internal scaling profile 
+            if it's already been computed, by default False.
+
+        Returns
+        -------
+        float
+           Returns the value equal to the mean end-to-end distance.
+        """
         selector = "nudep-saw-mean-re"
         if self.__NuDepSAW is None:
             from afrc.polymer_models.nudep_saw import NuDepSAW
@@ -297,6 +511,27 @@ class Polymeric:
         return self.__precomputed[selector]
     
     def get_mean_nudep_saw_radius_of_gyration(self, nu=0.5, prefactor=5.5, recompute=False):
+        """
+        Returns the mean radius of gyration (:math:`R_g`). As calculated 
+        from the nu-dependent SAW model.
+
+        Parameters
+        ------------
+        nu : float
+            Flory scaling exponent. Should fall between 0.33 and 0.6
+
+        prefactor : float
+            Prefactor is a number that tunes the SAW dimensions, by default 5.5 A.
+        
+        recompute : bool, optional
+            whether or not to recompute the internal scaling profile 
+            if it's already been computed, by default False.
+
+        Returns
+        -------
+        float
+           Returns the value equal to the mean end-to-end distance.
+        """        
         selector = "nudep-saw-mean-rg"
         if self.__NuDepSAW is None:
             from afrc.polymer_models.nudep_saw import NuDepSAW
