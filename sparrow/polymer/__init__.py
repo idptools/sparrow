@@ -155,7 +155,7 @@ class Polymeric:
             2D numpy array in which the first column is the distance (in angstroms) 
             and the second column is the probablity.
         """
-        if self.__NuDepSAW is None:
+        if self.__nudepsaw is None:
             from afrc.polymer_models.nudep_saw import NuDepSAW
             self.__nudepsaw = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
         
@@ -469,7 +469,7 @@ class Polymeric:
 
         """
         selector = "nudep-saw-re-dist"
-        if self.__NuDepSAW is None:
+        if self.__nudepsaw is None:
             from afrc.polymer_models.nudep_saw import NuDepSAW
             self.__nudepsaw = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
 
@@ -501,7 +501,7 @@ class Polymeric:
            Returns the value equal to the mean end-to-end distance.
         """
         selector = "nudep-saw-mean-re"
-        if self.__NuDepSAW is None:
+        if self.__nudepsaw is None:
             from afrc.polymer_models.nudep_saw import NuDepSAW
             self.__nudepsaw = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
 
@@ -533,7 +533,7 @@ class Polymeric:
            Returns the value equal to the mean end-to-end distance.
         """        
         selector = "nudep-saw-mean-rg"
-        if self.__NuDepSAW is None:
+        if self.__nudepsaw is None:
             from afrc.polymer_models.nudep_saw import NuDepSAW
             self.__nudepsaw = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
 
