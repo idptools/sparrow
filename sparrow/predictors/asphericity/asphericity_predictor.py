@@ -210,7 +210,7 @@ class AsphericityPredictor():
         ## REGRESSION CODE BLOCK
         # This block should be kept if we're doing a regression-based
         # prediction. If not, comment this out or delete it
-        prediction = self.network(seq_vector.float()).detach().numpy().flatten()
+        prediction = self.network(seq_vector.float()).detach().numpy().flatten()[0]
 
 
         ## CLIP
