@@ -19,8 +19,9 @@ from .scaled_re.scaled_end_to_end_distance_predictor import ScaledRePredictor
 from .scaled_rg.scaled_radius_of_gyration_predictor import ScaledRgPredictor
 from ..sparrow_exceptions import SparrowException
 
-def prepare_model(network,version):
-    """Given a predictor name and version, load the network weights and parameters to the appropriate device
+def prepare_model(network,version,gpuid):
+    """Given a predictor name and version, load the network weights and parameters 
+    to the appropriate device.
 
     Parameters
     ----------
@@ -47,7 +48,7 @@ def prepare_model(network,version):
     
     # Check if GPU is available
     if torch.cuda.is_available():
-        device = torch.device("cuda")
+        device = torch.device(f"cuda:{gpuid}")
     else:
         device = torch.device("cpu")
     
@@ -75,7 +76,7 @@ def prepare_model(network,version):
 
     return (device, model)
 
-def batch_predict(protein_objs : List[sparrow.Protein], batch_size : int, network : str = None, version : int = 1) -> dict:
+def batch_predict(protein_objs : List[sparrow.Protein], batch_size : int, network : str = None, version : int = 1, gpuid : int = 0) -> dict:
     """Perform batch predictions with a PARROT network in sparrow.
 
     Parameters
@@ -98,6 +99,9 @@ def batch_predict(protein_objs : List[sparrow.Protein], batch_size : int, networ
         
     version : int, optional
         Network version number, by default 1
+    
+    gpuid : int, optional
+        GPU ID to use for predictions, by default 0
 
     Returns
     -------
@@ -113,7 +117,7 @@ def batch_predict(protein_objs : List[sparrow.Protein], batch_size : int, networ
     if network not in ["rg", "re", "prefactor", "asphericity", "scaling_exponent", "scaled_re", "scaled_rg"]:
         raise SparrowException("Please choose a valid network for batch predictions")
     
-    device, model = prepare_model(network,version)
+    device, model = prepare_model(network,version,gpuid)
     model.to(device)
    
     pred_dict = {}
