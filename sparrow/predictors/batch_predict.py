@@ -49,10 +49,10 @@ def prepare_model(network,version,gpuid):
     # Check if GPU is available
     if torch.cuda.is_available():
         device = torch.device(f"cuda:{gpuid}")
-        loaded_model = torch.load(saved_weights,map_location=device)
     else:
         device = torch.device("cpu")
-        loaded_model = torch.load(saved_weights,map_location=device)
+        
+    loaded_model = torch.load(saved_weights, map_location=device)
     
 
     # count number of network layers
