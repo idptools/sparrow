@@ -133,10 +133,10 @@ def batch_predict(protein_objs : List[sparrow.Protein], batch_size : int, networ
         seqs_padded = seqs_padded.to(device)
 
         # Forward pass
-        outputs = model.forward(seqs_padded).detach().cpu().numpy()[0]
+        outputs = model.forward(seqs_padded).detach().cpu().numpy()
 
         # Save predictions
         for j, seq in enumerate(batch):
-            pred_dict[seq] = outputs[j]
+            pred_dict[seq] = outputs[j][0]
     
     return pred_dict
