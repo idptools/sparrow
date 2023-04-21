@@ -51,7 +51,7 @@ def prepare_model(network,version,gpuid):
         device = torch.device(f"cuda:{gpuid}")
     else:
         device = torch.device("cpu")
-        
+
     loaded_model = torch.load(saved_weights, map_location=device)
     
 
@@ -133,7 +133,7 @@ def batch_predict(protein_objs : List[sparrow.Protein], batch_size : int, networ
         seqs_padded = seqs_padded.to(device)
 
         # Forward pass
-        outputs = model.forward(seqs_padded).detach().cpu().numpy()
+        outputs = model.forward(seqs_padded).detach().cpu().numpy()[0]
 
         # Save predictions
         for j, seq in enumerate(batch):
