@@ -1009,7 +1009,7 @@ class Predictor:
         return self.__precomputed[selector] 
 
     
-    def radius_of_gyration(self, use_scaled=True, recompute=False):
+    def radius_of_gyration(self, use_scaled=False, recompute=False):
 
         """
         Returns the predicted radius of gyration of the sequence
@@ -1049,7 +1049,7 @@ class Predictor:
 
 
 
-    def end_to_end_distance(self, use_scaled=True, recompute=False):
+    def end_to_end_distance(self, use_scaled=False, recompute=False):
         """
         Returns the predicted end-to-end distance of the sequence
 
