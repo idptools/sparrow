@@ -72,8 +72,6 @@ class Predictor:
         self.__prefactor_predictor_object = None
         self.__scaling_exponent_predictor_object = None
         self.__asphericity_predictor_object = None
-        self.__scaled_rg_predictor_object = None
-        self.__scaled_re_predictor_object = None
 
 
         # this __precomputed dictionary is where predictions made can be scored so that
@@ -1010,7 +1008,18 @@ class Predictor:
 
         return self.__precomputed[selector] 
     
-    def radius_of_gyration(self, recompute=False):
+    def __radius_of_gyraton_scaled_helper(self, recompute):
+        """
+        Helper function for radius_of_gyration_scaled
+        """
+
+        selector = 'rg-scaled'
+
+        
+        return self.__precomputed[selector]
+    
+
+    def radius_of_gyration(self, use_scaled=True, recompute=False):
 
         """
         Returns the predicted radius of gyration of the sequence
@@ -1030,20 +1039,29 @@ class Predictor:
 
         selector = 'rg'
         
-        if self.__rg_predictor_object is None:
-            from .rg.radius_of_gyration_predictor import RgPredictor
-            
-            self.__rg_predictor_object = RgPredictor()
+        if use_scaled:
+            if self.__rg_predictor_object is None:
+                from .scaled_rg.scaled_radius_of_gyration_predictor import ScaledRgPredictor
+                self.__rg_predictor_object = ScaledRgPredictor()
 
+            if selector not in self.__precomputed or recompute is True:
+                self.__precomputed[selector] = self.__rg_predictor_object.predict_scaled_rg(self.__protein.sequence) * np.sqrt(len(self.__protein.sequence))
 
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__rg_predictor_object.predict_rg(self.__protein.sequence)
+        else:
+            if self.__rg_predictor_object is None:
+                from .rg.radius_of_gyration_predictor import RgPredictor    
+                self.__rg_predictor_object = RgPredictor()
 
+            if selector not in self.__precomputed or recompute is True:
+                self.__precomputed[selector] = self.__rg_predictor_object.predict_rg(self.__protein.sequence)
+        
         return self.__precomputed[selector]
-    
-    def end_to_end_distance(self, recompute=False):
+
+
+
+    def end_to_end_distance(self, use_scaled=True, recompute=False):
         """
-        Returns the predicted end_to_end distance of the sequence
+        Returns the predicted end-to-end distance of the sequence
 
         Parameters
         --------------
@@ -1054,85 +1072,29 @@ class Predictor:
         Returns
         -------------
         float
-            Returns the predicted end_to_end distance of the sequence
+            Returns the predicted end-to-end distance of the sequence
 
         """
 
         selector = 're'
         
-        if self.__re_predictor_object is None:
-            from .re.end_to_end_distance_predictor import RePredictor
-            
-            self.__re_predictor_object = RePredictor()
+        if use_scaled:
+            if self.__re_predictor_object is None:
+                from .scaled_re.scaled_end_to_end_distance_predictor import ScaledRePredictor
+                self.__re_predictor_object = ScaledRePredictor()
 
+            if selector not in self.__precomputed or recompute is True:
+                self.__precomputed[selector] = self.__re_predictor_object.predict_scaled_re(self.__protein.sequence) * np.sqrt(len(self.__protein.sequence))
+                
+        else:
+            if self.__re_predictor_object is None:
+                from .re.end_to_end_distance_predictor import RePredictor    
+                self.__re_predictor_object = RePredictor()
 
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__re_predictor_object.predict_re(self.__protein.sequence)
-
-        return self.__precomputed[selector]
-
-    def scaled_radius_of_gyration(self, recompute=False):
-
-        """
-        Returns the predicted scaled radius of gyration of the sequence
-
-        Parameters
-        --------------
-        recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
-            the prediction has run already
-   
-        Returns
-        -------------
-        float
-            Returns the predicted scaled radius of gyration of the sequence
-
-        """
-
-        selector = 'scaled_rg'
+            if selector not in self.__precomputed or recompute is True:
+                self.__precomputed[selector] = self.__re_predictor_object.predict_re(self.__protein.sequence)
         
-        if self.__scaled_rg_predictor_object is None:
-            from .scaled_rg.scaled_radius_of_gyration_predictor import ScaledRgPredictor
-            
-            self.__scaled_rg_predictor_object = ScaledRgPredictor()
-
-
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__scaled_rg_predictor_object.predict_scaled_rg(self.__protein.sequence)
-
         return self.__precomputed[selector]
-
-    def scaled_end_to_end_distance(self, recompute=False):
-
-        """
-        Returns the predicted scaled end to end distance of the sequence
-
-        Parameters
-        --------------
-        recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
-            the prediction has run already
-   
-        Returns
-        -------------
-        float
-            Returns the predicted scaled end to end distance of the sequence
-
-        """
-
-        selector = 'scaled_re'
-        
-        if self.__scaled_re_predictor_object is None:
-            from .scaled_re.scaled_end_to_end_distance_predictor import ScaledRePredictor
-            
-            self.__scaled_re_predictor_object = ScaledRePredictor()
-
-
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__scaled_re_predictor_object.predict_scaled_re(self.__protein.sequence)
-
-        return self.__precomputed[selector]
-
 
     def asphericity(self, recompute=False):
 
