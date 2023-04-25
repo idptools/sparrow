@@ -1007,18 +1007,8 @@ class Predictor:
                 self.__precomputed[selector]  = self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(self.__protein.sequence, raw_values=True)
 
         return self.__precomputed[selector] 
+
     
-    def __radius_of_gyraton_scaled_helper(self, recompute):
-        """
-        Helper function for radius_of_gyration_scaled
-        """
-
-        selector = 'rg-scaled'
-
-        
-        return self.__precomputed[selector]
-    
-
     def radius_of_gyration(self, use_scaled=True, recompute=False):
 
         """
@@ -1040,7 +1030,7 @@ class Predictor:
         selector = 'rg'
         
         if use_scaled:
-            if self.__rg_predictor_object is None:
+            if self.__rg_predictor_object is None or recompute is True:
                 from .scaled_rg.scaled_radius_of_gyration_predictor import ScaledRgPredictor
                 self.__rg_predictor_object = ScaledRgPredictor()
 
@@ -1048,7 +1038,7 @@ class Predictor:
                 self.__precomputed[selector] = self.__rg_predictor_object.predict_scaled_rg(self.__protein.sequence) * np.sqrt(len(self.__protein.sequence))
 
         else:
-            if self.__rg_predictor_object is None:
+            if self.__rg_predictor_object is None or recompute is True:
                 from .rg.radius_of_gyration_predictor import RgPredictor    
                 self.__rg_predictor_object = RgPredictor()
 
@@ -1079,7 +1069,7 @@ class Predictor:
         selector = 're'
         
         if use_scaled:
-            if self.__re_predictor_object is None:
+            if self.__re_predictor_object is None or recompute is True:
                 from .scaled_re.scaled_end_to_end_distance_predictor import ScaledRePredictor
                 self.__re_predictor_object = ScaledRePredictor()
 
@@ -1087,7 +1077,7 @@ class Predictor:
                 self.__precomputed[selector] = self.__re_predictor_object.predict_scaled_re(self.__protein.sequence) * np.sqrt(len(self.__protein.sequence))
                 
         else:
-            if self.__re_predictor_object is None:
+            if self.__re_predictor_object is None or recompute is True:
                 from .re.end_to_end_distance_predictor import RePredictor    
                 self.__re_predictor_object = RePredictor()
 
