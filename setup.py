@@ -93,7 +93,8 @@ setup(
         "protfasta",
         "metapredict>2",
         "ipython",
-        "idptools-parrot"
+        "idptools-parrot",
+        "afrc",
     ],
     
     python_requires=">=3.7",          # Python version restrictions

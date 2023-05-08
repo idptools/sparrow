@@ -10,6 +10,7 @@ from .sequence_analysis import physical_properties
 from .sequence_analysis import elm
 
 import numpy as np
+import torch
 from .patterning import kappa, iwd, scd
 from .data import amino_acids
 from sparrow.predictors import Predictor
@@ -89,6 +90,7 @@ class Protein:
         self.__predictor_object = None
         self.__polymeric_object = None
         self.__elms = None
+
         
     # .................................................................
     #
@@ -1089,6 +1091,7 @@ class Protein:
             * pscore
             * tad
             * mitochondrial targeting
+            * rg : radius of gyration
             * transmembrane_region : predict binary classification of transmembrane region 
         
         """

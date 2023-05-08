@@ -65,6 +65,13 @@ class Predictor:
         self.__tyr_phos_predictor_object = None
         self.__tad_predictor_object = None
 
+        # polymeric property predictors parameterized 
+        # from single chain IDR LAMMPS simulations
+        self.__rg_predictor_object = None
+        self.__re_predictor_object = None
+        self.__prefactor_predictor_object = None
+        self.__scaling_exponent_predictor_object = None
+        self.__asphericity_predictor_object = None
 
 
         # this __precomputed dictionary is where predictions made can be scored so that
@@ -1000,4 +1007,174 @@ class Predictor:
                 self.__precomputed[selector]  = self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(self.__protein.sequence, raw_values=True)
 
         return self.__precomputed[selector] 
+
     
+    def radius_of_gyration(self, use_scaled=False, recompute=False):
+
+        """
+        Returns the predicted radius of gyration of the sequence
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        float
+            Returns the predicted radius of gyration of the sequence
+
+        """
+
+        selector = 'rg'
+        
+        if use_scaled:
+            if self.__rg_predictor_object is None or recompute is True:
+                from .scaled_rg.scaled_radius_of_gyration_predictor import ScaledRgPredictor
+                self.__rg_predictor_object = ScaledRgPredictor()
+
+            if selector not in self.__precomputed or recompute is True:
+                self.__precomputed[selector] = self.__rg_predictor_object.predict_scaled_rg(self.__protein.sequence) * np.sqrt(len(self.__protein.sequence))
+
+        else:
+            if self.__rg_predictor_object is None or recompute is True:
+                from .rg.radius_of_gyration_predictor import RgPredictor    
+                self.__rg_predictor_object = RgPredictor()
+
+            if selector not in self.__precomputed or recompute is True:
+                self.__precomputed[selector] = self.__rg_predictor_object.predict_rg(self.__protein.sequence)
+        
+        return self.__precomputed[selector]
+
+
+
+    def end_to_end_distance(self, use_scaled=False, recompute=False):
+        """
+        Returns the predicted end-to-end distance of the sequence
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        float
+            Returns the predicted end-to-end distance of the sequence
+
+        """
+
+        selector = 're'
+        
+        if use_scaled:
+            if self.__re_predictor_object is None or recompute is True:
+                from .scaled_re.scaled_end_to_end_distance_predictor import ScaledRePredictor
+                self.__re_predictor_object = ScaledRePredictor()
+
+            if selector not in self.__precomputed or recompute is True:
+                self.__precomputed[selector] = self.__re_predictor_object.predict_scaled_re(self.__protein.sequence) * np.sqrt(len(self.__protein.sequence))
+                
+        else:
+            if self.__re_predictor_object is None or recompute is True:
+                from .re.end_to_end_distance_predictor import RePredictor    
+                self.__re_predictor_object = RePredictor()
+
+            if selector not in self.__precomputed or recompute is True:
+                self.__precomputed[selector] = self.__re_predictor_object.predict_re(self.__protein.sequence)
+        
+        return self.__precomputed[selector]
+
+    def asphericity(self, recompute=False):
+
+        """
+        Returns the predicted asphericity of the sequence
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        float
+            Returns the predicted asphericity of the sequence
+
+        """
+
+        selector = 'asph'
+        
+        if self.__asphericity_predictor_object is None:
+            from .asphericity.asphericity_predictor import AsphericityPredictor
+            
+            self.__asphericity_predictor_object = AsphericityPredictor()
+
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__asphericity_predictor_object.predict_asphericity(self.__protein.sequence)
+
+        return self.__precomputed[selector]
+    
+    def prefactor(self, recompute=False):
+
+        """
+        Returns the predicted prefactor of the sequence
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        float
+            Returns the predicted prefactor of the sequence
+
+        """
+
+        selector = 'prefactor'
+        
+        if self.__prefactor_predictor_object is None:
+            from .prefactor.prefactor_predictor import PrefactorPredictor
+            
+            self.__prefactor_predictor_object = PrefactorPredictor()
+
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__prefactor_predictor_object.predict_prefactor(self.__protein.sequence)
+
+        return self.__precomputed[selector]
+
+    def scaling_exponent(self, recompute=False):
+
+        """
+        Returns the predicted scaling exponent of the sequence
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+   
+        Returns
+        -------------
+        float
+            Returns the predicted scaling exponent of the sequence
+
+        """
+
+        selector = 'scaling_exponent'
+        
+        if self.__scaling_exponent_predictor_object is None:
+            from .scaling_exponent.scaling_exponent_predictor import ScalingExponentPredictor
+            
+            self.__scaling_exponent_predictor_object = ScalingExponentPredictor()
+
+
+        if selector not in self.__precomputed or recompute is True:
+            self.__precomputed[selector] = self.__scaling_exponent_predictor_object.predict_scaling_exponent(self.__protein.sequence)
+
+        return self.__precomputed[selector]
