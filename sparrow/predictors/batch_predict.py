@@ -123,7 +123,7 @@ def batch_predict(protein_objs : List[sparrow.Protein], batch_size : int, networ
    
     pred_dict = {}
     sequences = [protein_obj.sequence for _, protein_obj in protein_objs.items()]
-    seq_loader = DataLoader(sequences, batch_size=batch_size, shuffle=False)
+    seq_loader = DataLoader(sequences, batch_size=1, shuffle=False)
 
     for batch in tqdm(seq_loader):
         # Pad the sequence vector to have the same length as the longest sequence in the batch
