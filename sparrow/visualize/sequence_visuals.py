@@ -1,5 +1,7 @@
-from IPython import display
-from IPython.core.display import display, HTML
+#from IPython import display
+from IPython.display import display
+from IPython.display import HTML
+
 from sparrow.data.amino_acids import AA_COLOR
 from sparrow.sparrow_exceptions import SparrowException
 
@@ -129,3 +131,4 @@ def show_sequence(seq,
         return colorString
     else:
         display(HTML(colorString))
+        #HTML(colorString)
