@@ -213,8 +213,9 @@ def kappa_x(str seq, list group1, list group2, int window_size, int flatten=0):
     
     """
 
+
     # decare
-    cdef int string_length, winged_string_length, count, i;
+    cdef int string_length, winged_string_length, i, count_1, count_2;
     cdef float wt_sigma, kappa_val
 
 
@@ -239,17 +240,24 @@ def kappa_x(str seq, list group1, list group2, int window_size, int flatten=0):
 
 
     # --------------------------------------------------------
-     
+    
     seq_ternary_winged = ternarize(seq, group1, group2, seq_ternary_winged, wing_size, string_length)
 
-    # check we have at least one grouped residue
-    count = 0
+    count_1 = 0
+    count_2 = 0
     for i in range(winged_string_length):
-        if seq_ternary_winged[i] == 1 or seq_ternary_winged[i] == -1:
-            count = count + 1
+        if seq_ternary_winged[i] == 1:
+            count_1 = count_1 + 1
+        elif seq_ternary_winged[i] == -1:
+            count_2 = count_2 + 1
             
-    if count == 0:
-        return -1
+    if count_1 == 0:
+        if len(group1) > 0:
+            return -1.0
+
+    if count_2 == 0:
+        if len(group2) > 0:
+            return -1.0
         
     # --------------------------------------------------------
     wt_sigma = global_compositional_asymmetry(seq_ternary_winged, winged_string_length)
@@ -282,6 +290,9 @@ cdef array.array ternarize(str seq,
     Function that takes in an amino acid sequence and converts it into a ternary integer 
     array. Specifically, each position is set to 0 depending on if the residue in question
     is present or absent from the group list.
+
+    If group2 is empty, then this function becomes a binarizing function, whereby we just
+    set elements in ternarized_winged to zero or 1. 
 
 
     Parameters
@@ -319,15 +330,15 @@ cdef array.array ternarize(str seq,
     # to be in group 2
     if len(group2) == 0:
 
-        # note in this scenario we're really doing a binerize operation
-        
+        # note in this scenario we're really doing a binerize operation        
         for i in range(string_length):
             if seq[i] in group1:
                 ternarized_winged[i+wing_size] = 1
             else:
                 ternarized_winged[i+wing_size] = -1
-    else:
 
+    # here's where we generate a ternaized sequence
+    else:
         for i in range(string_length):
             if seq[i] in group1:
                 ternarized_winged[i+wing_size] = 1

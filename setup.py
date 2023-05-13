@@ -7,7 +7,7 @@ from setuptools import setup, find_packages
 import versioneer
 
 
-# ................................
+# ................................m
 # added for cython compilation
 from setuptools.extension import Extension
 
@@ -27,8 +27,6 @@ except ModuleNotFoundError:
     print('Error: Please install numpy first:\n\npip install numpy\n')
     print('########################################\n')
     exit(1)
-
-
     
 
 extensions = [
@@ -79,7 +77,6 @@ setup(
 
     # external modules
     ext_modules = cythonize(extensions, compiler_directives={'language_level' : "3"}),
-
 
     # Optional include package data to ship with your package
     # Customize MANIFEST.in if the general case does not suit your needs
