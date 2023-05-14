@@ -65,10 +65,13 @@ class Predictor:
         self.__tyr_phos_predictor_object = None
         self.__tad_predictor_object = None
 
-        # polymeric property predictors parameterized 
-        # from single chain IDR LAMMPS simulations
+        # ALBATROSS predictors set here
         self.__rg_predictor_object = None
         self.__re_predictor_object = None
+
+        self.__scaled_rg_predictor_object = None
+        self.__scaled_re_predictor_object = None
+
         self.__prefactor_predictor_object = None
         self.__scaling_exponent_predictor_object = None
         self.__asphericity_predictor_object = None
@@ -1027,17 +1030,19 @@ class Predictor:
 
         """
 
-        selector = 'rg'
+
         
         if use_scaled:
-            if self.__rg_predictor_object is None or recompute is True:
+            selector = 'scaled_rg'
+            if self.__scaled_rg_predictor_object is None or recompute is True:
                 from .scaled_rg.scaled_radius_of_gyration_predictor import ScaledRgPredictor
-                self.__rg_predictor_object = ScaledRgPredictor()
+                self.__scaled_rg_predictor_object = ScaledRgPredictor()
 
             if selector not in self.__precomputed or recompute is True:
-                self.__precomputed[selector] = self.__rg_predictor_object.predict_scaled_rg(self.__protein.sequence) * np.sqrt(len(self.__protein.sequence))
+                self.__precomputed[selector] = self.__scaled_rg_predictor_object.predict_scaled_rg(self.__protein.sequence) * np.sqrt(len(self.__protein.sequence))
 
         else:
+            selector = 'rg'
             if self.__rg_predictor_object is None or recompute is True:
                 from .rg.radius_of_gyration_predictor import RgPredictor    
                 self.__rg_predictor_object = RgPredictor()
@@ -1066,17 +1071,19 @@ class Predictor:
 
         """
 
-        selector = 're'
+
         
         if use_scaled:
-            if self.__re_predictor_object is None or recompute is True:
+            selector = 'scaled_re'
+            if self.__scaled_re_predictor_object is None or recompute is True:
                 from .scaled_re.scaled_end_to_end_distance_predictor import ScaledRePredictor
-                self.__re_predictor_object = ScaledRePredictor()
+                self.__scaled_re_predictor_object = ScaledRePredictor()
 
             if selector not in self.__precomputed or recompute is True:
-                self.__precomputed[selector] = self.__re_predictor_object.predict_scaled_re(self.__protein.sequence) * np.sqrt(len(self.__protein.sequence))
+                self.__precomputed[selector] = self.__scaled_re_predictor_object.predict_scaled_re(self.__protein.sequence) * np.sqrt(len(self.__protein.sequence))
                 
         else:
+            selector = 're'
             if self.__re_predictor_object is None or recompute is True:
                 from .re.end_to_end_distance_predictor import RePredictor    
                 self.__re_predictor_object = RePredictor()

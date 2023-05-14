@@ -82,15 +82,19 @@ def batch_predict(protein_objs : List[sparrow.Protein], batch_size : int, networ
 
     Parameters
     ----------
-    protein_objs : List[sparrow.Protein]
-        A list of sparrow.Protein objects. 
+    protein_objs : Dict[sparrow.Protein]
+        A dictionary of key-value paris where keys are indices and
+        values are sparrow.protein.Protein objects.
+
     batch_size : int
         The batch size to use for network forward pass. 
         This should be <= the batch size used during training.
+
     network : str, optional
         The name of the network you wish to predict, by default None
         Currently implemented options include:
 
+            "rg"
             "re",
             "prefactor",
             "asphericity",
