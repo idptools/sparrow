@@ -78,11 +78,11 @@ def test_kappa():
                       1.0]
 
     for p in range(len(das)):
-        assert np.isclose(das_kappa_vals[p],Protein(das[p]).kappa, 5)
+        assert np.isclose(das_kappa_vals[p], Protein(das[p]).kappa, atol=0.03)
         
     if USE_LOCALCIDER:
         from localcider.sequenceParameters import SequenceParameters
-        nseqs = 10
+        nseqs = 100
         max_count = 100
         n_diff_res = 10
 
@@ -100,12 +100,17 @@ def test_kappa():
             seq = "".join(seq)
 
             P = Protein(seq)
+
+            # skip sequences 
+            if P.fraction_negative == 0 or P.fraction_positive == 0:
+                continue
+            
             SO = SequenceParameters(seq)
             assert np.isclose(P.NCPR, SO.get_NCPR())
             assert np.isclose(P.FCR, SO.get_FCR())
 
             # note, this will stochastically fial from time to time..
-            assert abs(P.kappa - SO.get_kappa()) < 0.1
+            assert np.isclose(P.kappa, SO.get_kappa(), atol=0.03)
 
 
 def test_kappa_range():

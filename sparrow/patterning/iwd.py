@@ -1,6 +1,5 @@
 import numpy as np
-
-
+from sparrow import sparrow_exceptions
 
 # ....................................................................................................
 #
@@ -27,12 +26,9 @@ def calculate_average_inverse_distance_from_sequence(sequence, target_residues):
 
     """
 
-    binary_mask = []
-    for i in sequence:
-        if i in target_residues:
-            binary_mask.append(1)
-        else:
-            binary_mask.append(0)
+    # build a binary mask based on the sequence and the set of target
+    # residues passed
+    binary_mask = [1 if i in target_residues else 0 for i in sequence]
 
     # compute IWD 
     return __compute_IWD_from_binary_mask(binary_mask)
@@ -45,8 +41,8 @@ def __compute_IWD_from_binary_mask(binary_mask, weights=None):
     """
     Internal function that actually computes the inverse weighted distance
     from a binary mask. This function should not be called directly, but
-    intsead should be called by functions inside this module. This is the
-    single place where the monovariate IWD should be calculated .
+    instead should be called by functions inside this module. This is the
+    single place where the monovariate IWD should be calculated.
 
     Parameters
     ----------------
@@ -71,39 +67,36 @@ def __compute_IWD_from_binary_mask(binary_mask, weights=None):
         weights = [1]*len(binary_mask)
 
     # get the indices where the binary mask is 1
-    hit_indices = []
-    all_hits = {}
-    
-    for idx, value in enumerate(binary_mask):
-        if value == 1:
-            hit_indices.append(idx)
-            all_hits[idx] = 0
+    hit_indices = [idx for idx, value in enumerate(binary_mask) if value == 1]
 
-    # convert to an array so we can reference multiple positions with 
-    # slice notation
-    hit_indices = np.array(hit_indices)
-            
-    # now cycle over each position that was '1' and calculate the index
-    # position between 
-    for index, position in enumerate(hit_indices):
-        resi_distances = 0
-        
-        # for every OTHER hit index  
-        for other_position in hit_indices[np.arange(len(hit_indices)) != index]:
-            resi_distances = resi_distances + 1/(np.abs(other_position - position))
-
-        all_hits[position] = resi_distances*weights[position]
-
-    if len(all_hits) > 0:
-        return sum(all_hits.values())/len(all_hits)
-    else:
+    # if we fouond no hit indices then return 0 and be done!
+    if len(hit_indices) == 0:
         return 0
 
+    # Initialize a dictionary to store the intial hit value 
+    inverse_distance_sums = {idx: 0 for idx in hit_indices}
+
+    # Now cycle over each position that was '1' and calculate the index
+    # position between 
+    for position in hit_indices:
+
+        total_distance = 0
+        
+        # For every OTHER hit index  
+        for other_position in hit_indices:
+            if other_position != position:
+                total_distance = total_distance + ( 1 / abs(other_position - position))
+
+        # Update the total distance for the current position, weighted by the corresponding weight
+        inverse_distance_sums[position] = total_distance * weights[position]
+
+    
+    return sum(inverse_distance_sums.values()) / len(inverse_distance_sums)
 
 
 # ------------------------------------------------------------------
 #
-def calculate_average_inverse_distance_charge(mask, sequence, charge=['-','+']):
+def calculate_average_inverse_distance_charge(linear_NCPR, sequence, charge):
     """
     Function that returns the charge weighted average inverse distance of either the positive or
     negative residues in the sequence. For more information on the average_inverse_distance see 
@@ -115,7 +108,7 @@ def calculate_average_inverse_distance_charge(mask, sequence, charge=['-','+']):
 
     Parameters
     -------------
-    mask : list
+    linear_NCPR : list
         Linear net charge per residue (NCPR) as list calculated accross the sequence. For 
         more information on how to calculate the NCPR see SPARROW
 
@@ -127,51 +120,72 @@ def calculate_average_inverse_distance_charge(mask, sequence, charge=['-','+']):
         Pass '-' to quantify the clustering of negitive residues.
         Pass '+' to quantify the clustering of positive residues.
 
+    
+
     Returns
     --------
     float 
         Returns average charge weighted IWD value for the sequence based on the passed,
         NCPR mask, sequence, and which prefered charge to calculate the charge-weighted average IWD    
     """
-    
-    # dictionary to select delimiter function based on passed charge prefference 
-    delimiter_function = {'-':lambda a: a in ['D','E'], '+':lambda a: a in ['R','K']}[charge]
 
-    # dictionary to test map prefered charge to sign of NCPR     
-    charge_tester = {'-':-1.0,'+':1.0}
-    
-    # dictionary of empty values for each index point 
-    # (extracts all hit residues based on charge definition)
-    all_hits = {i:0 for i in find_all_indices(sequence, delimiter_function)} 
-    hits = np.array([i for i in all_hits.keys()])
-    
-    # iterate through index (here p is an index in the sequence)
-    for i, p in enumerate(hits):
-        resi_distances= 0
-        # iterate through pairs for that index 
-        for p1 in hits[np.arange(len(hits))!=i]:
-            resi_distances += 1 / np.abs(p1-p)
-
-        # multiply the residue charge by the resi_distances
-        # if NCPR of residue in the mask is opposite of the charge being evaluated set charge to 0 
-        if np.sign(mask[p]) == charge_tester[charge]:
-            all_hits[p] = abs(mask[p])*resi_distances
-        else:
-            all_hits[p] = 0*resi_distances
+    if charge not in ['-','+']:
+        raise sparrow_exceptions('charge parameter must be either "+" or "-"')
         
-    if len(hits) > 0:
-        return sum(all_hits.values())/len(hits)
+    # Define delimiter functions for amino acids carrying negative and positive charge
+    is_negatively_charged = lambda a: a in ['D', 'E']
+    is_positively_charged = lambda a: a in ['R', 'K']
+
+    # choose the appropriate delimiter function based on the charge preference
+    if charge == '-':
+        is_charged = is_negatively_charged
+        charge_value = -1.0
     else:
+        is_charged = is_positively_charged
+        charge_value = 1.0
+        
+    # get indices of charged residues as per the requested charge
+    # sign
+    charged_indices = find_all_indices(sequence, is_charged)
+
+    # if we found no charged residues then return 0 and be done!
+    if len(charged_indices) == 0:
         return 0
 
+    # initialize an empty dictionary
+    inverse_distance_sums = {}
+
+    # for each index where a charged residue is found
+    for p in charged_indices:
+        
+        total_distance = 0
+
+        # for every other index
+        for p1 in charged_indices:
+
+            # if not the same one
+            if p != p1:
+                total_distance = total_distance + ( 1 / abs(p1 - p))
+
+        # if for this residue the NCPR-weighted charge matches
+        # the sign of charge clustering we're interested in
+        if np.sign(linear_NCPR[p]) == charge_value:
+            inverse_distance_sums[p] = abs(linear_NCPR[p]) * total_distance
+        else:
+            inverse_distance_sums[p] = 0
+
+    # return average
+    return sum(inverse_distance_sums.values()) / len(inverse_distance_sums)
+    
+    
 # ------------------------------------------------------------------
 #
-def calculate_average_bivariate_inverse_distance_charge(mask, sequence):
+def calculate_average_bivariate_inverse_distance_charge(linear_NCPR, sequence):
     """
     Function returns the charge-weight average inverse distance BETWEEN positive and negative
     residues in an amino acid sequence. This function is similar to the 
     calculate_average_bivariate_inverse_distance in its calculation except it is specific to charge
-    residues and is weigthed by the difference in NCPR between charge pairs. 
+    residues and is weighted by the difference in NCPR between charge pairs. 
 
     The per residue pair bivariate inverse distance is weighted by the difference in charge 
     between the two oppositly charged residues of intrest: 
@@ -182,9 +196,9 @@ def calculate_average_bivariate_inverse_distance_charge(mask, sequence):
 
     Parameters
     -------------
-    mask : list
+    linear_NCPR : list
         Linear net charge per residue (NCPR) as list calculated accross the sequence. For 
-        more information on how to calculate the NCPR see SPARROW
+        more information on how to calculate the NCPR see SPARROW. 
 
     sequence : list
         Amino acid sequence spit into list, where element 0 is the first residue in sequence and 
@@ -201,47 +215,50 @@ def calculate_average_bivariate_inverse_distance_charge(mask, sequence):
     # dictionary to select delimiter function based on passed charge prefference 
     delimiter_function = {'-':lambda a: a in ['D','E'], '+':lambda a: a in ['R','K']}
 
+    # lambda functions to find negative and positive residues
+    is_negatively_charged = lambda a: a in ['D', 'E']
+    is_positively_charged = lambda a: a in ['R', 'K']
+
     #  dictionary to test map prefered charge to sign of NCPR     
     charge_tester = {-1.0:['D','E'], 1.0:['R','K'], 0:[None]}
     
-    # adjust charge mask such that charged residues with a charge opposite to that of the 
+    # adjust linear_NCPR such that charged residues with a charge opposite to that of the 
     # their defined charge are automatically set to zero. This is important to do so that during 
     # the charge difference calculation for weighting the difference of between charges is always
     # calculated a the difference between a - & + charge 
-    l_mask = [c if sequence[i] in charge_tester[np.sign(c)] else 0 for i,c in enumerate(mask)]
+    l_linear_NCPR = [c if sequence[i] in charge_tester[np.sign(c)] else 0 for i,c in enumerate(linear_NCPR)]
     
-    # dictionary of empty values for each index point for both catagories
-    all_neg_hits = {i:0 for i in find_all_indices(sequence, delimiter_function['-'])} 
-    neg_hits = np.array([i for i in all_neg_hits.keys()])
-    
-    all_pos_hits = {i:0 for i in find_all_indices(sequence, delimiter_function['+'])}
-    pos_hits = np.array([i for i in all_pos_hits.keys()])
-    
-    
+    # find the indices of D/E/R/K residues 
+    negative_indices = find_all_indices(sequence, is_negatively_charged)
+    positive_indices = find_all_indices(sequence, is_positively_charged)
+
     # make sure both catigories are populated with hits 
-    if len(neg_hits) == 0 or len(neg_hits) == 0:
+    if len(negative_indices) == 0 or len(positive_indices) == 0:
         return 0
-    
-    else:
-    
-        # iterate through index
-        for i, p in enumerate(neg_hits):
-            resi_distances= 0
-            # iterate through pairs for that index 
-            for p1 in pos_hits:
-                # sum over inverse distance
-                # resi_distances += 1 / np.abs(p1-p)
-                
-                # sum over charge difference over linear distance
-                resi_distances += np.abs(l_mask[p1]-l_mask[p]) / np.abs(p1-p)
 
-            # save to all_hits
-            all_neg_hits[p] = resi_distances
+    inverse_distance_sums = {}
+    # Calculate the sum of charge differences over linear distances. Specifically, 
+    # for each index that has a negative residue associated with it..    
+    for p in negative_indices:
         
+        # for this residue initialize the total at 0
+        total = 0
         
-        # return bivariate average IWD of pairs 
-        return sum(all_neg_hits.values())/(len(neg_hits)+len(pos_hits))
+        # for each positive residue in the sequence, calculate the absolute difference
+        # in charge divided by the distance in linear sequence space, adding this
+        # to a total score
+        for p1 in positive_indices:
+            total = total + abs(l_linear_NCPR[p1] - l_linear_NCPR[p]) / abs(p1 - p)
 
+        # finally, that total is associated with all the inverse distance sums
+        # at position p
+        inverse_distance_sums[p] = total    
+   
+    # return average
+    return sum(inverse_distance_sums.values()) / len(inverse_distance_sums)
+
+
+    
 
 # ------------------------------------------------------------------
 def find_all_indices(input_list, boolean_function):

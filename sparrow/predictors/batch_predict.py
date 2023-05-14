@@ -118,7 +118,7 @@ def batch_predict(protein_objs : List[sparrow.Protein], batch_size : int, networ
     if network not in ["rg", "re", "prefactor", "asphericity", "scaling_exponent", "scaled_re", "scaled_rg"]:
         raise SparrowException("Please choose a valid network for batch predictions")
     
-    device, model = prepare_model(network,version,gpuid)
+    device, model = prepare_model(network, version,gpuid)
     model.to(device)
    
     pred_dict = {}
@@ -138,5 +138,12 @@ def batch_predict(protein_objs : List[sparrow.Protein], batch_size : int, networ
         # Save predictions
         for j, seq in enumerate(batch):
             pred_dict[seq] = outputs[j][0]
-    
+
+
+    # finally, if using a scaled network re-multiply by np.sqrt(N)
+    if network in ['scaled_re', 'scaled_rg']:
+        
+        for s in pred_dict:
+            pred_dict[s] = pred_dict[s]*np.sqrt(len(s))
+                
     return pred_dict
