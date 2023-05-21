@@ -90,8 +90,13 @@ class RePredictor():
         if version is None:
             version = DEFAULT_VERSION
 
-        # CHANGE THIS!! Make sure oyu change the <DIRECTORY_NAME> and <PREDICTOR_NAME> to the appropriate
+        # CHANGE THIS!! Make sure you change the <DIRECTORY_NAME> and <PREDICTOR_NAME> to the appropriate
         # paths. Keep the network_v{version}.pt because this is how a version-specific string is selected
+        ##
+        ## NOTE that for the end-to-end distance predictor, the network name is 're' yet the predictor module
+        ## is 'e2e' and not 're'. This is a deliberate choice and avoids the predictor module clashing with
+        ## the Python regular expression (re) module.
+        ##
         saved_weights = sparrow.get_data(f'networks/re/re_network_v{version}.pt')
 
         if not os.path.isfile(saved_weights):

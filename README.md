@@ -1,7 +1,7 @@
 # sparrow: a tool for integrative analysis and prediction from protein sequence data 
 
 
-### Major version 0.2
+### Major version 0.2.1
 
 
 ## Overview
@@ -113,6 +113,19 @@ An initial public version of SPARROW was released in June 2022 to enable existin
 A full public release is planned for spring of 2023.
 
 ## Changelog
+
+#### May 2023 (version 0.2.1 release)
+* Update to ALBATROSS v2 networks (all networks use the `v2` by default both in individual predictors and batch predictions
+* Re-wrote much of `batch_predict()` code. Changes here include 
+	* Implementation of the `size-collect` algorithm to ensure the passed batchsize does not impact the accuracy of predictions. Batch prediction can now use larger batch sizes, providing better performanceon both GPUs and CPUs
+	*  Set default batch size to 32
+	*  Improved robustness of input types `batch_predict()` can accept. Can now take dictionaries and lists of sparrow.protein.Protein objects or dictionaries/lists of sequences.
+	*  Changed order of input parameters for `batch_predict()`, such that now the only required options are [0] Input list/dictionary and [2] name of the network to be used.
+	*  Updated return type for `batch_predict()` such that now the return type by default is a dictionary that maps input IDs (or list positions) to sequence and prediction. The original return behavior (a dictionary that maps sequence to prediction) can be obtained if the `return_seq2prediction` flag is set to True.
+	*  Wrote much more extensive tests for all `batch_predict()` code
+*  **Added scaled-network for small sequences**: In the course of testing the networks we noticed that in both V1 and V2, when sequences are short (<30-40 amino acids) the non-scaled Re and Rg predictors can return non-sensical results. In contrast, the `scaled_rg` and `scaled_re` networks show reasonable and reproducible polymeric behavior for these smaller sequences. To address this, in both single sequence predictions and batch predict, by default, even if an `rg` or `re` network is requested, if the sequence is less than 35 residues long, we force the `scaled_rg` or `scaled_re` networks. This can be over-ridden by setting the 'safe' keyword in either `batch_predict()` or the single sequence `radius_of_gyration()` or `end_to_end_distance()` 
+*  Technical change: the end-to-end distance predictor module found under sparrow/predictors was renamed from `re` to `e2e` to prevent clashing with Python's regular expression (`re`) package. This does not introduce any errors, but makes debugging predictors challenging. The actual network name is retained as `re`.
+	
 
 #### May 2023 (version 0.2 release)
 * First major 'alpha' release to coincide with ALBATROSS preprint

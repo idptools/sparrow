@@ -1,1 +1,1 @@
-# To Be Trained
+## The end-to-end networks are defined as re, although the actual predictor class is e2e. This is a rare exception where there's a mismatch in network name and predictor class name, because if the predictor class name were 're' then this would clash with the Python regular expression package ('re'), such that for code sanity purposes the predictor class and module is e2e even though the networks are re.

@@ -26,6 +26,8 @@
 #    
 #
 
+from sparrow.data.configs import MIN_LENGTH_ALBATROSS_RE_RG
+
 import numpy as np
 from sparrow.sparrow_exceptions import SparrowException
 
@@ -1012,16 +1014,36 @@ class Predictor:
         return self.__precomputed[selector] 
 
     
-    def radius_of_gyration(self, use_scaled=False, recompute=False):
+    def radius_of_gyration(self, use_scaled=False, recompute=False, safe=True):
 
         """
-        Returns the predicted radius of gyration of the sequence
+        Returns the predicted radius of gyration of the sequence. Note that this 
+        prediction can be done using one of two independently-trained networks. If
+        use_scaled = True then the predictor uses a network that was trained on 
+        sequences after normalizing out the length contribution, whereas if 
+        use_scaled=False then the prediction is done on a network trained using
+        rg data directly.
+
+        In principle both networks should give near-identical predictions. If they
+        do not, this is a red flag that the prediction may be unreliable. 
+
+        Note that for short sequences use_scaled performs much more accurately. As
+        such, if the sequence is less than 25 residues in length, the predictor
+        automatically invokes the scaled network even if the non-scaled version
+        was requested. This is the recommended and save behavior; however, if you
+        want to override this, you can do so by setting safe=False. We do NOT
+        recommend this, but, it can be done.
 
         Parameters
         --------------
         recompute : bool
             Flag which, of set to true, means the predictor re-runs regardless of if
             the prediction has run already
+
+        safe : bool
+            Flag which, if set to False, means the requested network will be used 
+            for rg prediction regardless of the sequence length. NOT RECOMMENDED.
+            Default = True.
    
         Returns
         -------------
@@ -1030,7 +1052,10 @@ class Predictor:
 
         """
 
-
+        # if this is a short sequence and safe=True
+        if safe:
+            if len(self.__protein) < MIN_LENGTH_ALBATROSS_RE_RG:
+                use_scaled = True
         
         if use_scaled:
             selector = 'scaled_rg'
@@ -1054,9 +1079,35 @@ class Predictor:
 
 
 
-    def end_to_end_distance(self, use_scaled=False, recompute=False):
+    def end_to_end_distance(self, use_scaled=False, recompute=False, safe=True):
         """
-        Returns the predicted end-to-end distance of the sequence
+        Returns the predicted end-to-end distance of the sequence. Note that this 
+        prediction can be done using one of two independently-trained networks. If
+        use_scaled = True then the predictor uses a network that was trained on 
+        sequences after normalizing out the length contribution, whereas if 
+        use_scaled=False then the prediction is done on a network trained using
+        end-to-end distance data directly data directly.
+
+        In principle both networks should give near-identical predictions. If they
+        do not, this is a red flag that the prediction may be unreliable. 
+
+        Note that for short sequences scaled networks performs much more accurately. As
+        such, if the sequence is less than 25 residues in length, the predictor
+        automatically invokes the scaled network even if the non-scaled version
+        was requested. This is the recommended and save behavior; however, if you
+        want to override this, you can do so by setting safe=False. We do NOT
+        recommend this, but, it can be done.
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, of set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+
+        safe : bool
+            Flag which, if set to False, means the requested network will be used 
+            for re prediction regardless of the sequence length. NOT RECOMMENDED.
+            Default = True.
 
         Parameters
         --------------
@@ -1070,8 +1121,10 @@ class Predictor:
             Returns the predicted end-to-end distance of the sequence
 
         """
-
-
+        
+        if safe:
+            if len(self.__protein) < MIN_LENGTH_ALBATROSS_RE_RG:
+                use_scaled = True
         
         if use_scaled:
             selector = 'scaled_re'
@@ -1085,7 +1138,7 @@ class Predictor:
         else:
             selector = 're'
             if self.__re_predictor_object is None or recompute is True:
-                from .re.end_to_end_distance_predictor import RePredictor    
+                from .e2e.end_to_end_distance_predictor import RePredictor    
                 self.__re_predictor_object = RePredictor()
 
             if selector not in self.__precomputed or recompute is True:
