@@ -120,6 +120,47 @@ def __size_filter(inseqs):
     return retdict
 
 
+# ....................................................................................
+#
+#
+def __list2dict(protein_objs):
+    """
+    Helper function that takes in variable and if it's a list
+    converts into a dictionary with keys as indices (1,2,...n)
+    while if its a dictionary just returns the same dictionary 
+    again.
+
+    Parameters
+    --------------
+    protein_objs : list or dict
+        Input data which will be converted to a dictionary IF
+        its a list, otherwise if a dictionary is passed in it
+        is returned, else an exception is raised
+
+    Returns
+    -------------
+    dict
+         Guarenteed to return a dictionary
+
+    Raises
+    sparrow.exception.SparrowException 
+
+
+    """
+    if type(protein_objs) is list:
+        tmp = {}
+        for i in range(0,len(protein_objs)):
+            tmp[i] = protein_objs[i]
+
+        return tmp
+    elif type(protein_objs) is dict:
+        return protein_objs
+    else:
+        raise SparrowException('Input must be one of a list or a dictionary')
+    
+
+
+
 
 # ....................................................................................
 #
@@ -229,6 +270,10 @@ def __short_seq_fix(protein_objs,
     else:
         raise SparrowException('Invalid types passed to protein_objs; must be a dict or list where values/elements are either strings or sparrow.protein.Protein objects') 
 
+    ##
+    ## For the code block below, we build a tmp_return_dict which undergoes a final processing step to ensure
+    ## its in the same final order as the input dictonary
+    
     # if we have 1 or more short sequences then we know at least a subset of sequences must be run using the scaled_ network
     if len(short_seqs) > 0:
 
@@ -242,15 +287,53 @@ def __short_seq_fix(protein_objs,
             return_dict2 = batch_predict(long_seqs,  batch_size=batch_size, network=network, version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, safe=False)
 
             # merge output and return; recall this would destroy any order of insertion, hence why we use a dictionary instead of a list
-            return   {**return_dict1, **return_dict2}
+            tmp_return_dict = {**return_dict1, **return_dict2}
         else:
-            return return_dict1
+            tmp_return_dict = return_dict1
     else:
 
         # note we have need to set safe=False here or we fall into infinite recursive calls
-        return batch_predict(protein_objs, batch_size=batch_size, network=network, version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, safe=False)
+        tmp_return_dict = batch_predict(protein_objs, batch_size=batch_size, network=network, version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, safe=False)
 
 
+    ## this final step ensures we return a dictionary ordered to match the
+    ## order of the input
+
+    # convert protein_objs into a dictionary so we can be consistent in how we parse (instead of separately parsing
+    # input lists and dicts)
+    input_dict = __list2dict(protein_objs)
+    return_dict = {}
+
+    # if return mode is seq2predictions...
+    if return_seq2prediction:
+            
+        # If we want to return data as seq:pred dictionary
+        # then rebuild the final return dict in the order
+        # of the input_dict...            
+        for k in input_dict:
+
+            # get 'value' associated with each input element
+            s = input_dict[k]
+
+            # if that value is already a protein string 
+            if type(s) is str:
+                return_dict[s] = tmp_return_dict[s]
+
+            # else if the value is a sparrow.protein.Protein object
+            elif type(s) is sparrow.protein.Protein:
+                return_dict[s.sequence] = tmp_return_dict[s.sequence]
+
+            # else throw an exception
+            else:
+                raise SparrowException('Error parsing type of return dictionary. This is a bug, please report https://github.com/idptools/sparrow/issues')
+
+    # if we're returning the standard key:[seq,pred] mapping
+    else:
+        for k in input_dict:
+            return_dict[k] = tmp_return_dict[k]
+            
+    return return_dict
+        
     
 # ....................................................................................
 #
@@ -293,6 +376,13 @@ def batch_predict(protein_objs,
     useses sequences as keys and predictions as values. This can
     sometimes be an ideal return type, but makes mapping between
     sequence and index (if an input dictionary was passed) tricky.
+
+    The order of the return dictionaries is guarenteed to match
+    the order of the input dictionary and list if possible; i.e.
+    if return_seq2prediction=False then the orders are guarenteed,
+    while if return_seq2prediction=True then if there are duplicate
+    sequences these only preserve the first appearance of the
+    sequence.
 
     NB:
     Note if the requested network is Rg or Re, any sequences
@@ -423,13 +513,13 @@ def batch_predict(protein_objs,
     # if we've requested to use rg/re predictions, this function ensures short sequences are appropriately
     # dealt with (this is a recurisve function that calls batch_predict)
     if network in ['rg','re'] and safe:
-        return __short_seq_fix(protein_objs,
-                               batch_size=batch_size,
-                               network=network,
-                               version=version,
-                               gpuid=gpuid,
-                               batch_algorithm=batch_algorithm,
-                               return_seq2prediction=return_seq2prediction)
+        return  __short_seq_fix(protein_objs,
+                                batch_size=batch_size,
+                                network=network,
+                                version=version,
+                                gpuid=gpuid,
+                                batch_algorithm=batch_algorithm,
+                                return_seq2prediction=return_seq2prediction)
 
 
     ## Note in 0.2.1 this does not get called because of the over-ride, but we're leaving
@@ -447,16 +537,9 @@ def batch_predict(protein_objs,
     ## Homogenize input to ensure protein_objs is a dictionary 
     ##
 
-    # enables return mapping (realizing that one sequence can map to one OR MORE key values)
-
-
     ## If we passed a list, convert into a dictionary where indices are integers and 0...n
     ## such that we have unique list->dict mapping with same order preserved.
-    if type(protein_objs) is list:
-        tmp = {}
-        for i in range(0,len(protein_objs)):
-            tmp[i] = protein_objs[i]
-        protein_objs = tmp
+    protein_objs = __list2dict(protein_objs)
 
 
     ## ------------------------------------------------------------------------------------
@@ -464,8 +547,6 @@ def batch_predict(protein_objs,
     ## Build list of sequences and mapping between sequence and one or more key values in
     ## the input dictioanry
     ##
-    
-
     seq2id = {}
     if sum([1 for i in protein_objs if type(protein_objs[i]) is sparrow.protein.Protein]) == len(protein_objs):
 
@@ -591,9 +672,13 @@ def batch_predict(protein_objs,
         return pred_dict
 
     else:
-        return_dict = {}
+        tmp = {}
         for seq in seq2id:
             for idx in seq2id[seq]:
-                return_dict[idx] = [seq, pred_dict[seq]]
+                tmp[idx] = [seq, pred_dict[seq]]
+
+        return_dict = {}
+        for idx in protein_objs:
+            return_dict[idx] = tmp[idx]
                 
         return return_dict

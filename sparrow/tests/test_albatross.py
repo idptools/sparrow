@@ -329,8 +329,6 @@ def test_batch_vs_single_re():
 
 
 
-
-
 def test_batch_vs_single_rg_scaled():
     # assert same value comes from batch vs. single prediction
     # for a set of randomly generated sequences
@@ -581,3 +579,148 @@ def test_batch_size_impact_all_networks():
                 for idx in batch_pred_big:
                     assert np.isclose(batch_pred_big[idx][1], batch_pred_1[idx][1] , atol=1e-05)
                 
+
+
+
+def test_preserved_order():
+    # assert we preserve input order from a variety of possible scenarios when using
+    # batch_predict
+
+    # ......................................................
+    def internal_order_test(seqs, n_shuffles, mode='list'):
+        """
+        Internal helper function that takes a list of sequences and tests that the order
+        is preserved for both normal return and for return_seq2prediction=True mode.
+
+        Parameters
+        --------------
+        seqs : list
+            List of sequences
+
+        """
+
+        def get_input_list():
+            if type(seqs) is list:
+                return  seqs
+            else:
+                return list(seqs.values())
+
+        return_vals = list(batch_predict(seqs, batch_size=32, network='rg').values())
+        input_list = get_input_list()            
+        for idx in range(len(seqs)):
+            assert return_vals[idx][0] == input_list[idx]
+
+            
+        return_vals = list(batch_predict(seqs, batch_size=32, network='rg', return_seq2prediction=True).keys())
+        if len(return_vals) == len(seqs):
+            for idx in range(len(seqs)):
+                assert return_vals[idx] == input_list[idx]
+
+        else:
+            # if duplicates sequences were removed
+            input_list_fixed = []
+            for i in input_list:
+                if i in input_list_fixed:
+                    pass
+                else:
+                    input_list_fixed.append(i)
+                    
+            for idx in range(len(return_vals)):
+                assert return_vals[idx] == input_list_fixed[idx]
+
+        for i in range(n_shuffles):
+
+            # randomize order
+            if type(seqs) is list:
+                np.random.shuffle(seqs)
+            else:
+                items = list(seqs.items())
+                np.random.shuffle(items)
+                seqs = dict(items)
+
+            # recompute order of sequences passed into the function
+            input_list = get_input_list()            
+
+            # randomize batch size as well
+            bs = np.random.randint(1,32)
+
+            return_vals = list(batch_predict(seqs, batch_size=bs, network='rg').values())
+            
+            for idx in range(len(seqs)):
+                assert return_vals[idx][0] == input_list[idx]
+
+            return_vals = list(batch_predict(seqs, batch_size=bs, network='rg', return_seq2prediction=True).keys())
+            if len(return_vals) == len(seqs):
+                for idx in range(len(seqs)):
+                    assert return_vals[idx] == input_list[idx]
+            else:
+                # if duplicates sequences were removed
+                input_list_fixed = []
+                for i in input_list:
+                    if i in input_list_fixed:
+                        pass
+                    else:
+                        input_list_fixed.append(i)
+
+                for idx in range(len(return_vals)):
+                    assert return_vals[idx] == input_list_fixed[idx]
+
+                
+
+    # ......................................................
+
+    
+
+    # test with mix of seqyenc
+    n_seqs = 16
+    seqs = []
+    for i in range(n_seqs):
+        seqs.append(build_seq())
+
+    for i in range(n_seqs):
+        seqs.append(build_seq(5,10)[0:np.random.randint(5,15)])
+
+    internal_order_test(seqs, 10)
+        
+    n_seqs = 8
+    seqs = []
+    for i in range(n_seqs):
+        seqs.append(build_seq(5,10)[0:np.random.randint(5,15)])
+
+    for i in range(n_seqs):
+        seqs.append(build_seq())
+
+    internal_order_test(seqs, 5)
+
+
+
+    # same but use dict as input
+    n_seqs = 16
+    seqs = {}
+    for i in range(n_seqs):
+        seqs[i] = build_seq()
+
+    for i in range(n_seqs):
+        seqs[i] = build_seq(5,10)[0:np.random.randint(5,15)]
+
+    internal_order_test(seqs, 10)
+        
+    n_seqs = 8
+    seqs = {}
+    for i in range(n_seqs):
+        seqs[i] = build_seq(5,10)[0:np.random.randint(5,15)]
+
+    for i in range(n_seqs):
+        seqs[i] = build_seq()
+
+    internal_order_test(seqs, 5)
+
+    
+    # finally, test for simple systems where we have multiple duplicates
+    seqs = ['A'*40, 'G'*40, 'A'*40, 'A'*10, 'A'*10]
+    internal_order_test(seqs, 5)
+
+    seqs = {'in 1':'A'*40, 'in 2':'G'*40, 'in 3':'A'*40, 'test 4':'A'*10, 'out 5':'A'*10}
+    internal_order_test(seqs, 5)
+    
+                    
