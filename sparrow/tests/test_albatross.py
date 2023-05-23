@@ -311,7 +311,7 @@ def test_batch_vs_single_rg():
     
     batch_pred = batch_predict(seqs, batch_size=1, network='rg')
     for idx in batch_pred:
-        assert np.isclose(Protein(seqs[idx]).predictor.radius_of_gyration(), batch_pred[idx][1], atol=1e-05)        
+        assert np.isclose(Protein(seqs[idx]).predictor.radius_of_gyration(use_scaled=False), batch_pred[idx][1], atol=1e-05)        
 
         
 def test_batch_vs_single_re():
@@ -325,7 +325,7 @@ def test_batch_vs_single_re():
     
     batch_pred = batch_predict(seqs, batch_size=1, network='re')
     for idx in batch_pred:
-        assert np.isclose(Protein(seqs[idx]).predictor.end_to_end_distance(), batch_pred[idx][1], atol=1e-05)        
+        assert np.isclose(Protein(seqs[idx]).predictor.end_to_end_distance(use_scaled=False), batch_pred[idx][1], atol=1e-05)        
 
 
 
@@ -419,7 +419,7 @@ def test_batch_vs_single_rg_short_seqs_only():
     # first check safe defaults
     batch_pred = batch_predict(seqs, batch_size=1, network='rg')
     for idx in batch_pred:
-        assert np.isclose(Protein(seqs[idx]).predictor.radius_of_gyration(), batch_pred[idx][1], atol=1e-05)        
+        assert np.isclose(Protein(seqs[idx]).predictor.radius_of_gyration(use_scaled=False), batch_pred[idx][1], atol=1e-05)        
 
     batch_pred = batch_predict(seqs, batch_size=1, network='scaled_rg')
     for idx in batch_pred:
@@ -428,7 +428,7 @@ def test_batch_vs_single_rg_short_seqs_only():
     # next check unsafe defaults
     batch_pred = batch_predict(seqs, batch_size=1, network='rg', safe=False)
     for idx in batch_pred:
-        assert np.isclose(Protein(seqs[idx]).predictor.radius_of_gyration(safe=False), batch_pred[idx][1], atol=1e-05)        
+        assert np.isclose(Protein(seqs[idx]).predictor.radius_of_gyration(use_scaled=False, safe=False), batch_pred[idx][1], atol=1e-05)        
 
     batch_pred = batch_predict(seqs, batch_size=1, network='scaled_rg', safe=False)
     for idx in batch_pred:
@@ -456,7 +456,7 @@ def test_batch_vs_single_rg_short_and_long():
     # first check safe defaults
     batch_pred = batch_predict(seqs, batch_size=1, network='rg')
     for idx in batch_pred:
-        assert np.isclose(Protein(seqs[idx]).predictor.radius_of_gyration(), batch_pred[idx][1], atol=1e-05)        
+        assert np.isclose(Protein(seqs[idx]).predictor.radius_of_gyration(use_scaled=False), batch_pred[idx][1], atol=1e-05)        
 
     batch_pred = batch_predict(seqs, batch_size=1, network='scaled_rg')
     for idx in batch_pred:
@@ -465,7 +465,7 @@ def test_batch_vs_single_rg_short_and_long():
     # next check unsafe defaults
     batch_pred = batch_predict(seqs, batch_size=1, network='rg', safe=False)
     for idx in batch_pred:
-        assert np.isclose(Protein(seqs[idx]).predictor.radius_of_gyration(safe=False), batch_pred[idx][1], atol=1e-05)        
+        assert np.isclose(Protein(seqs[idx]).predictor.radius_of_gyration(safe=False, use_scaled=False), batch_pred[idx][1], atol=1e-05)        
 
     batch_pred = batch_predict(seqs, batch_size=1, network='scaled_rg', safe=False)
     for idx in batch_pred:
@@ -493,7 +493,7 @@ def test_batch_vs_single_re_short_and_long():
     # first check safe defaults
     batch_pred = batch_predict(seqs, batch_size=1, network='re')
     for idx in batch_pred:
-        assert np.isclose(Protein(seqs[idx]).predictor.end_to_end_distance(), batch_pred[idx][1], atol=1e-05)        
+        assert np.isclose(Protein(seqs[idx]).predictor.end_to_end_distance(use_scaled=False), batch_pred[idx][1], atol=1e-05)        
 
     batch_pred = batch_predict(seqs, batch_size=1, network='scaled_re')
     for idx in batch_pred:
@@ -502,7 +502,7 @@ def test_batch_vs_single_re_short_and_long():
     # next check unsafe defaults
     batch_pred = batch_predict(seqs, batch_size=1, network='re', safe=False)
     for idx in batch_pred:
-        assert np.isclose(Protein(seqs[idx]).predictor.end_to_end_distance(safe=False), batch_pred[idx][1], atol=1e-05)        
+        assert np.isclose(Protein(seqs[idx]).predictor.end_to_end_distance(safe=False, use_scaled=False), batch_pred[idx][1], atol=1e-05)        
 
     batch_pred = batch_predict(seqs, batch_size=1, network='scaled_re', safe=False)
     for idx in batch_pred:
@@ -526,7 +526,7 @@ def test_batch_vs_single_re_short_seqs_only():
     # first check safe defaults
     batch_pred = batch_predict(seqs, batch_size=1, network='re')
     for idx in batch_pred:
-        assert np.isclose(Protein(seqs[idx]).predictor.end_to_end_distance(), batch_pred[idx][1], atol=1e-05)        
+        assert np.isclose(Protein(seqs[idx]).predictor.end_to_end_distance(use_scaled=False), batch_pred[idx][1], atol=1e-05)        
 
     batch_pred = batch_predict(seqs, batch_size=1, network='scaled_re')
     for idx in batch_pred:
@@ -535,7 +535,7 @@ def test_batch_vs_single_re_short_seqs_only():
     # next check unsafe defaults
     batch_pred = batch_predict(seqs, batch_size=1, network='re', safe=False)
     for idx in batch_pred:
-        assert np.isclose(Protein(seqs[idx]).predictor.end_to_end_distance(safe=False), batch_pred[idx][1], atol=1e-05)        
+        assert np.isclose(Protein(seqs[idx]).predictor.end_to_end_distance(safe=False, use_scaled=False), batch_pred[idx][1], atol=1e-05)        
 
     batch_pred = batch_predict(seqs, batch_size=1, network='scaled_re', safe=False)
     for idx in batch_pred:
@@ -556,7 +556,7 @@ def test_batch_vs_single_batchsize():
     
             batch_pred = batch_predict(seqs, batch_size=bs, network='rg')
             for idx in batch_pred:
-                assert np.isclose(Protein(seqs[idx]).predictor.radius_of_gyration(), batch_pred[idx][1], atol=1e-05)        
+                assert np.isclose(Protein(seqs[idx]).predictor.radius_of_gyration(use_scaled=False), batch_pred[idx][1], atol=1e-05)        
         
 
 

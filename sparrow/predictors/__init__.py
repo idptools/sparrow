@@ -1014,7 +1014,7 @@ class Predictor:
         return self.__precomputed[selector] 
 
     
-    def radius_of_gyration(self, use_scaled=False, recompute=False, safe=True):
+    def radius_of_gyration(self, use_scaled=True, recompute=False, safe=True):
 
         """
         Returns the predicted radius of gyration of the sequence. Note that this 
@@ -1024,8 +1024,8 @@ class Predictor:
         use_scaled=False then the prediction is done on a network trained using
         rg data directly.
 
-        In principle both networks should give near-identical predictions. If they
-        do not, this is a red flag that the prediction may be unreliable. 
+        In principle both networks should give near-identical predictions. However,
+        in general we have found the scaled networks are slightly more accurate.
 
         Note that for short sequences use_scaled performs much more accurately. As
         such, if the sequence is less than 25 residues in length, the predictor
@@ -1079,7 +1079,7 @@ class Predictor:
 
 
 
-    def end_to_end_distance(self, use_scaled=False, recompute=False, safe=True):
+    def end_to_end_distance(self, use_scaled=True, recompute=False, safe=True):
         """
         Returns the predicted end-to-end distance of the sequence. Note that this 
         prediction can be done using one of two independently-trained networks. If
@@ -1088,8 +1088,8 @@ class Predictor:
         use_scaled=False then the prediction is done on a network trained using
         end-to-end distance data directly data directly.
 
-        In principle both networks should give near-identical predictions. If they
-        do not, this is a red flag that the prediction may be unreliable. 
+        In principle both networks should give near-identical predictions. However,
+        in general we have found the scaled networks are slightly more accurate.
 
         Note that for short sequences scaled networks performs much more accurately. As
         such, if the sequence is less than 25 residues in length, the predictor
