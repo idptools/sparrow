@@ -171,7 +171,9 @@ def __short_seq_fix(protein_objs,
                     version : int = 2,
                     gpuid : int = 0,
                     batch_algorithm : str = 'default',
-                    return_seq2prediction : bool = False):
+                    return_seq2prediction : bool = False,
+                    show_progress_bar : bool = True):
+                    
 
     """
     Helper function that deals with datasets when we want to predict Re and Rg.
@@ -232,6 +234,10 @@ def __short_seq_fix(protein_objs,
         dictionary where keys are unique indices matching the input dictionary
         are values are a tuple of sequence and prediction. Default = False.
 
+    show_progress_bar : bool
+        Flag which, if set to True, means a progress bar is printed as 
+        predictions are made, while if False no progress bar is printed.
+        Default  =  True
 
     Returns
     -------
@@ -278,13 +284,13 @@ def __short_seq_fix(protein_objs,
     if len(short_seqs) > 0:
 
         # run predictions on each set
-        return_dict1 = batch_predict(short_seqs, batch_size=batch_size, network=f'scaled_{network}', version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction)
+        return_dict1 = batch_predict(short_seqs, batch_size=batch_size, network=f'scaled_{network}', version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, show_progress_bar=show_progress_bar)
 
         # if we also had 1 or more long sequences then run this using the non-scaled network
         if len(long_seqs) > 0:
 
             # note we have need to set safe=False here or we fall into infinite recursive calls
-            return_dict2 = batch_predict(long_seqs,  batch_size=batch_size, network=network, version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, safe=False)
+            return_dict2 = batch_predict(long_seqs,  batch_size=batch_size, network=network, version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, show_progress_bar=show_progress_bar, safe=False)
 
             # merge output and return; recall this would destroy any order of insertion, hence why we use a dictionary instead of a list
             tmp_return_dict = {**return_dict1, **return_dict2}
@@ -293,7 +299,7 @@ def __short_seq_fix(protein_objs,
     else:
 
         # note we have need to set safe=False here or we fall into infinite recursive calls
-        tmp_return_dict = batch_predict(protein_objs, batch_size=batch_size, network=network, version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, safe=False)
+        tmp_return_dict = batch_predict(protein_objs, batch_size=batch_size, network=network, version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, show_progress_bar=show_progress_bar, safe=False)
 
 
     ## this final step ensures we return a dictionary ordered to match the
@@ -344,7 +350,8 @@ def batch_predict(protein_objs,
                   version : int = 2,
                   gpuid : int = 0,
                   batch_algorithm = 'default',
-                  return_seq2prediction : bool= False,
+                  return_seq2prediction : bool = False,
+                  show_progress_bar : bool = True,
                   safe : bool = True) -> dict:                  
     """Perform batch predictions with a PARROT network in sparrow.
 
@@ -448,6 +455,11 @@ def batch_predict(protein_objs,
         prediction. This is in contrast to the default return which is a
         dictionary where keys are unique indices matching the input dictionary
         are values are a tuple of sequence and prediction. Default = False.
+
+    show_progress_bar : bool
+        Flag which, if set to True, means a progress bar is printed as 
+        predictions are made, while if False no progress bar is printed.
+        Default  =  True
             
     safe : bool
         Flag which, if set to False, means the requested
@@ -519,7 +531,8 @@ def batch_predict(protein_objs,
                                 version=version,
                                 gpuid=gpuid,
                                 batch_algorithm=batch_algorithm,
-                                return_seq2prediction=return_seq2prediction)
+                                return_seq2prediction=return_seq2prediction,
+                                show_progress_bar=show_progress_bar)
 
 
     ## Note in 0.2.1 this does not get called because of the over-ride, but we're leaving
@@ -600,7 +613,10 @@ def batch_predict(protein_objs,
         # and values is a list of sequences of that exact length
         size_filtered =  __size_filter(sequence_list)
         
-        for local_size in tqdm(size_filtered):
+        loop_range = tqdm(size_filtered) if show_progress_bar else size_filtered
+        
+        #for local_size in tqdm(size_filtered):
+        for local_size in loop_range:
 
             local_seqs = size_filtered[local_size]
 
@@ -628,8 +644,11 @@ def batch_predict(protein_objs,
         ##
 
         seq_loader = DataLoader(sequence_list, batch_size=batch_size, shuffle=False)
+
+        loop_range = tqdm(seq_loader) if show_progress_bar else seq_loader
                             
-        for batch in tqdm(seq_loader):
+        #for batch in tqdm(seq_loader):
+        for batch in loop_range:
             # Pad the sequence vector to have the same length as the longest sequence in the batch
             seqs_padded = pad_sequence([encode_sequence.one_hot(seq).float() for seq in batch], batch_first=True)
 

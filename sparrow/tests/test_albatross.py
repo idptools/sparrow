@@ -724,3 +724,22 @@ def test_preserved_order():
     internal_order_test(seqs, 5)
     
                     
+
+def test_batch_show_progress_bar():
+    # assert same value comes from batch vs. single prediction
+    # for a set of randomly generated sequences
+
+    for n_seqs in [1, 10, 50]:
+        seqs = []
+        for i in range(n_seqs):
+            seqs.append(build_seq())
+
+        for bs in [1,10,32,120,2000]:
+    
+            batch_pred_1 = batch_predict(seqs, batch_size=bs, network='rg', show_progress_bar=True)
+            batch_pred_2 = batch_predict(seqs, batch_size=bs, network='rg', show_progress_bar=False)
+
+            for k in batch_pred_1:
+                assert batch_pred_1[k][0] == batch_pred_2[k][0]
+                assert batch_pred_1[k][1] == batch_pred_2[k][1]
+    
