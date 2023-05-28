@@ -58,7 +58,7 @@ And have it work!
 
 # NOTE - this is where you can define the version number that is read by default. If you add a new network MAKE SURE you update
 # this default if you want that new network to be used by default
-DEFAULT_VERSION="1"
+DEFAULT_VERSION="2"
 
 
 ## CHANGE class name

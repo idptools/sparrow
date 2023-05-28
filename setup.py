@@ -92,6 +92,7 @@ setup(
         "ipython",
         "idptools-parrot",
         "afrc",
+        'tqdm',
     ],
     
     python_requires=">=3.7",          # Python version restrictions
