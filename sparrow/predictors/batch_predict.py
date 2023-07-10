@@ -515,7 +515,7 @@ def batch_predict(protein_objs,
     ## OVERRIDE - as of sparrow version 0.2.1 the only batch prediction algorithm working is
     ## size-collect. An initial draft of pad-n-pack is implemented but it DOES NOT WORK, so we hardcode
     ## in size-collect for now
-    batch_algorithm = 'size-collect'
+    # batch_algorithm = 'size-collect'
 
     # note this is moot in 0.2.1
     # pad-n-pack only available in PyTorch 1.11.0 or higher
@@ -629,51 +629,47 @@ def batch_predict(protein_objs,
 
                 # Move padded sequences to device
                 seqs_padded = seqs_padded.to(device)
-
-                outputs = model.forward(seqs_padded).detach().cpu().numpy()
+                with torch.no_grad():
+                    outputs = model.forward(seqs_padded).detach().cpu().numpy()
 
                 for j, seq in enumerate(batch):
                     pred_dict[seq] = outputs[j][0]
 
     elif batch_algorithm == 'pad-n-pack':
 
-        raise SparrowException('pad-n-pack does not work currently - do not use')
-
-        ## 
-        ## pad-n-pack is not currently working. Do not use.
-        ##
-
         seq_loader = DataLoader(sequence_list, batch_size=batch_size, shuffle=False)
-
         loop_range = tqdm(seq_loader) if show_progress_bar else seq_loader
-                            
-        #for batch in tqdm(seq_loader):
+
         for batch in loop_range:
             # Pad the sequence vector to have the same length as the longest sequence in the batch
             seqs_padded = pad_sequence([encode_sequence.one_hot(seq).float() for seq in batch], batch_first=True)
 
-            # get lengths for input into pack_padded_sequence
+            # Get lengths for input into pack_padded_sequence
             lengths = torch.tensor([len(seq) for seq in batch])
 
-            # pack up for vacation
-            packed_and_padded = pack_padded_sequence(seqs_padded, lengths.cpu().numpy(), batch_first=True, enforce_sorted=False)
+            # Pack up for vacation
+            packed_and_padded = pack_padded_sequence(seqs_padded, lengths, batch_first=True, enforce_sorted=False)
 
-            # input packed_and_padded into loaded lstm
-            packed_output, (ht, ct) = (model.lstm.forward(packed_and_padded))
+            # Move padded sequences to device
+            packed_and_padded = packed_and_padded.to(device)
+
+            # Input packed_and_padded into loaded lstm
+            with torch.no_grad():
+                packed_output, _ = model.lstm.forward(packed_and_padded)
             
-            # inverse of pack_padded_sequence
+            # Inverse of pack_padded_sequence
             output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
             
-            # get the outputs by calling fc
-            outputs = model.fc(output).cpu()
+            # Get the outputs by calling fc
+            with torch.no_grad():
+                outputs = model.fc(output)
 
-            # get the unpacked, finalized values into the dict.
+            # Get the unpacked, finalized values into the dict.
             for cur_ind, score in enumerate(outputs):
+                # First detach, flatten, etc
+                cur_score = score.detach().cpu().numpy().flatten()
                 
-                # first detach, flatten, etc
-                cur_score = score.detach().numpy().flatten()
-                
-                # get the sequence from batch from seq_loader
+                # Get the sequence from batch from seq_loader
                 cur_seq = batch[cur_ind]
 
                 pred_dict[cur_seq] = cur_score[0]
