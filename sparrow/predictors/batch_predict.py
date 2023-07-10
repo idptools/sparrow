@@ -648,7 +648,7 @@ def batch_predict(protein_objs,
             lengths = torch.tensor([len(seq) for seq in batch])
 
             # Pack up for vacation
-            packed_and_padded = pack_padded_sequence(seqs_padded, lengths, batch_first=True, enforce_sorted=False)
+            packed_and_padded = pack_padded_sequence(seqs_padded, lengths.cpu().numpy(), batch_first=True, enforce_sorted=False)
 
             # Move padded sequences to device
             packed_and_padded = packed_and_padded.to(device)
