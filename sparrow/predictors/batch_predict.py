@@ -4,6 +4,7 @@ from typing import List, Dict
 from torch.utils.data import DataLoader
 from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
 from tqdm import tqdm
+from IPython import embed
 import os
 
 from packaging import version as VERSION_PACKAGE
@@ -26,7 +27,7 @@ from sparrow.data.configs import MIN_LENGTH_ALBATROSS_RE_RG
 # ....................................................................................
 #
 #
-def prepare_model(network, version, gpuid):
+def prepare_model(network, version, gpuid, force_cpu):
     """
     Given a predictor name and version, load the network weights and parameters 
     to the appropriate device.
@@ -56,10 +57,15 @@ def prepare_model(network, version, gpuid):
         raise SparrowException(f'Error: could not find saved weights file {saved_weights} for {network} predictor')
     
     # Check if GPU is available
-    if torch.cuda.is_available():
+    print("force CPU: ", force_cpu)
+    if force_cpu:
+        device = torch.device("cpu")
+        print("arrived here")
+    elif torch.cuda.is_available():
         device = torch.device(f"cuda:{gpuid}")
     else:
         device = torch.device("cpu")
+    
 
     loaded_model = torch.load(saved_weights, map_location=device)
     
@@ -172,7 +178,8 @@ def __short_seq_fix(protein_objs,
                     gpuid : int = 0,
                     batch_algorithm : str = 'default',
                     return_seq2prediction : bool = False,
-                    show_progress_bar : bool = True):
+                    show_progress_bar : bool = True,
+                    force_cpu : bool = False):
                     
 
     """
@@ -284,13 +291,17 @@ def __short_seq_fix(protein_objs,
     if len(short_seqs) > 0:
 
         # run predictions on each set
-        return_dict1 = batch_predict(short_seqs, batch_size=batch_size, network=f'scaled_{network}', version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, show_progress_bar=show_progress_bar)
+        return_dict1 = batch_predict(short_seqs, batch_size=batch_size, network=f'scaled_{network}', version=version, gpuid=gpuid, 
+                                                 batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction,
+                                                 show_progress_bar=show_progress_bar, force_cpu=force_cpu)
 
         # if we also had 1 or more long sequences then run this using the non-scaled network
         if len(long_seqs) > 0:
 
             # note we have need to set safe=False here or we fall into infinite recursive calls
-            return_dict2 = batch_predict(long_seqs,  batch_size=batch_size, network=network, version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, show_progress_bar=show_progress_bar, safe=False)
+            return_dict2 = batch_predict(long_seqs,  batch_size=batch_size, network=network, version=version, gpuid=gpuid,
+                                          batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction,
+                                            show_progress_bar=show_progress_bar, safe=False,force_cpu=force_cpu)
 
             # merge output and return; recall this would destroy any order of insertion, hence why we use a dictionary instead of a list
             tmp_return_dict = {**return_dict1, **return_dict2}
@@ -299,7 +310,9 @@ def __short_seq_fix(protein_objs,
     else:
 
         # note we have need to set safe=False here or we fall into infinite recursive calls
-        tmp_return_dict = batch_predict(protein_objs, batch_size=batch_size, network=network, version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, show_progress_bar=show_progress_bar, safe=False)
+        tmp_return_dict = batch_predict(protein_objs, batch_size=batch_size, network=network, version=version, gpuid=gpuid, 
+                                        batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, 
+                                        show_progress_bar=show_progress_bar, safe=False,force_cpu=force_cpu)
 
 
     ## this final step ensures we return a dictionary ordered to match the
@@ -352,7 +365,8 @@ def batch_predict(protein_objs,
                   batch_algorithm = 'default',
                   return_seq2prediction : bool = False,
                   show_progress_bar : bool = True,
-                  safe : bool = True) -> dict:                  
+                  safe : bool = True,
+                  force_cpu : bool = False) -> dict:                  
     """Perform batch predictions with a PARROT network in sparrow.
 
     Input can be either a dictionary or a list.
@@ -510,7 +524,7 @@ def batch_predict(protein_objs,
 
     # check a valid batch_algo was passed
     if batch_algorithm not in ['default', 'size-collect', 'pad-n-pack']:
-        raise SparrowException("For option 'batch_algorithm': Please choose a valid batch algorithm, one of 'default', 'size-collect', 'pad-n-pack")
+        raise SparrowException(f"For option 'batch_algorithm': Please choose a valid batch algorithm, one of 'default', 'size-collect', 'pad-n-pack'. Received {batch_algorithm}")
 
     ## OVERRIDE - as of sparrow version 0.2.1 the only batch prediction algorithm working is
     ## size-collect. An initial draft of pad-n-pack is implemented but it DOES NOT WORK, so we hardcode
@@ -532,7 +546,7 @@ def batch_predict(protein_objs,
                                 gpuid=gpuid,
                                 batch_algorithm=batch_algorithm,
                                 return_seq2prediction=return_seq2prediction,
-                                show_progress_bar=show_progress_bar)
+                                show_progress_bar=show_progress_bar,force_cpu=force_cpu)
 
 
     ## Note in 0.2.1 this does not get called because of the over-ride, but we're leaving
@@ -592,15 +606,15 @@ def batch_predict(protein_objs,
         raise SparrowException('Invalid input - must pass either a dictionary of key-values where values are sequences (str)\nor sparrow.protein.Protein objects, or a list of sequences (str) or sparrow.protein.Protein objects')
 
 
-
     ## ------------------------------------------------------------------------------------
     ##
     ## Perform prediction
     ##
 
     pred_dict = {}
-    device, model = prepare_model(network, version, gpuid)
+    device, model = prepare_model(network, version, gpuid,force_cpu=force_cpu)
     model.to(device)
+    print(device)
 
     if batch_algorithm == 'size-collect':
         # size-collect means we systematically subdivide the sequences into groups 
@@ -632,10 +646,12 @@ def batch_predict(protein_objs,
                 with torch.no_grad():
                     outputs = model.forward(seqs_padded).detach().cpu().numpy()
 
+                # embed()
                 for j, seq in enumerate(batch):
                     pred_dict[seq] = outputs[j][0]
-
+    
     elif batch_algorithm == 'pad-n-pack':
+        # raise SparrowException('pad-n-pack is not yet implemented')
 
         seq_loader = DataLoader(sequence_list, batch_size=batch_size, shuffle=False)
         loop_range = tqdm(seq_loader) if show_progress_bar else seq_loader
@@ -643,29 +659,31 @@ def batch_predict(protein_objs,
         for batch in loop_range:
             # Pad the sequence vector to have the same length as the longest sequence in the batch
             seqs_padded = pad_sequence([encode_sequence.one_hot(seq).float() for seq in batch], batch_first=True)
-
+            
             # Get lengths for input into pack_padded_sequence
-            lengths = torch.tensor([len(seq) for seq in batch])
-
+            sequence_lengths = [len(seq) for seq in batch]
+            
             # Pack up for vacation
-            packed_and_padded = pack_padded_sequence(seqs_padded, lengths.cpu().numpy(), batch_first=True, enforce_sorted=False)
+            packed_and_padded = pack_padded_sequence(seqs_padded, sequence_lengths, batch_first=True, enforce_sorted=False)
 
             # Move padded sequences to device
             packed_and_padded = packed_and_padded.to(device)
 
             # Input packed_and_padded into loaded lstm
             with torch.no_grad():
-                packed_output, _ = model.lstm.forward(packed_and_padded)
-            
-            # Inverse of pack_padded_sequence
-            output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
-            
+                packed_output, (h_n, c_n) = model.lstm.forward(packed_and_padded)
+                
+            forward_last_step = h_n[-2, :, :]
+            reverse_last_step = h_n[-1, :, :]
+            final_outs = torch.cat((forward_last_step, reverse_last_step), -1)
+
             # Get the outputs by calling fc
             with torch.no_grad():
-                outputs = model.fc(output)
-
+                outputs = model.fc(final_outs).detach().cpu().squeeze()
+            
             # Get the unpacked, finalized values into the dict.
             for cur_ind, score in enumerate(outputs):
+                
                 # First detach, flatten, etc
                 cur_score = score.detach().cpu().numpy().flatten()
                 
