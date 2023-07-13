@@ -30,6 +30,7 @@ from sparrow.data.configs import MIN_LENGTH_ALBATROSS_RE_RG
 
 import numpy as np
 from sparrow.sparrow_exceptions import SparrowException
+from sparrow.tools.utilities import validate_keyword_option
 
 class Predictor:
 
@@ -121,50 +122,9 @@ class Predictor:
         
         return self.__precomputed[selector] 
 
-
-
     # .................................................................
     #
-    def dssp(self, recompute=False):
-        """
-        Predictor that returns per-residue predictions for DSSP scores.
-
-
-        Value = 0 : helical
-        Value = 1 : extended
-        Value = 2 : coil
-
-        Predictor trained by Ryan on DSSP scores from AF2
-
-        Parameters
-        --------------
-        recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
-            the prediction has run already
-
-        Returns
-        -----------
-        list
-            An list of len(seq) with per-residue predictions
-
-        """
-
-        selector = 'dssp'
-
-
-        if self.__dssp_predictor_object is None:
-            from .dssp.dssp_predictor import DSSPPredictor
-            self.__dssp_predictor_object = DSSPPredictor()
-
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__dssp_predictor_object.predict_dssp(self.__protein.sequence)
-
-        return self.__precomputed[selector] 
-
-
-    # .................................................................
-    #
-    def dssp_helicity(self, recompute=False):
+    def dssp_helicity(self, mode='class', threshold=0.5, minimum_helical_length=5):
         """
         Predictor that returns a binary list with 1 or 0 for helicity
         or not, as predicted from a DSSP prediction.
@@ -172,110 +132,184 @@ class Predictor:
         Value = 0 : non-helical
         Value = 1 : helical
 
-        Predictor trained by Ryan on DSSP scores from AF2
+        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. Note
+        that because several options are available for dssp helicity predictions we
+        do not offer a recompute option and we always recompute.
 
         Parameters
         --------------
-        recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
-            the prediction has run already
+        mode : str
+            Selector which defines how helicity is represented. Default is 'class' but
+            the other options are 'probability' and 'both'. For more information on this
+            see the Return type info.
 
+        threshold :float
+            If class is requested, this defines the threshold at which a residue is 
+            considered to be helical or not. Default =0.5
+
+        minimum_helical_length : int
+            If class is requested, this is the short a region can be and be designated
+            as a helix. Default = 5.
+        
         Returns
         -----------
-        list
-            An list of len(seq) with per-residue predictions
+        np.ndarray or tuple
+            Return data depends on mode selector
+            
+            * class : An np.ndarray of length equal to the sequence where each element
+            is a 1 or a 0 (1=helical, 0 non-helocal)
+
+            * probability : An np.ndarray of length equal to the sequence where each 
+            element is between 0 and 1 and reports on the probability that the residue
+            is in a helix
+
+            * both : A tuple where first element is the class np.ndarray and the second
+            element is the probability np.ndarray
 
         """
 
-        selector = 'dssp'
-
+        # ensure a valid keyword was passed
+        validate_keyword_option(mode, ['class','probability', 'both'], 'mode')
+        
 
         if self.__dssp_predictor_object is None:
             from .dssp.dssp_predictor import DSSPPredictor
             self.__dssp_predictor_object = DSSPPredictor()
 
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__dssp_predictor_object.predict_dssp(self.__protein.sequence)
 
-        # note DSSP 0 = helical
-        return np.array(np.array(self.__precomputed[selector]) == 0, dtype=int).tolist()
+        if mode == 'class':
+            return self.__dssp_predictor_object.predict_helicity_smart(self.__protein.sequence, threshold=threshold, minlen=minimum_helical_length)
+        
+        elif mode == 'probability':
+            return self.__dssp_predictor_object.predict_helical_probability(self.__protein.sequence)
+
+        elif mode == 'both':
+            return self.__dssp_predictor_object.predict_helicity_smart(self.__protein.sequence, threshold=threshold, minlen=minimum_helical_length, return_probability=True)
+        
 
     # .................................................................
     #
-    def dssp_coil(self, recompute=False):
+    def dssp_coil(self, mode='class', threshold=0.5, minimum_coil_length=1):
         """
-        Predictor that returns a binary list with 1 or 0 for helicity
-        or not, as predicted from a DSSP prediction.
+        Prediction as to whethere a residue will be found in a coil-state or not (i.e.
+        not a helix or an extended/beta structure).
 
-        Value = 0 : non-coil
-        Value = 1 : coil
-
-        Predictor trained by Ryan on DSSP scores from AF2
+        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. Note
+        that because several options are available for dssp predictions, we
+        do not offer a recompute option and we always recompute.
 
         Parameters
         --------------
-        recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
-            the prediction has run already
+        mode : str
+            Selector which defines how coil is represented. Default is 'class' but
+            the other options are 'probability' and 'both'. For more information on this
+            see the Return type info.
+
+        threshold :float
+            If class is requested, this defines the threshold at which a residue is 
+            considered to be coil or not. Default = 0.5
+
+        minimum_coil_length : int
+            If class is requested, this is the short a region can be and be designated
+            as a coil region. Default = 1.
+        
 
         Returns
         -----------
-        list
-            An list of len(seq) with per-residue predictions
+        np.ndarray or tuple
+            Return data depends on mode selector
+            
+            * class : An np.ndarray of length equal to the sequence where each element
+            is a 1 or a 0 (1=coil, 0=non-coil)
+
+            * probability : An np.ndarray of length equal to the sequence where each 
+            element is between 0 and 1 and reports on the probability that the residue
+            is in a coil
+
+            * both : A tuple where first element is the class np.ndarray and the second
+            element is the probability np.ndarray
 
         """
 
-        selector = 'dssp'
-
+        # ensure a valid keyword was passed
+        validate_keyword_option(mode, ['class','probability', 'both'], 'mode')
+        
 
         if self.__dssp_predictor_object is None:
             from .dssp.dssp_predictor import DSSPPredictor
             self.__dssp_predictor_object = DSSPPredictor()
 
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__dssp_predictor_object.predict_dssp(self.__protein.sequence)
+        if mode == 'class':
+            return self.__dssp_predictor_object.predict_coil_smart(self.__protein.sequence, threshold=threshold, minlen=minimum_coil_length)
+        
+        elif mode == 'probability':
+            return self.__dssp_predictor_object.predict_coil_probability(self.__protein.sequence)
 
-        # note DSSP 2 = coil
-        return np.array(np.array(self.__precomputed[selector]) == 2, dtype=int).tolist()
+        elif mode == 'both':
+            return self.__dssp_predictor_object.predict_coil_smart(self.__protein.sequence, threshold=threshold, minlen=minimum_coil_length, return_probability=True)
+        
 
     # .................................................................
     #
-    def dssp_extended(self, recompute=False):
+    def dssp_extended(self, mode='class', threshold=0.5, minimum_extended_length=5):
         """
-        Predictor that returns a binary list with 1 or 0 for extended
-        or not, as predicted from a DSSP prediction.
+        Prediction as to whethere a residue will be found in an extended/beta-state or not (i.e.
+        not a helix or a coil region).
 
-        Value = 0 : non-extended
-        Value = 1 : extended
-
-        Predictor trained by Ryan on DSSP scores from AF2
+        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. Note
+        that because several options are available for dssp predictions, we
+        do not offer a recompute option and we always recompute.
 
         Parameters
         --------------
-        recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
-            the prediction has run already
+        mode : str
+            Selector which defines how extended is represented. Default is 'class' but
+            the other options are 'probability' and 'both'. For more information on this
+            see the Return type info.
+
+        threshold :float
+            If class is requested, this defines the threshold at which a residue is 
+            considered to be in an extended region or not. Default = 0.5
+
+        minimum_extended_length : int
+            If class is requested, this is the short a region can be and be designated
+            as an extended region. Default = 5.
+        
 
         Returns
         -----------
-        list
-            An list of len(seq) with per-residue predictions
+        np.ndarray or tuple
+            Return data depends on mode selector
+            
+            * class : An np.ndarray of length equal to the sequence where each element
+            is a 1 or a 0 (1=extended, 0=non-coil)
+
+            * probability : An np.ndarray of length equal to the sequence where each 
+            element is between 0 and 1 and reports on the probability that the residue
+            is in an extended state
+
+            * both : A tuple where first element is the class np.ndarray and the second
+            element is the probability np.ndarray
 
         """
 
-        selector = 'dssp'
-
+        # ensure a valid keyword was passed
+        validate_keyword_option(mode, ['class','probability', 'both'], 'mode')
+        
 
         if self.__dssp_predictor_object is None:
             from .dssp.dssp_predictor import DSSPPredictor
             self.__dssp_predictor_object = DSSPPredictor()
 
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__dssp_predictor_object.predict_dssp(self.__protein.sequence)
+        if mode == 'class':
+            return self.__dssp_predictor_object.predict_extended_smart(self.__protein.sequence, threshold=threshold, minlen=minimum_extended_length)
+        
+        elif mode == 'probability':
+            return self.__dssp_predictor_object.predict_extended_probability(self.__protein.sequence)
 
-        # note DSSP 1 = extended
-        return np.array(np.array(self.__precomputed[selector]) == 1, dtype=int).tolist()
-
+        elif mode == 'both':
+            return self.__dssp_predictor_object.predict_extended_smart(self.__protein.sequence, threshold=threshold, minlen=minimum_extended_length, return_probability=True)
+        
 
     # .................................................................
     #

@@ -108,13 +108,22 @@ class <RelevantName>Predictor():
         # version of PARROT (see DSSP predictor as an example of where its needed) but in
         # 2022 trained networks didn't need this. As such, this can PROBABLY be deleted but
         # in case you're using an older network we've kept this to make things simple
-        
-        #for i in range(len(loaded_model)):
-        #    key, value = loaded_model.popitem(last=False)
-        #    new_key = key[7:]
-        #    loaded_model[new_key] = value
-        ## END OF DELETE ME PROBABLY
 
+        # this removes this weird appending of 'module.' to the front of the keyes
+        # which I honestly don't know where came from, but this fixes the issue.
+        # 
+        # In some versions of trained models the 'module.' sits in front of the parameters
+        # while in others it doesnt - the code block below, updated in July 2023, provides
+        # a safe approach that removes that keyword if it exists but doesn't cause problems
+        # if its missing.
+        for i in range(len(loaded_model)):
+            key, value = loaded_model.popitem(last=False)
+            if key.find('module.') == 0:
+                new_key = key[7:]
+                loaded_model[new_key] = value
+            else:
+                loaded_model[key] = value
+                
       
         # Dynamically calculate the hyperparameters used to train the network. 
         ## NOTE:
