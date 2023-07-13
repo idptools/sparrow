@@ -1,5 +1,5 @@
-from .tools import general_tools, track_tools, io
-from protfasta import utilities 
+from .tools import general_tools, track_tools, io, utilities
+from protfasta import utilities as protfasta_utilities
 from . import sparrow_exceptions
 from . import calculate_parameters
 from .visualize import sequence_visuals
@@ -56,7 +56,7 @@ class Protein:
             s = s.upper()
             if general_tools.is_valid_protein_sequence(s) is False:
                 
-                fixed = utilities.convert_to_valid(s)
+                fixed = protfasta_utilities.convert_to_valid(s)
 
                 if general_tools.is_valid_protein_sequence(fixed) is False:                
                     raise sparrow_exceptions.SparrowException('Invalid amino acid')
@@ -823,7 +823,7 @@ class Protein:
             Returns a list with values that correspond to the passed mode
         """
 
-        io.validate_keyword_option(mode, ['FCR','NCPR','aromatic','aliphatic','polar','proline','positive','negative','hydrophobicity', 'seg-complexity','kappa'], 'mode')
+        utilities.validate_keyword_option(mode, ['FCR','NCPR','aromatic','aliphatic','polar','proline','positive','negative','hydrophobicity', 'seg-complexity','kappa'], 'mode')
 
         if smooth is not None:
             name = '%s-%i-%s-%i' %(mode, window_size, end_mode, smooth)
@@ -879,7 +879,7 @@ class Protein:
 
         """
 
-        io.validate_keyword_option(end_mode, ['extend-ends', 'zero-ends', ''], 'end_mode')
+        utilities.validate_keyword_option(end_mode, ['extend-ends', 'zero-ends', ''], 'end_mode')
         
         # we sort the composition list to unify how it is saved for memoization
         try:
@@ -975,8 +975,8 @@ class Protein:
 
         """
 
-        #io.validate_keyword_option(mode, ['holt', 'holt-permissive'], 'mode')
-        io.validate_keyword_option(mode, ['holt'], 'mode')
+        #utilities.validate_keyword_option(mode, ['holt', 'holt-permissive'], 'mode')
+        utilities.validate_keyword_option(mode, ['holt'], 'mode')
 
         if mode == 'holt':
             return sequence_complexity.low_complexity_domains_holt(self.sequence, **kwargs)
