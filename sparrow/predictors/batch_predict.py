@@ -614,7 +614,6 @@ def batch_predict(protein_objs,
     pred_dict = {}
     device, model = prepare_model(network, version, gpuid,force_cpu=force_cpu)
     model.to(device)
-    print(device)
 
     if batch_algorithm == 'size-collect':
         # size-collect means we systematically subdivide the sequences into groups 
@@ -652,7 +651,7 @@ def batch_predict(protein_objs,
     
     elif batch_algorithm == 'pad-n-pack':
         # raise SparrowException('pad-n-pack is not yet implemented')
-
+    
         seq_loader = DataLoader(sequence_list, batch_size=batch_size, shuffle=False)
         loop_range = tqdm(seq_loader) if show_progress_bar else seq_loader
 
