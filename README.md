@@ -22,6 +22,11 @@ The reason for this is to try and discourage you from incorporating code that ma
 Installation can be done via `pip` directly from GitHub!!!
 
 	pip install git+https://git@github.com/idptools/sparrow.git
+
+NOTE: In Python versions >= 3.11, The proper installation process currently requires installing [idptools-parrot](https://github.com/idptools/parrot) before sparrow. This can be accomplished by running the following commands in sequence.
+
+	pip install git+https://git@github.com/idptools/parrot.git
+ 	pip install git+https://git@github.com/idptools/sparrow.git
 	
 ## Usage
 
