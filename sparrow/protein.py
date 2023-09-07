@@ -995,6 +995,7 @@ class Protein:
                       header=None,
                       bold_positions=[],
                       bold_residues=[],
+                      opaque_positions=[],
                       return_raw_string=False):
 
         """
@@ -1037,6 +1038,11 @@ class Protein:
         bold_residues : list
             List of residue types that can be bolded. Useful for highlighting specific residue groups.  Default is an empty list.
 
+        opaque_positions : list
+            List of positions (indexing from 1 onwards) which will be grey and slighlty opaque. Useful for highlighting specific regions. 
+            Note that this defines individual residues so (for example) to bold residues 10 to 15 would require 
+            bold_positions=[10,11,12,13,14,15]. Default is an empty list.
+
         return_raw_string : bool
             If set to true, the function returns the actual raw HTML string, as opposed to an in-notebook rendering. 
             Default is False
@@ -1064,6 +1070,7 @@ class Protein:
                                                header=header,
                                                bold_positions=bold_positions,
                                                bold_residues=bold_residues,
+                                               opaque_positions=opaque_positions,
                                                return_raw_string=return_raw_string)
         
         if return_raw_string:

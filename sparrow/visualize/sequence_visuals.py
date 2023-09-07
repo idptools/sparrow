@@ -14,6 +14,7 @@ def show_sequence(seq,
                   header=None,
                   bold_positions=[],
                   bold_residues=[],
+                  opaque_positions=[],
                   return_raw_string=False):
                   
     """
@@ -55,6 +56,11 @@ def show_sequence(seq,
 
     bold_residues : list
         List of residue types that can be bolded. Useful for highlighting specific residue groups.  Default is an empty list.
+    
+    opaque_positions : list
+        List of positions (indexing from 1 onwards) which will be grey and slighlty opaque. Useful for highlighting specific regions. 
+        Note that this defines individual residues so (for example) to bold residues 10 to 15 would require 
+        bold_positions=[10,11,12,13,14,15]. Default is an empty list.
 
     return_raw_string : bool
         If set to true, the function returns the actual raw HTML string, as opposed to an in-notebook rendering. 
@@ -117,12 +123,17 @@ def show_sequence(seq,
             else:
                 c = AA_COLOR[residue]
 
+             # check if residue should be light grey and opaque
+            # This overrides other coloring 
+            if count+1 in opaque_positions:
+                 c = '#a9a9a9'
+
             # if the residue type OR residue position is to be bolded...
             if residue in bold_residues or (count+1) in bold_positions:
                 colorString = colorString + '<span style="color:%s"><b>%s</b></span>' % (c, residue)
             else:
                 colorString = colorString + '<span style="color:%s">%s</span>' % (c, residue)
-            
+
 
 
     colorString = colorString +"</p>"
