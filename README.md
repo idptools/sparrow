@@ -114,6 +114,10 @@ A full public release is planned for spring of 2023.
 
 ## Changelog
 
+#### Sept 2023 (version 0.2.2 release)
+* Updated low complexity domain identification code. 
+* Added ability to grey out sequences in `show_sequence()` [h/t Garrett!].
+
 #### May 2023 (version 0.2.1 release)
 * Update to ALBATROSS v2 networks (all networks use the `v2` by default both in individual predictors and batch predictions
 * Re-wrote much of `batch_predict()` code. Changes here include 
