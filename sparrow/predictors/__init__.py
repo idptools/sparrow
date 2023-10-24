@@ -79,7 +79,6 @@ class Predictor:
         self.__scaling_exponent_predictor_object = None
         self.__asphericity_predictor_object = None
 
-
         # this __precomputed dictionary is where predictions made can be scored so that
         # the Predictor avoids needing to recompute (potentially expensive) predictions
         self.__precomputed = {}

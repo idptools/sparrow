@@ -59,7 +59,7 @@ class Protein:
                 fixed = protfasta_utilities.convert_to_valid(s)
 
                 if general_tools.is_valid_protein_sequence(fixed) is False:                
-                    raise sparrow_exceptions.SparrowException('Invalid amino acid')
+                    raise sparrow_exceptions.SparrowException(f'Invalid amino acid in {fixed}')
 
                 self.__seq = fixed
             else:

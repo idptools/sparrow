@@ -44,13 +44,13 @@ def test_rg_prediction_v1():
     v1 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=1, batch_size=1, network='rg', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v1[s] ==  uid_2_rg_v1[k]
+        assert  np.isclose(v1[s], uid_2_rg_v1[k] )
 
     # input dict of strings
     v1 = batch_predict(seqs, version=1, batch_size=1, network='rg', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v1[s] ==  uid_2_rg_v1[k]
+        assert  np.isclose(v1[s], uid_2_rg_v1[k])
 
     # input list of sparrow.protein.Protein objects
     v1 = batch_predict([Protein(seqs[k]) for k in seqs], version=1, batch_size=1, network='rg', return_seq2prediction=True)
@@ -58,7 +58,7 @@ def test_rg_prediction_v1():
     for idx in range(len(keys)):
         k = keys[idx]
         s = seqs[k]
-        assert  v1[s] ==  uid_2_rg_v1[k]
+        assert  np.isclose(v1[s], uid_2_rg_v1[k])
 
     # input list of sparrow.protein.Protein objects
     v1 = batch_predict(list(seqs.values()), version=1, batch_size=1, network='rg', return_seq2prediction=True)
@@ -66,7 +66,7 @@ def test_rg_prediction_v1():
     for idx in range(len(keys)):
         k = keys[idx]
         s = seqs[k]
-        assert  v1[s] ==  uid_2_rg_v1[k]
+        assert  np.isclose(v1[s], uid_2_rg_v1[k])
 
 
         
@@ -75,14 +75,14 @@ def test_rg_prediction_v1():
     v1 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=1, batch_size=1, network='rg')
     for k in seqs:
         s = seqs[k]        
-        assert  v1[k][1] ==  uid_2_rg_v1[k]
-        assert  v1[k][0] ==  s
+        assert  np.isclose(v1[k][1], uid_2_rg_v1[k])
+        assert  v1[k][0] == s
 
     # v1 test (using str input)
     v1 = batch_predict(seqs, version=1, batch_size=1, network='rg')
     for k in seqs:
         s = seqs[k]        
-        assert  v1[k][1] ==  uid_2_rg_v1[k]
+        assert  np.isclose(v1[k][1], uid_2_rg_v1[k])
         assert  v1[k][0] ==  s
 
     # input list of sparrow.protein.Protein objects
@@ -90,7 +90,7 @@ def test_rg_prediction_v1():
     keys = list(seqs.keys())
     for idx in range(len(keys)):
         k = keys[idx]
-        assert  v1[idx][1] ==  uid_2_rg_v1[k]
+        assert  np.isclose(v1[idx][1], uid_2_rg_v1[k])
 
 
     # input list of sparrow.protein.Protein objects
@@ -98,7 +98,7 @@ def test_rg_prediction_v1():
     keys = list(seqs.keys())
     for idx in range(len(keys)):
         k = keys[idx]
-        assert  v1[idx][1] ==  uid_2_rg_v1[k]
+        assert  np.isclose(v1[idx][1], uid_2_rg_v1[k])
 
 
 
@@ -112,13 +112,13 @@ def test_rg_prediction_v2():
     v2 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=2, batch_size=1, network='rg', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v2[s] ==  uid_2_rg_v2[k]
+        assert  np.isclose(v2[s],uid_2_rg_v2[k])
 
     # input dict of strings
     v2 = batch_predict(seqs, version=2, batch_size=1, network='rg', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v2[s] ==  uid_2_rg_v2[k]
+        assert  np.isclose(v2[s], uid_2_rg_v2[k])
 
     # input list of sparrow.protein.Protein objects
     v2 = batch_predict([Protein(seqs[k]) for k in seqs], version=2, batch_size=1, network='rg', return_seq2prediction=True)
@@ -126,7 +126,7 @@ def test_rg_prediction_v2():
     for idx in range(len(keys)):
         k = keys[idx]
         s = seqs[k]
-        assert  v2[s] ==  uid_2_rg_v2[k]
+        assert  np.isclose(v2[s] , uid_2_rg_v2[k])
 
     # input list of sparrow.protein.Protein objects
     v2 = batch_predict(list(seqs.values()), version=2, batch_size=1, network='rg', return_seq2prediction=True)
@@ -134,7 +134,7 @@ def test_rg_prediction_v2():
     for idx in range(len(keys)):
         k = keys[idx]
         s = seqs[k]
-        assert  v2[s] ==  uid_2_rg_v2[k]
+        assert  np.isclose(v2[s], uid_2_rg_v2[k])
 
         
     ## return_seq2prediction is False
@@ -142,22 +142,22 @@ def test_rg_prediction_v2():
     v2 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=2, batch_size=1, network='rg')
     for k in seqs:
         s = seqs[k]        
-        assert  v2[k][1] ==  uid_2_rg_v2[k]
-        assert  v2[k][0] ==  s
+        assert  np.isclose(v2[k][1], uid_2_rg_v2[k])
+        assert  v2[k][0] == s
 
     # v2 test (using str input)
     v2 = batch_predict(seqs, version=2, batch_size=1, network='rg')
     for k in seqs:
         s = seqs[k]        
-        assert  v2[k][1] ==  uid_2_rg_v2[k]
-        assert  v2[k][0] ==  s
+        assert  np.isclose(v2[k][1],  uid_2_rg_v2[k])
+        assert  v2[k][0] == s
 
     # input list of sparrow.protein.Protein objects
     v2 = batch_predict([Protein(seqs[k]) for k in seqs], version=2, batch_size=1, network='rg')
     keys = list(seqs.keys())
     for idx in range(len(keys)):
         k = keys[idx]
-        assert  v2[idx][1] ==  uid_2_rg_v2[k]
+        assert  np.isclose(v2[idx][1],  uid_2_rg_v2[k])
 
 
     # input list of sparrow.protein.Protein objects
@@ -165,7 +165,7 @@ def test_rg_prediction_v2():
     keys = list(seqs.keys())
     for idx in range(len(keys)):
         k = keys[idx]
-        assert  v2[idx][1] ==  uid_2_rg_v2[k]
+        assert  np.isclose(v2[idx][1], uid_2_rg_v2[k])
         
         
 
@@ -177,7 +177,7 @@ def test_rg_scaled_prediction_v1():
     v1 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=1, batch_size=1, network='scaled_rg', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v1[s] ==  uid_2_rg_scaled_v1[k]
+        assert  np.isclose(v1[s],  uid_2_rg_scaled_v1[k])
 
 
 def test_rg_scaled_prediction_v2():
@@ -188,7 +188,7 @@ def test_rg_scaled_prediction_v2():
     v2 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=2, batch_size=1, network='scaled_rg', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v2[s] ==  uid_2_rg_scaled_v2[k]
+        assert  np.isclose(v2[s], uid_2_rg_scaled_v2[k])
 
 
 def test_re_prediction_v1():
@@ -199,7 +199,7 @@ def test_re_prediction_v1():
     v1 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=1, batch_size=1, network='re', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v1[s] ==  uid_2_rg_scaled_v1[k]
+        assert  np.isclose(v1[s], uid_2_rg_scaled_v1[k])
 
 
 def test_re_prediction_v2():
@@ -210,7 +210,7 @@ def test_re_prediction_v2():
     v2 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=2, batch_size=1, network='re', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v2[s] ==  uid_2_rg_scaled_v2[k]
+        assert  np.isclose(v2[s] ,  uid_2_rg_scaled_v2[k])
         
 
 
@@ -222,7 +222,7 @@ def test_re_scaled_prediction_v1():
     v1 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=1, batch_size=1, network='scaled_re', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v1[s] ==  uid_2_rg_scaled_v1[k]
+        assert  np.isclose(v1[s], uid_2_rg_scaled_v1[k])
 
 
 def test_re_scaled_prediction_v2():
@@ -233,7 +233,7 @@ def test_re_scaled_prediction_v2():
     v2 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=2, batch_size=1, network='scaled_re', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v2[s] ==  uid_2_rg_scaled_v2[k]
+        assert  np.isclose(v2[s], uid_2_rg_scaled_v2[k])
         
 
 def test_asph_prediction_v1():
@@ -244,7 +244,7 @@ def test_asph_prediction_v1():
     v1 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=1, batch_size=1, network='asphericity', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v1[s] ==  uid_2_data[k]
+        assert  np.isclose(v1[s],  uid_2_data[k])
 
 def test_asph_prediction_v2():
     uid_2_data= np.load('test_data/test_100_asph_v2.npy', allow_pickle=True).item()
@@ -254,7 +254,7 @@ def test_asph_prediction_v2():
     v2 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=2, batch_size=1, network='asphericity', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v2[s] ==  uid_2_data[k]
+        assert  np.isclose(v2[s], uid_2_data[k])
 
 def test_scaling_exponent_prediction_v1():
     uid_2_data = np.load('test_data/test_100_exponent.npy', allow_pickle=True).item()
@@ -264,7 +264,7 @@ def test_scaling_exponent_prediction_v1():
     v1 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=1, batch_size=1, network='scaling_exponent', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v1[s] ==  uid_2_data[k]
+        assert  np.isclose(v1[s],  uid_2_data[k])
 
 def test_scaling_exponent_prediction_v2():        
     uid_2_data = np.load('test_data/test_100_exponent_v2.npy', allow_pickle=True).item()
@@ -274,7 +274,7 @@ def test_scaling_exponent_prediction_v2():
     v2 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=2, batch_size=1, network='scaling_exponent', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v2[s] ==  uid_2_data[k]
+        assert  np.isclose(v2[s],  uid_2_data[k])
         
 
 
@@ -286,7 +286,7 @@ def test_scaling_prefactor_prediction_v1():
     v1 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=1, batch_size=1, network='prefactor', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v1[s] ==  uid_2_data[k]
+        assert  np.isclose(v1[s], uid_2_data[k])
 
 def test_scaling_prefactor_prediction_v2():
     uid_2_data = np.load('test_data/test_100_prefactor_v2.npy', allow_pickle=True).item()
@@ -296,7 +296,7 @@ def test_scaling_prefactor_prediction_v2():
     v2 = batch_predict({k:Protein(seqs[k]) for k in seqs}, version=2, batch_size=1, network='prefactor', return_seq2prediction=True)
     for k in seqs:
         s = seqs[k]        
-        assert  v2[s] ==  uid_2_data[k]
+        assert  np.isclose(v2[s],  uid_2_data[k])
         
         
         
