@@ -95,7 +95,7 @@ setup(
         'tqdm',
     ],
     
-    python_requires=">=3.7",          # Python version restrictions
+    python_requires=">=3.7,<3.12.0",          # Python version restrictions; update to < 3.12 in Nov 2023
 
 
     # Allows `setup.py test` to work correctly with pytest
