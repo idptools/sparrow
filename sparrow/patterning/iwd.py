@@ -191,8 +191,8 @@ def calculate_average_bivariate_inverse_distance_charge(linear_NCPR, sequence):
     between the two oppositly charged residues of intrest: 
     (charge2 - charge1) / (distance2 - distance1)
 
-    This metric can be used to quantify the relitive clustering between charge residues or 
-    the interdespersion of charge residues in a sequence relitive to each other. 
+    This metric can be used to quantify the relative clustering between charge residues or 
+    the interdespersion of charge residues in a sequence relative to each other. 
 
     Parameters
     -------------
