@@ -10,7 +10,6 @@ from .sequence_analysis import physical_properties
 from .sequence_analysis import elm
 
 import numpy as np
-import torch
 from .patterning import kappa, iwd, scd
 from .data import amino_acids
 from sparrow.predictors import Predictor
@@ -662,7 +661,7 @@ class Protein:
 
         """
 
-        scd.compute_shd(self.sequence, hydro_dict=hydro_dict)
+        return scd.compute_shd(self.sequence, hydro_dict=hydro_dict)
         
     # .................................................................
     #
