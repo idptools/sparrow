@@ -1,7 +1,3 @@
-from sparrow.data import amino_acids
-
-
-
 def low_complexity_domains_holt_permissive(sequence, residue_selector, minimum_length=15, max_interruption=5, fractional_threshold=0.25):
     """
     Function to identify low complexity domains enriched in a specific residues.
