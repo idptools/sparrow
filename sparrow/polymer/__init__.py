@@ -1,5 +1,3 @@
-import numpy as np
-
 # from afrc.polymer_models.saw import SAW
 # from afrc.polymer_models.wlc import WormLikeChain
 # from afrc.polymer_models.wlc2 import WormLikeChain2
