@@ -1,5 +1,4 @@
 import numpy as np
-from sparrow.data.amino_acids import VALID_AMINO_ACIDS
 from sparrow.sparrow_exceptions import SparrowException
 
 
@@ -190,7 +189,7 @@ def compute_shd(seq, hydro_dict=False):
     """
     
     # define Hydropathy converision dictionary if not provided 
-    if not hydro_dict: 
+    if not hydro_dict:
         hydro_dict = {'A': 0.730, 'R': 0.000, 'N': 0.432, 'D': 0.378, 'C': 0.595, 'Q': 0.514, 'E': 0.459,
                       'G': 0.649, 'H': 0.514, 'I': 0.973, 'L': 0.973, 'K': 0.514, 'M': 0.838, 'F': 1.000,
                       'P': 1.000, 'S': 0.595, 'T': 0.676, 'W': 0.946, 'Y': 0.865, 'V': 0.892}
