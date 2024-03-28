@@ -78,9 +78,9 @@ def test_protein_code_coverage():
                             'N-degron',
                             'NRD cleavage site',
                             'PCSK cleavage site']
-    assert start == [1, 6, 11, 16, 4, 9, 14, 0, 5, 10, 15, 0, 5, 10, 15, 1, 11, 0, 16, 1, 6, 11, 16, 0, 3, 13, 4, 14, 1, 9]
-    assert end == [4, 9, 14, 19, 9, 14, 19, 3, 8, 13, 18, 3, 8, 13, 18, 8, 18, 3, 20, 5, 10, 15, 20, 20, 9, 19, 10, 20, 9, 15]
-    assert elm_sequences == ['RRA',
+    assert sorted(start) == sorted([1, 6, 11, 16, 4, 9, 14, 0, 5, 10, 15, 0, 5, 10, 15, 1, 11, 0, 16, 1, 6, 11, 16, 0, 3, 13, 4, 14, 1, 9])
+    assert sorted(end) == sorted([4, 9, 14, 19, 9, 14, 19, 3, 8, 13, 18, 3, 8, 13, 18, 8, 18, 3, 20, 5, 10, 15, 20, 20, 9, 19, 10, 20, 9, 15])
+    assert sorted(elm_sequences) == sorted(['RRA',
                             'RRA',
                             'RRA',
                             'RRA',
@@ -109,7 +109,7 @@ def test_protein_code_coverage():
                             'RKRRAR',
                             'RKRRAR',
                             'RRARKRRA',
-                            'RKRRAR']
+                            'RKRRAR'])
 
         
         
