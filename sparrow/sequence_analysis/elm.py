@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from typing import Int, List, Set, Str, Tuple, Union
+from typing import List, Set, Tuple, Union
 
 import pandas as pd
 
@@ -117,7 +117,7 @@ def find_all_elms(sequence : str) -> List[ELM]:
             elms.append(elm)
     return set(elms)
 
-def compute_lost_elms(target_protein : Union[sparrow.Protein, str], query : Union[Tuple[Int,Str],str]) -> Set:
+def compute_lost_elms(target_protein : Union[sparrow.Protein, str], query : Union[Tuple[int,str],str]) -> Set:
     """This function takes a protein sequence and a target query and returns a 
     the set of ELMs that were lost due to the mutation. The query can either be 
     a list or tuple of the form (position, mutant) where position is the position
@@ -152,7 +152,7 @@ def compute_lost_elms(target_protein : Union[sparrow.Protein, str], query : Unio
 
     return lost_elms
 
-def compute_gained_elms(target_protein : Union[sparrow.Protein, str], query : Union[Tuple[Int,Str],str]) -> Set:
+def compute_gained_elms(target_protein : Union[sparrow.Protein, str], query : Union[Tuple[int,str],str]) -> Set:
     """This function takes a protein sequence and a target query and returns a 
     the set of ELMs that were gained due to the mutation. The query can either be 
     a list or tuple of the form (position, mutant) where position is the position
@@ -188,7 +188,7 @@ def compute_gained_elms(target_protein : Union[sparrow.Protein, str], query : Un
     
     return gained_elms
 
-def compute_retained_elms(target_protein : Union[sparrow.Protein, str], query : Union[Tuple[Int,Str],str]) -> Set:
+def compute_retained_elms(target_protein : Union[sparrow.Protein, str], query : Union[Tuple[int,str],str]) -> Set:
     """This function takes a protein sequence and a target query and returns a 
     the set of ELMs that were retained (no change) after mutation. The query can 
     either be a list or tuple of the form (position, mutant) where position is 
