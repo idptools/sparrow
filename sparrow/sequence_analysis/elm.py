@@ -1,10 +1,11 @@
-import pandas as pd 
-from sparrow.sparrow_exceptions import SparrowException
-from collections import namedtuple
 import re
-from typing import List, NamedTuple, Union
-import sparrow
 from dataclasses import dataclass
+from typing import Int, List, Set, Str, Tuple, Union
+
+import pandas as pd
+
+import sparrow
+from sparrow.sparrow_exceptions import SparrowException
 
 
 @dataclass(frozen=True)
@@ -31,7 +32,7 @@ class ELM:
         return hash((self.regex, self.functional_site_name, self.start))
         
 
-def parse_hgvs(hgvs_notation):
+def parse_hgvs(hgvs_notation : str) -> Tuple:
     """This function takes an HGVS notation and returns a tuple of the form (position, mutation)
     where position is the position of the mutation and mutation is the amino acid change.
 
@@ -89,7 +90,7 @@ def generate_elm_df(file : str) -> pd.DataFrame:
     df = pd.DataFrame(elm_data,columns=columns)
     return df
 
-def find_all_elms(sequence : str) -> List[NamedTuple]:
+def find_all_elms(sequence : str) -> List[ELM]:
     """This function takes an input sequence and returns a namedtuple
     containing the regex used to find the elm from sequence, it's functional annotation,
     the start and stop position, as well as the sequence of the e
@@ -101,7 +102,7 @@ def find_all_elms(sequence : str) -> List[NamedTuple]:
 
     Returns
     -------
-    List[NamedTuple]
+    List[sparrow.sequence_analysis.elm.ELM]
         A list of NamedTuples containing all possible elms in a given sequence.
     """
     elm_file = sparrow.get_data("elm_classes.tsv")
@@ -116,7 +117,7 @@ def find_all_elms(sequence : str) -> List[NamedTuple]:
             elms.append(elm)
     return set(elms)
 
-def compute_lost_elms(target_protein, query):
+def compute_lost_elms(target_protein : Union[sparrow.Protein, str], query : Union[Tuple[Int,Str],str]) -> Set:
     """This function takes a protein sequence and a target query and returns a 
     the set of ELMs that were lost due to the mutation. The query can either be 
     a list or tuple of the form (position, mutant) where position is the position
@@ -151,7 +152,7 @@ def compute_lost_elms(target_protein, query):
 
     return lost_elms
 
-def compute_gained_elms(target_protein, query):
+def compute_gained_elms(target_protein : Union[sparrow.Protein, str], query : Union[Tuple[Int,Str],str]) -> Set:
     """This function takes a protein sequence and a target query and returns a 
     the set of ELMs that were gained due to the mutation. The query can either be 
     a list or tuple of the form (position, mutant) where position is the position
@@ -187,7 +188,7 @@ def compute_gained_elms(target_protein, query):
     
     return gained_elms
 
-def compute_retained_elms(target_protein, query):
+def compute_retained_elms(target_protein : Union[sparrow.Protein, str], query : Union[Tuple[Int,Str],str]) -> Set:
     """This function takes a protein sequence and a target query and returns a 
     the set of ELMs that were retained (no change) after mutation. The query can 
     either be a list or tuple of the form (position, mutant) where position is 
