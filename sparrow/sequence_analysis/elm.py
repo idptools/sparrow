@@ -1,6 +1,6 @@
 import re
 from dataclasses import dataclass
-from typing import List, Set, Tuple, Union,Type
+from typing import List, Set, Tuple, Union
 
 import pandas as pd
 
