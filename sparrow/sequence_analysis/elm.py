@@ -7,7 +7,6 @@ import sparrow
 from dataclasses import dataclass
 
 
-
 @dataclass(frozen=True)
 class ELM:
     regex: str
@@ -54,10 +53,12 @@ def parse_hgvs(hgvs_notation):
         raise SparrowException("Invalid HGVS notation. Must be in the form p.xxx")
 
     # Extract the position and amino acids
-    position = int(''.join(filter(str.isdigit, parts[1])))
+    position = int(''.join(filter(str.isdigit, parts[1]))) # shift indexing to 0
+    assert position > 0, SparrowException(f"Invalid position in HGVS notation, must be a 1 indexed integer greater than 0. Received {position}")
     mutation = parts[1][-1]
 
-    return tuple(position, mutation)
+    # position shifted to 0 index
+    return position-1, mutation.upper()
 
 def generate_elm_df(file : str) -> pd.DataFrame:
     """Generates a pandas DataFrame object containing all the information 
@@ -142,7 +143,7 @@ def compute_lost_elms(target_protein, query):
     else:
         position, mutation = query
 
-    mutant_protein = sparrow.Protein(target_protein.sequence[:position] + mutation + target_protein[position+1:])
+    mutant_protein = sparrow.Protein(target_protein.sequence[:position] + mutation + target_protein.sequence[position+1:])
     
     wt_elms = target_protein.elms
     mutant_elms = mutant_protein.elms
@@ -151,9 +152,10 @@ def compute_lost_elms(target_protein, query):
     return lost_elms
 
 def compute_gained_elms(target_protein, query):
-    """This function takes a protein sequence and a list of mutations and returns
-    a list of NamedTuples containing the functional site name, the start and stop position,
-    the sequence of the elm, and the mutation that occurs in the elm.
+    """This function takes a protein sequence and a target query and returns a 
+    the set of ELMs that were gained due to the mutation. The query can either be 
+    a list or tuple of the form (position, mutant) where position is the position
+    of the mutation. or it can be a string in the HGVS format.
 
     Parameters
     ----------
@@ -176,7 +178,7 @@ def compute_gained_elms(target_protein, query):
     else:
         position, mutation = query
 
-    mutant_protein = sparrow.Protein(target_protein.sequence[:position] + mutation + target_protein[position+1:])
+    mutant_protein = sparrow.Protein(target_protein.sequence[:position] + mutation + target_protein.sequence[position+1:])
     
     
     wt_elms = target_protein.elms
@@ -186,9 +188,10 @@ def compute_gained_elms(target_protein, query):
     return gained_elms
 
 def compute_retained_elms(target_protein, query):
-    """This function takes a protein sequence and a list of mutations and returns
-    a list of NamedTuples containing the functional site name, the start and stop position,
-    the sequence of the elm, and the mutation that occurs in the elm.
+    """This function takes a protein sequence and a target query and returns a 
+    the set of ELMs that were retained (no change) after mutation. The query can 
+    either be a list or tuple of the form (position, mutant) where position is 
+    the position of the mutation. or it can be a string in the HGVS format.
 
     Parameters
     ----------
@@ -210,7 +213,7 @@ def compute_retained_elms(target_protein, query):
     else:
         position, mutation = query
 
-    mutant_protein = sparrow.Protein(target_protein.sequence[:position] + mutation + target_protein[position+1:])
+    mutant_protein = sparrow.Protein(target_protein.sequence[:position] + mutation + target_protein.sequence[position+1:])
     
     wt_elms = target_protein.elms
     mutant_elms = mutant_protein.elms
