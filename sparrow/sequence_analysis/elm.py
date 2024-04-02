@@ -20,15 +20,16 @@ class ELM:
         if self.start > other.end or self.end < other.start:
             return False
 
-        # Only compare regex patterns for equality
-        return self.regex == other.regex  
-
-        # regex_pattern = re.compile(self.regex)
-        # return bool(regex_pattern.match(self.sequence)) and bool(regex_pattern.match(other.sequence))
+        # Only compare regex patterns for equality - all regexes for ELMs are unique - we could also check functional site names?
+        return self.regex == other.regex 
 
     def __hash__(self):
         # I THINK this works since we're basically saying we dont CARE about sequences if they're the same or not
-        # this will let us do set differences and intersections?
+        # this will let us do set differences and intersections
+        # Does restrict motif to starting at the same position though which we know these could be diff spots from indels
+        # This is fine for point mutation comparison, but this could probably be generalized.
+        # don't want just look for "in the sequence" because their might be 
+        # multiple occurences of the same motif and motif positioning may matter.
         return hash((self.regex, self.functional_site_name, self.start))
         
 
