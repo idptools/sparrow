@@ -1,4 +1,4 @@
-from .tools import general_tools, track_tools, io, utilities
+from .tools import general_tools, track_tools, utilities
 from protfasta import utilities as protfasta_utilities
 from . import sparrow_exceptions
 from . import calculate_parameters
@@ -9,8 +9,7 @@ from .sequence_analysis import phospho_isoforms
 from .sequence_analysis import physical_properties
 from .sequence_analysis import elm
 
-import numpy as np
-import torch
+
 from .patterning import kappa, iwd, scd
 from .data import amino_acids
 from sparrow.predictors import Predictor
