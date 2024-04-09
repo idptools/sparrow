@@ -3,13 +3,21 @@ Unit and regression test for the sparrow package.
 """
 
 # Import package, test suite, and other packages as needed
-import sparrow
-import pytest
-import sys
-import numpy as np
-from sparrow.protein import Protein
-from sparrow.data.amino_acids import VALID_AMINO_ACIDS
 import random
+import sys
+
+import numpy as np
+import pytest
+
+import sparrow
+from sparrow.data.amino_acids import VALID_AMINO_ACIDS
+from sparrow.protein import Protein
+from sparrow.sequence_analysis.elm import (
+    ELM,
+    compute_gained_elms,
+    compute_lost_elms,
+    compute_retained_elms,
+)
 
 
 def test_sparrow_imported():
@@ -78,9 +86,9 @@ def test_protein_code_coverage():
                             'N-degron',
                             'NRD cleavage site',
                             'PCSK cleavage site']
-    assert start == [1, 6, 11, 16, 4, 9, 14, 0, 5, 10, 15, 0, 5, 10, 15, 1, 11, 0, 16, 1, 6, 11, 16, 0, 3, 13, 4, 14, 1, 9]
-    assert end == [4, 9, 14, 19, 9, 14, 19, 3, 8, 13, 18, 3, 8, 13, 18, 8, 18, 3, 20, 5, 10, 15, 20, 20, 9, 19, 10, 20, 9, 15]
-    assert elm_sequences == ['RRA',
+    assert sorted(start) == sorted([1, 6, 11, 16, 4, 9, 14, 0, 5, 10, 15, 0, 5, 10, 15, 1, 11, 0, 16, 1, 6, 11, 16, 0, 3, 13, 4, 14, 1, 9])
+    assert sorted(end) == sorted([4, 9, 14, 19, 9, 14, 19, 3, 8, 13, 18, 3, 8, 13, 18, 8, 18, 3, 20, 5, 10, 15, 20, 20, 9, 19, 10, 20, 9, 15])
+    assert sorted(elm_sequences) == sorted(['RRA',
                             'RRA',
                             'RRA',
                             'RRA',
@@ -109,7 +117,35 @@ def test_protein_code_coverage():
                             'RKRRAR',
                             'RKRRAR',
                             'RRARKRRA',
-                            'RKRRAR']
+                            'RKRRAR'])
 
-        
-        
+def test_elm_comparisons():
+    wt = sparrow.Protein("MKKK")
+    mut = sparrow.Protein("MRKK")
+
+    wt_elms = wt.elms
+    mut_elms = mut.elms
+
+    assert wt.elms == {
+                        ELM(regex='^M{0,1}[RK][^P].', functional_site_name='N-degron', start=0, end=3, sequence='KKK')
+                    }
+    assert mut.elms == {
+                        ELM(regex='(.RK)|(RR[^KR])', functional_site_name='NRD cleavage site', start=0, end=3, sequence='MRK'),
+                        ELM(regex='^M{0,1}[RK][^P].', functional_site_name='N-degron', start=0, end=4, sequence='MRKK')
+                    }
+
+    assert wt.elms - mut.elms == set()
+    assert wt.elms & mut.elms == {ELM(regex='^M{0,1}[RK][^P].', functional_site_name='N-degron', start=0, end=4, sequence='MKKK')}
+    
+    assert compute_lost_elms(wt,[2,"K"]) == set()
+    assert compute_retained_elms(wt,"p.K1R") == {ELM(regex='^M{0,1}[RK][^P].', functional_site_name='N-degron', start=0, end=3, sequence='RKK')}
+    assert compute_gained_elms(wt,"p.K2R") == {ELM(regex='(.RK)|(RR[^KR])', functional_site_name='NRD cleavage site', start=0, end=3, sequence='MRK')}
+    
+    assert compute_retained_elms(mut,"p.M1K") == {ELM(regex='(.RK)|(RR[^KR])', functional_site_name='NRD cleavage site', start=0, end=3, sequence='MRK'),
+                                                 ELM(regex='^M{0,1}[RK][^P].', functional_site_name='N-degron', start=0, end=4, sequence='MRKK')}
+    
+    assert compute_gained_elms(mut,"p.M1K") == {ELM(regex='KR.', functional_site_name='PCSK cleavage site', start=0, end=3, sequence='KRK'),
+                                                 ELM(regex='[KR]R.', functional_site_name='PCSK cleavage site', start=0, end=3, sequence='KRK')}
+    assert compute_lost_elms(mut, "p.M1G") == {ELM(regex='^M{0,1}[RK][^P].', functional_site_name='N-degron', start=0, end=4, sequence='MRKK')}
+
+
