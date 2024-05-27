@@ -31,14 +31,12 @@ cdef double __compute_IWD_from_binary_mask(INT64_t[:] binary_mask, DOUBLE_t[:] w
         Py_ssize_t i, j, n = binary_mask.shape[0]
         Py_ssize_t num_hits = 0
         double total_distance, inverse_distance_sum = 0.0
-        INT64_t[:] hit_indices
-        DOUBLE_t[:] tmp_weights
+        INT64_t hit_index
+        DOUBLE_t weight, weight_sum = 0.0
 
     # if no weights are passed, use a null weight mask
     if weights is None:
-        tmp_weights = np.ones(n, dtype=np.float64)
-    else:
-        tmp_weights = weights
+        weights = np.ones(n, dtype=np.float64)
 
     # Count hits and allocate space for hit indices
     for i in range(n):
@@ -48,25 +46,21 @@ cdef double __compute_IWD_from_binary_mask(INT64_t[:] binary_mask, DOUBLE_t[:] w
     if num_hits == 0:
         return 0.0
 
-    hit_indices = np.empty(num_hits, dtype=np.int64)
-
-    # Populate hit indices
-    num_hits = 0
+    # Calculate inverse weighted distances
     for i in range(n):
         if binary_mask[i] == 1:
-            hit_indices[num_hits] = i
-            num_hits += 1
+            hit_index = i
+            total_distance = 0.0
+            weight = weights[hit_index]
+            weight_sum += weight
 
-    # Calculate inverse weighted distances
-    for i in range(num_hits):
-        total_distance = 0.0
-        for j in range(num_hits):
-            if i != j:
-                total_distance += 1.0 / fabs(hit_indices[j] - hit_indices[i])
-        inverse_distance_sum += total_distance * tmp_weights[hit_indices[i]]
+            for j in range(n):
+                if binary_mask[j] == 1 and i != j:
+                    total_distance += 1.0 / fabs(hit_index - j)
 
-    return inverse_distance_sum / num_hits
+            inverse_distance_sum += total_distance * weight
 
+    return inverse_distance_sum / weight_sum
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
