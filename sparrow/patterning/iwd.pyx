@@ -3,7 +3,6 @@ import numpy as np
 cimport cython
 cimport numpy as np
 from libc.math cimport abs, fabs
-from cython.view cimport array as cvarray
 
 # Define a typed memoryview for efficient access to numpy arrays
 ctypedef np.float64_t DOUBLE_t
