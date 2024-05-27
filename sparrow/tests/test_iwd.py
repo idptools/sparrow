@@ -1,4 +1,4 @@
-from sparrow.patterning import calculate_iwd as iwd
+from sparrow.patterning import iwd
 import os
 import protfasta
 import numpy as np
