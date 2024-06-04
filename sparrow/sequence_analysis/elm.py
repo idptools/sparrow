@@ -11,10 +11,10 @@ from sparrow.sparrow_exceptions import SparrowException
 @dataclass(frozen=True)
 class ELM:
     regex: str
-    elm_identifier: str
+    identifier: str
     functional_site_name: str
-    elm_description: str
-    elm_probability: float
+    description: str
+    probability: float
     start: int
     end: int
     sequence: str
