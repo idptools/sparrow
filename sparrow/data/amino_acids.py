@@ -3,7 +3,8 @@
 ##
 ##
 
-VALID_AMINO_ACIDS = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
+VALID_AMINO_ACIDS =      ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
+VALID_AMINO_ACIDS_PHYS = ['W','Y','F','H','Q','N','T','S','C','G','A','I','L','V','M','E','D','K','R','P']
 
 
 ARO   = ['Y','W','F']
