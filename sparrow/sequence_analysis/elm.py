@@ -1,8 +1,8 @@
 import re
 from dataclasses import dataclass
 from typing import List, Set, Tuple, Union
-
 import pandas as pd
+from IPython import embed
 
 import sparrow
 from sparrow.sparrow_exceptions import SparrowException
@@ -11,7 +11,10 @@ from sparrow.sparrow_exceptions import SparrowException
 @dataclass(frozen=True)
 class ELM:
     regex: str
+    elm_identifier: str
     functional_site_name: str
+    elm_description: str
+    elm_probability: float
     start: int
     end: int
     sequence: str
@@ -79,14 +82,14 @@ def generate_elm_df(file : str) -> pd.DataFrame:
         
     """
     elm_data = []
-    with open(f"{file}", "r") as f:
+    with open(f"{file}", "r", encoding="utf-8") as f:
         for line in f:
             if line.startswith("#"):
                 continue
-            elif line.startswith('"Accession"'):
+            if line.startswith('"Accession"'):
                 columns = line.strip().split("\t")
                 columns = [col.replace('"','') for col in columns]
-            else: 
+            else:
                 elm_data.append(line.replace('"','').strip().split("\t"))
     df = pd.DataFrame(elm_data,columns=columns)
     return df
@@ -108,13 +111,17 @@ def find_all_elms(sequence : str) -> List[ELM]:
     """
     elm_file = sparrow.get_data("elm_classes.tsv")
     df = generate_elm_df(elm_file)
-    mapper = {regex : site for regex, site in zip(df["Regex"],df["FunctionalSiteName"])}
-
     elms = []
-    for regex in df["Regex"]:
+    for _, row in df.iterrows():
+        regex = row["Regex"]
+        elm_class = row["ELMIdentifier"]
+        site = row["FunctionalSiteName"]
+        elm_description = row["Description"]
+        elm_probability = row["Probability"]
+
         match_indices = [(m.start(0), m.end(0)) for m in re.finditer(regex, sequence)]
         for (start,end) in match_indices:
-            elm = ELM(regex, mapper[regex], start, end, sequence[start:end]) 
+            elm = ELM(regex, elm_class, site, elm_description, elm_probability, start, end, sequence[start:end]) 
             elms.append(elm)
     return set(elms)
 
