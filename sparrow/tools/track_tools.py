@@ -1,6 +1,6 @@
 from sparrow import sparrow_exceptions, protein
 from scipy.signal import savgol_filter
-
+import numpy as np
 
 
 # .................................................................
@@ -282,6 +282,6 @@ def build_track(seq, track_function, window_size=7, end_mode='extend-ends', smoo
         except Exception as e:
             raise sparrow_exceptions.SparrowException(f'Invalid smoothing parameter passed [smooth={smooth}]. Must be an integer between 3 and the length of the sequence')
         
-    return track_vals
+    return np.array(track_vals)
         
         

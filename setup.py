@@ -39,6 +39,18 @@ extensions = [
         "sparrow.patterning.kappa",
         ["sparrow/patterning/kappa.pyx"],
         include_dirs=[numpy.get_include()], 
+    ),
+    Extension(
+        "sparrow.patterning.iwd",
+        ["sparrow/patterning/iwd.pyx"],
+        include_dirs=[numpy.get_include()],
+        extra_compile_args=["-O3"],
+    ),
+    Extension(
+        "sparrow.patterning.scd",
+        ["sparrow/patterning/scd.pyx"],
+        include_dirs=[numpy.get_include()],
+        extra_compile_args=["-O3"],
     )]
 
 
@@ -76,8 +88,14 @@ setup(
     packages=find_packages(),
 
     # external modules
-    ext_modules = cythonize(extensions, compiler_directives={'language_level' : "3"}),
-
+    # ext_modules = cythonize(extensions, compiler_directives={'language_level' : "3"}),
+    ext_modules=cythonize(extensions, compiler_directives={
+            'boundscheck': False,
+            'wraparound': False,
+            'cdivision': True,
+            'language_level': "3"
+        }),
+    zip_safe=False,
     # Optional include package data to ship with your package
     # Customize MANIFEST.in if the general case does not suit your needs
     # Comment out this line to prevent the files from being packaged with your software
