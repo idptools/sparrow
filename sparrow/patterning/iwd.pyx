@@ -139,7 +139,7 @@ def calculate_average_inverse_distance_charge(DOUBLE_t[:] linear_NCPR, str seque
     """    
     cdef:
         Py_ssize_t i, n = len(sequence)
-        list charged_indices = []
+        list charged_indices_list = []
         int num_charged = 0
         double result
         bint is_negatively_charged = 0, is_positively_charged = 0
@@ -154,11 +154,14 @@ def calculate_average_inverse_distance_charge(DOUBLE_t[:] linear_NCPR, str seque
     for i in range(n):
         if (is_negatively_charged and sequence[i] in ['D', 'E']) or \
            (is_positively_charged and sequence[i] in ['R', 'K']):
-            charged_indices.append(i)
+            charged_indices_list.append(i)
             num_charged += 1
 
     if num_charged == 0:
         return 0.0
+
+    charged_indices = np.array(charged_indices_list, dtype=np.int64)
+
 
     result = __compute_charge_IWD(linear_NCPR, charged_indices, num_charged, is_negatively_charged)
     return result
@@ -166,7 +169,7 @@ def calculate_average_inverse_distance_charge(DOUBLE_t[:] linear_NCPR, str seque
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-cdef double __compute_charge_IWD(DOUBLE_t[:] linear_NCPR, list charged_indices, int num_charged, bint is_negatively_charged):
+cdef double __compute_charge_IWD(DOUBLE_t[:] linear_NCPR, INT64_t[:] charged_indices, int num_charged, bint is_negatively_charged):
     """
     Internal Cython function to compute the inverse weighted distance (IWD) for charged residues.
     This function calculates the IWD based on the positions and charges of specified residues.

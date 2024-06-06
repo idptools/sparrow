@@ -297,7 +297,7 @@ class Protein:
 
         """
         if self.__shd is None:
-            self.__shd = scd.compute_shd(self.sequence, hydro_dict=False)
+            self.__shd = scd.compute_shd(self.sequence, hydro_dict=None)
             
         return self.__shd 
     
@@ -665,15 +665,13 @@ class Protein:
         
     # .................................................................
     #
-    def compute_iwd_charged_weighted(self, charge=['-','+']):
+    def compute_iwd_charged_weighted(self, charge=None):
         """
         Returns the weighted inverse weighted distance (IWD) for either 
         positive or negative residues in the sequence. This is a metric 
         for residue clustering weighted by the NCPR of each target 
         residue.  
         
-        
-
         Parameters
         -------------
 

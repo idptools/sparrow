@@ -45,6 +45,12 @@ extensions = [
         ["sparrow/patterning/iwd.pyx"],
         include_dirs=[numpy.get_include()],
         extra_compile_args=["-O3"],
+    ),
+    Extension(
+        "sparrow.patterning.scd",
+        ["sparrow/patterning/scd.pyx"],
+        include_dirs=[numpy.get_include()],
+        extra_compile_args=["-O3"],
     )]
 
 
