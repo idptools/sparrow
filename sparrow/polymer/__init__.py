@@ -191,7 +191,7 @@ class Polymeric:
             self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__afrc.end_to_end_distribution()
+            self.__precomputed[selector] = self.__afrc.get_end_to_end_distribution()
 
         return self.__precomputed[selector]
     
