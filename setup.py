@@ -92,7 +92,7 @@ setup(
     ext_modules=cythonize(extensions, compiler_directives={
             'boundscheck': False,
             'wraparound': False,
-            'cdivision': True,
+            'cdivision': False,
             'language_level': "3"
         }),
     zip_safe=False,
