@@ -1,7 +1,7 @@
 # sparrow: a tool for integrative analysis and prediction from protein sequence data 
 
 
-### Major version 0.2.1
+### Major version 0.2.3
 
 
 ## Overview
@@ -14,9 +14,7 @@ SPARROW is in *active* development. As of version 0.2 a few things are considere
 In general, we recommend using [localCIDER](http://pappulab.github.io/localCIDER/) for general sequence analysis, but the ALBATROSS predictors in SPARROW are ready for public use.
 
 ## Use and distribution
-SPARROW is still under active development. Because of this, we have deliberately attached the constructive Creative Commons Attribution NonCommercial NoDerivs (CC-NC-ND) license (see LICENSE). This is – deliberately – an extremely restrictive license that we are using ONLY until the code is released (at which point we'll transition to a GNU-style license). 
-
-The reason for this is to try and discourage you from incorporating code that may change dramatically over the next few months. This is a safety feature!
+SPARROW is still under active development until the first major release; however, the core API has mostly been decided upon. 
 
 ## Installation
 Installation can be done via `pip` directly from GitHub!!!
@@ -43,7 +41,7 @@ Much more extensive documentation is coming, and for now, to see the functions t
 In general, SPARROW is written in a Protein-centric way - i.e., all functions emerge from the Protein object.
 
 #### Reading in FASTA files
-One non-obvious thing is if you have a FASTA file you can read it in to a dictionary of `sparrow.Protein` objects using:
+One non-obvious thing is if you have a FASTA file you can read it into a dictionary of `sparrow.Protein` objects using:
 
 	from sparrow import read_fasta
 	protein_dictionary = read_fasta('my_fasta_file.fasta')
@@ -74,7 +72,7 @@ For single protein prediction, one can predict specific features using the follo
 	print(P.predictor.scaling_exponent())
 	print(P.predictor.prefactor())
 	
-Note that Rg and Re can be calculated using the `use_scaled` flag, which if used means we calculate on a network trained on Rg/Sqrt(N) and Re/Sqrt(N) data. We found this works better for shorter sequences, although as of May 13th 2023 we're still re-training these networks with larger datasets with the hope of offering a more accurate model.
+Note that Rg and Re can be calculated using the `use_scaled` flag, which if used means we calculate on a network trained on Rg/Sqrt(N) and Re/Sqrt(N) data. We found this works better for shorter sequences.
 
 #### Batch predictions
 ALBATROSS also affords a batch mode which on GPUs enables 1000s of seconds in a few seconds.
@@ -105,14 +103,20 @@ The return dict is a dictionary of sequence-to-value mapping, and you can select
 The benefits from parallelization on both GPUs but also on CPUs, i.e. proteome-scale analysis is highly accessible.
 
 NOTE - we are still actively working on the batch predictor so various things, including the format of the return data and/or input data, may well change. As such you may prefer for now to use the single-sequence prediction mode and loop in a for-loop.
-            
+
+If you use ALBATROSS, please cite:
+
+1. Lotthammer, J. M.; Ginell, G. M.; Griffith, D.; Emenecker, R. J.; Holehouse, A. S. Direct Prediction of Intrinsically Disordered Protein Conformational Properties from Sequence. Nat. Methods 2024, 1–12.
 
 ### Roadmap
 An initial public version of SPARROW was released in June 2022 to enable existing tools developed by the Holehouse lab to use this code. This version is not meant for those outside the Holehouse lab to take and use (see **Use and distribution** for their own safety!).
 
-A full public release is planned for spring of 2023.
+A full public release is planned for spring of 2024.
 
 ## Changelog
+
+#### June 2024 (version 0.2.3 release)
+* Cythonized SHD/SCD and IWD clustering sequence parameters
 
 #### Sept 2023 (version 0.2.2 release)
 * Updated low complexity domain identification code. 
@@ -158,7 +162,7 @@ A full public release is planned for spring of 2023.
 
 
 ### Copyright
-Copyright (c) 2020-2023, Alex Holehouse, Ryan Emenecker, Jeff Lotthammer, Garrett Ginell, and Dan Griffith built in the Holehouse lab. Currently shared under a CC BY-NC-ND license. 
+Copyright (c) 2020-2024, Alex Holehouse, Ryan Emenecker, Jeff Lotthammer, Garrett Ginell, and Dan Griffith built in the Holehouse lab. Currently shared under a MIT license. 
 
 
 #### Acknowledgements
