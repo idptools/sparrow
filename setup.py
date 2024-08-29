@@ -110,7 +110,8 @@ setup(
         "ipython",
         "idptools-parrot",
         "afrc",
-        'tqdm',
+        "tqdm",
+        "pyfamsa",
     ],
     
     python_requires=">=3.7,<3.12.0",          # Python version restrictions; update to < 3.12 in Nov 2023

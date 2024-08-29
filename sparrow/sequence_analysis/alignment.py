@@ -3,13 +3,14 @@ from typing import Dict, List, Union
 from protfasta import read_fasta
 from pyfamsa import Aligner, Sequence
 
+from sparrow import Protein
 from sparrow.visualize.sequence_visuals import show_sequence
 
 
 class SequenceAlignment:
     def __init__(
         self,
-        input_data: Union[List[Protein], str, Dict[str, str]],
+        input_data: Union[str, Dict[str, Protein]],
         threads: int = 0,
         scoring_matrix: str = "BLOSUM62",
         guide_tree: str = "upgma",
