@@ -1,6 +1,6 @@
 from typing import Dict, List, Union
 
-from protfasta import read_fasta
+from protfasta import read_fasta, write_fasta
 from pyfamsa import Aligner, Sequence
 
 from sparrow import Protein
@@ -23,7 +23,7 @@ class SequenceAlignment:
         """
         Initialize the SequenceAlignment object.
 
-        Parameters
+        Parametersip
         ----------
         input_data : Union[List[Protein], str, Dict[str, str]]
             A list of Protein objects, a path to a FASTA file, or a dictionary
@@ -125,6 +125,29 @@ class SequenceAlignment:
             # Compute MSA if it hasn't been computed yet
             self.construct_msa()
         return self._cached_msa
+
+    def save_msa(
+        self, filename: str, linelength: int = 60, append_to_fasta: bool = False
+    ):
+        """
+        Save the multiple sequence alignment to a FASTA file.
+
+        Parameters
+        ----------
+        filename : str
+            The filename to save the MSA. Should end with .fasta or .fa.
+
+        linelength : int, optional
+            Length of lines in the output file, by default 60.
+
+        append_to_fasta : bool, optional
+            Whether to append to an existing FASTA file, by default False.
+        """
+        msa = self.alignment
+        fasta_data = {seq.id.decode(): seq.sequence.decode() for seq in msa}
+        write_fasta(
+            fasta_data, filename, linelength=linelength, append_to_fasta=append_to_fasta
+        )
 
     @property
     def display_msa(self, ljust: int = 10, html: bool = False):
