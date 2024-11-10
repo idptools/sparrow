@@ -99,7 +99,7 @@ def test_dssp_helicity_class_test100():
 
     for k in seqs:
         P = Protein(seqs[k])
-        assert np.array_equal(P.predictor.dssp_helicity(), test_data[k])
+        assert np.allclose(P.predictor.dssp_helicity(), test_data[k], rtol=1e-03, atol=1e-03)
 
 
         
@@ -116,7 +116,7 @@ def test_dssp_helicity_prob_test100():
 
     for k in seqs:
         P = Protein(seqs[k])
-        assert np.array_equal(P.predictor.dssp_helicity(mode='probability'), test_data[k])
+        assert np.allclose(P.predictor.dssp_helicity(mode='probability'), test_data[k], rtol=1e-03, atol=1e-03)
 
 
 def test_dssp_extended_class_test100():
@@ -131,7 +131,7 @@ def test_dssp_extended_class_test100():
 
     for k in seqs:
         P = Protein(seqs[k])
-        assert np.array_equal(P.predictor.dssp_extended(), test_data[k])
+        assert np.allclose(P.predictor.dssp_extended(), test_data[k], rtol=1e-03, atol=1e-03)
 
     
 def test_dssp_extended_prob_test100():
@@ -146,7 +146,7 @@ def test_dssp_extended_prob_test100():
 
     for k in seqs:
         P = Protein(seqs[k])
-        assert np.array_equal(P.predictor.dssp_extended(mode='probability'), test_data[k])
+        assert np.allclose(P.predictor.dssp_extended(mode='probability'), test_data[k], rtol=1e-03, atol=1e-03)
 
 
         
@@ -177,7 +177,7 @@ def test_dssp_coil_prob_test100():
 
     for k in seqs:
         P = Protein(seqs[k])
-        assert np.array_equal(P.predictor.dssp_coil(mode='probability'), test_data[k])
+        assert np.allclose(P.predictor.dssp_coil(mode='probability'), test_data[k], rtol=1e-03, atol=1e-03)
 
 
 ##

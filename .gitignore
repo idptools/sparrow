@@ -4,6 +4,7 @@ __pycache__/
 *$py.class
 sparrow/patterning.html
 .DS_Store
+sparrow/_version.py
 
 # C extensions
 *.so

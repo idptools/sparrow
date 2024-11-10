@@ -1,0 +1,62 @@
+[build-system]
+
+# delete cython/numpy if not needed
+requires = ["setuptools>=61", "versioningit~=2.0", "cython", "numpy", ]
+build-backend = "setuptools.build_meta"
+
+
+# define project info
+[project]
+name = "sparrow"
+dynamic = ["version"]
+description = "Next generation sequence analysis package for working with disordered regions and disordered proteins"
+authors = [
+    {name = "Alex Holehouse", email = "alex.holehouse@wustl.edu"}
+]
+license = {text = "CC-NC-ND"}
+readme = "README.md"  
+requires-python = ">=3.7"
+
+# add in as needed  
+dependencies = [      
+    "numpy",
+    "scipy",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=6.1.2",
+]
+
+
+[tool.setuptools]
+zip-safe = false
+include-package-data = true 
+
+[tool.setuptools.packages.find]
+namespaces = true
+where = ["."]
+include = ["sparrow", "sparrow.*"]  # Discover all sub-packages inside the main package
+
+[tool.setuptools.package-data]
+sparrow = [
+    "py.typed"
+]
+
+[tool.versioningit]
+default-version = "1+unknown"
+
+[tool.versioningit.format]
+distance = "{base_version}+{distance}.{vcs}{rev}"
+dirty = "{base_version}+{distance}.{vcs}{rev}.dirty"
+distance-dirty = "{base_version}+{distance}.{vcs}{rev}.dirty"
+
+[tool.versioningit.vcs]
+# The method key:
+method = "git"  # <- The method name
+# Parameters to pass to the method:
+match = ["*"]
+default-tag = "1.0.0"
+
+[tool.versioningit.write]
+file = "sparrow/_version.py"

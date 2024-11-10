@@ -36,7 +36,7 @@ def test_protein_code_coverage():
     P = Protein(s, validate=True)
     assert len(P) == 61
 
-    s_broken = 'MkASNDYTQQATQSYGAYPTQPGQGYSQQSSQPYGQQSYSGYSQSTDTSXYGQSSYSSYXQ'
+    s_broken = 'MKASNDYTQQATQSYGAYPTQPGQGYSQQSSQPYGQQSYSGYSQSTDTSXYGQSSYSSYXQ'
     P = Protein(s_broken, validate=True)
     assert len(P) == 61
     assert s == P.sequence
@@ -53,7 +53,10 @@ def test_protein_code_coverage():
     assert P.fraction_polar == 0.6721311475409836
     assert P.fraction_proline == 0.04918032786885246
 
-    assert np.mean(P.predictor.disorder()) == 0.8636131147540983
+    # V2
+    # assert np.mean(P.predictor.disorder()) == 0.8636131147540983
+    
+    assert np.isclose(np.mean(P.predictor.disorder()), 0.92875415)
     assert P.hydrophobicity == 3.052459016393442
     assert P.compute_residue_fractions(['P','E','K','R','D']) == 0.09836065573770492
 

@@ -10,4 +10,7 @@ def test_protein_code_coverage():
     P = Protein('MKASNDYTQQATQSYGAYPTQPGQGYSQQSSQPYGQQSYSGYSQSTDTSGYGQSSYSSYGQ')
 
 
-    assert np.isclose(np.mean(P.predictor.disorder()), 0.8636131147540983)
+    # V2
+    # assert np.isclose(np.mean(P.predictor.disorder()), 0.8636131147540983)
+    
+    assert np.isclose(np.mean(P.predictor.disorder()), 0.92875415)

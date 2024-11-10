@@ -1,17 +1,17 @@
-from .tools import general_tools, track_tools, utilities
+from sparrow.tools import general_tools, track_tools, utilities
 from protfasta import utilities as protfasta_utilities
-from . import sparrow_exceptions
-from . import calculate_parameters
-from .visualize import sequence_visuals
+from sparrow import sparrow_exceptions
+from sparrow import calculate_parameters
+from sparrow.visualize import sequence_visuals
 from sparrow import data
-from .sequence_analysis import sequence_complexity
-from .sequence_analysis import phospho_isoforms
-from .sequence_analysis import physical_properties
-from .sequence_analysis import elm
+from sparrow.sequence_analysis import sequence_complexity
+from sparrow.sequence_analysis import phospho_isoforms
+from sparrow.sequence_analysis import physical_properties
+from sparrow.sequence_analysis import elm
 
 
-from .patterning import kappa, iwd, scd
-from .data import amino_acids
+from sparrow.patterning import kappa, iwd, scd
+from sparrow.data import amino_acids
 from sparrow.predictors import Predictor
 from sparrow.polymer import Polymeric
 
