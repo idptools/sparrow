@@ -996,7 +996,8 @@ class Protein:
                       bold_positions=[],
                       bold_residues=[],
                       opaque_positions=[],
-                      return_raw_string=False):
+                      return_raw_string=False,
+                      warnings = True):
 
         """
         Function that generates an HTML colored string that either renders in the browser or returns the 
@@ -1047,6 +1048,9 @@ class Protein:
             If set to true, the function returns the actual raw HTML string, as opposed to an in-notebook rendering. 
             Default is False
 
+        warnings : bool
+            If set to True, will print warnings if an invalid amino acid is encountered. Default is True.
+
         Returns
         ----------
         None or str
@@ -1071,7 +1075,9 @@ class Protein:
                                                bold_positions=bold_positions,
                                                bold_residues=bold_residues,
                                                opaque_positions=opaque_positions,
-                                               return_raw_string=return_raw_string)
+                                               return_raw_string=return_raw_string,
+                                               warnings=warnings)
+                                               
         
         if return_raw_string:
             return r_val

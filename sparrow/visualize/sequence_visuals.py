@@ -15,7 +15,8 @@ def show_sequence(seq,
                   bold_positions=[],
                   bold_residues=[],
                   opaque_positions=[],
-                  return_raw_string=False):
+                  return_raw_string=False,
+                  warnings = True):
                   
     """
     Function that generates an HTML colored string that either renders in the browser or returns the 
@@ -44,8 +45,7 @@ def show_sequence(seq,
         residue is a residue in the string and color is a valid HTML color (which can be a Hexcode, standard HTML color name). 
         Note that this also lets you define colors for non-standard amino acids should these be useful. Default is an empty 
         dictionary. Note also that the standard amino acid colorings are defined at sparrow.data.amino_acids.AA_COLOR
-        
-
+      
     header : str
         If provided, this is a string that provides a FASTA-style header (with a leading carrett included). Default None.
 
@@ -65,6 +65,10 @@ def show_sequence(seq,
     return_raw_string : bool
         If set to true, the function returns the actual raw HTML string, as opposed to an in-notebook rendering. 
         Default is False
+
+    warnings : bool
+        If set to true, the function will print warnings if invalid amino acids are found. Default is True.
+                  
 
     Returns
     ----------
@@ -111,7 +115,8 @@ def show_sequence(seq,
 
 
         if residue not in AA_COLOR and residue not in colors:
-            print('Warning: found invalid amino acid (%s and position %i'%(residue, count+1))
+            if warnings:
+                print('Warning: found invalid amino acid (%s and position %i'%(residue, count+1))
             colorString = colorString + '<span style="color:%s"><b>%s</b></span>' % ('black', residue)
         else:
 
