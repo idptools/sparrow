@@ -1,27 +1,20 @@
 import importlib
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from typing import Any
 
 
 class PluginManager:
     def __init__(self, protein: "sparrow.Protein"):
         self.__protein_obj = protein
-        self.__precomputed = {}
+        # Memoization for both args and no-args results
+        self.__precomputed = defaultdict(dict)
         self.__plugins = {}
 
     def __getattr__(self, name: str):
         """
-        Dynamically load and return the plugin's calculate method result.
-
-        Parameters
-        --------------
-        name : str
-            The name of the plugin to be accessed
-
-        Returns
-        -------------
-        float
-            Returns the result of the plugin's calculate method
+        Dynamically load and return the plugin's calculate method result
+        as if it were a property when accessed without arguments.
         """
         if name not in self.__plugins:
             try:
@@ -35,12 +28,31 @@ class PluginManager:
                     f"Plugin '{name}' not found. Available plugins are: {list(self.__plugins.keys())}"
                 )
 
-        if name not in self.__precomputed:
-            self.__precomputed[name] = self.__plugins[name].calculate(
-                self.__protein_obj
-            )
+        plugin_instance = self.__plugins[name]
 
-        return self.__precomputed[name]
+        # Wrapper class to handle both args and no-args cases
+        class PluginWrapper:
+            def __init__(self, cache_dict):
+                self.cache_dict = cache_dict
+                self.plugin_instance = plugin_instance
+
+            def __call__(self, *args, **kwargs):
+                """
+                Call calculate() with or without arguments.
+                Implement caching to avoid recomputation.
+                """
+                # Create hashable cache key for args and kwargs
+                cache_key = (args, frozenset(kwargs.items()))
+
+                # Check if the result is cached
+                if cache_key not in self.cache_dict[name]:
+                    self.cache_dict[name][cache_key] = self.plugin_instance.calculate(
+                        *args, **kwargs
+                    )
+
+                return self.cache_dict[name][cache_key]
+
+        return PluginWrapper(self.__precomputed)
 
 
 class BasePlugin(ABC):
@@ -51,22 +63,15 @@ class BasePlugin(ABC):
         self.__protein_obj = protein
 
     @abstractmethod
-    def calculate(self, protein: "sparrow.Protein") -> Any:
+    def calculate(self) -> Any:
         """
-        This method takes a sparrow.Protein object as input and must operate
-        on the sequence attribute of the object. The method must return
-        the result of the contributed analysis.
-
-        Parameters
-        --------------
-        seq : sparrow.Protein
-            A sparrow.Protein object instance
+        This method must operate on the sequence attribute of the protein object.
+        The method must return the result of the contributed analysis.
 
         Returns
         -------------
         float
             Returns the result of the contributed analysis
-
         """
         pass
 

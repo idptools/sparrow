@@ -1,24 +1,23 @@
 from sparrow.sequence_analysis.plugins import BasePlugin
 
 
-class DoubleFCR(BasePlugin):
+class MultiplicativeFCR(BasePlugin):
     def __init__(self, protein):
         super().__init__(protein)
 
-    def calculate(self, seq):
+    def calculate(self, factor=2.0):
         """
         This analysis doubles the FCR (fraction of charged residues) of the protein.
         This is a simple example of a contributed plugin.
 
-        Parameters
-        --------------
-        seq : sparrow.Protein
-            A sparrow.Protein object instance
+        Parameters: factor (float)
+        -------------
+        factor: float
+            The factor by which the FCR will be multiplied (default is 2.0)
 
         Returns
         -------------
         float
             Returns the result of the contributed analysis
-
         """
-        return 2.0 * self.protein.FCR
+        return factor * self.protein.FCR
