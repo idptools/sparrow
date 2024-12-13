@@ -32,15 +32,29 @@ def test_invalid_plugin(protein):
 
 
 def test_multiple_plugins(protein):
-    class TripleFCR(DoubleFCR):
+    class TripleFCR(BasePlugin):
         def calculate(self, seq):
             return 3.0 * self.protein.FCR
 
+    class QuadrupleFCR(BasePlugin):
+        def calculate(self, seq):
+            return 4.0 * self.protein.FCR
+
     plugin_manager = protein.plugin
+    # plugin_manager._PluginManager__plugins is a dictionary that stores plugins.
+    # we can add a new plugin to it by assigning a new key-value pair to it.
     plugin_manager._PluginManager__plugins["TripleFCR"] = TripleFCR(protein)
+    plugin_manager._PluginManager__plugins["QuadrupleFCR"] = QuadrupleFCR(protein)
+
+    # Testing TripleFCR plugin
     triple_fcr_result = plugin_manager.TripleFCR
-    expected_result = 3.0 * protein.FCR
-    assert pytest.approx(triple_fcr_result, 0.000001) == expected_result
+    expected_triple_result = 3.0 * protein.FCR
+    assert pytest.approx(triple_fcr_result, 0.000001) == expected_triple_result
+
+    # Testing QuadrupleFCR plugin
+    quadruple_fcr_result = plugin_manager.QuadrupleFCR
+    expected_quadruple_result = 4.0 * protein.FCR
+    assert pytest.approx(quadruple_fcr_result, 0.000001) == expected_quadruple_result
 
 
 def test_base_plugin_initialization(protein):
