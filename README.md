@@ -72,10 +72,10 @@ For single protein prediction, one can predict specific features using the follo
 	print(P.predictor.scaling_exponent())
 	print(P.predictor.prefactor())
 	
-Note that Rg and Re can be calculated using the `use_scaled` flag, which if used means we calculate on a network trained on Rg/Sqrt(N) and Re/Sqrt(N) data. We found this works better for shorter sequences.
+Note that Rg and Re can be calculated using the `use_scaled` flag, which if used, means we calculate on a network trained on Rg/Sqrt(N) and Re/Sqrt(N) data. In general, we always recommend using use_scaled (which is the default behavior); it provides much better accuracy at shorter sequences, and is the mode used in the main-text ALBATROSS figures. 
 
 #### Batch predictions
-ALBATROSS also affords a batch mode which on GPUs enables 1000s of seconds in a few seconds.
+ALBATROSS also affords a batch mode which on GPUs enables 1000s of sequences to be predicted in a few seconds.
 
 Batch prediction can be obtained via 
 
@@ -100,9 +100,8 @@ The return dict is a dictionary of sequence-to-value mapping, and you can select
 * `scaling_exponent`
 * `asphericity`
 
-The benefits from parallelization on both GPUs but also on CPUs, i.e. proteome-scale analysis is highly accessible.
+The benefits from parallelization on both GPUs and CPUs, i.e., proteome-scale analysis, is highly accessible. As with single sequence predictions, **we strongly recommend using the `scaled_rg` and `scaled_re` networks**.
 
-NOTE - we are still actively working on the batch predictor so various things, including the format of the return data and/or input data, may well change. As such you may prefer for now to use the single-sequence prediction mode and loop in a for-loop.
 
 If you use ALBATROSS, please cite:
 
@@ -111,9 +110,13 @@ If you use ALBATROSS, please cite:
 ### Roadmap
 An initial public version of SPARROW was released in June 2022 to enable existing tools developed by the Holehouse lab to use this code. This version is not meant for those outside the Holehouse lab to take and use (see **Use and distribution** for their own safety!).
 
-A full public release is planned for spring of 2024.
+A full public release is planned for spring of 2025.
 
 ## Changelog
+
+#### Nover 2024 (version 0.2.3 release)
+* Updated to using pyproject.toml for package data
+* Fixed tests to work with metapredict V3
 
 #### June 2024 (version 0.2.3 release)
 * Cythonized SHD/SCD and IWD clustering sequence parameters
