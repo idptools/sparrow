@@ -1,7 +1,52 @@
 import importlib
+import inspect
+import pkgutil
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import Any
+
+
+class PluginWrapper:
+    """
+    A wrapper class for plugins that integrates with the plugin manager.
+
+    This class is responsible for managing the execution of plugin instances
+    and caching their results to avoid redundant computations. It uses a
+    combination of the plugin name and the arguments passed to the plugin's
+    `calculate` method to create a unique cache key for storing results.
+
+    Attributes:
+        name (str): The name of the plugin.
+        cache_dict (dict): A dictionary used to store cached results.
+        plugin_instance (object): An instance of the plugin to be wrapped.
+
+    Methods:
+        __call__(*args, **kwargs):
+            Executes the plugin's `calculate` method with the provided arguments.
+            Caches the result to avoid recomputation on subsequent calls with
+            the same arguments.
+    """
+
+    def __init__(self, name, cache_dict, plugin_instance):
+        self.name = name
+        self.cache_dict = cache_dict
+        self.plugin_instance = plugin_instance
+
+    def __call__(self, *args, **kwargs):
+        """
+        Call calculate() with or without arguments.
+        Implement caching to avoid recomputation.
+        """
+        # Create hashable cache key for args and kwargs
+        cache_key = (args, frozenset(kwargs.items()))
+
+        # Check if the result is cached
+        if cache_key not in self.cache_dict[self.name]:
+            self.cache_dict[self.name][cache_key] = self.plugin_instance.calculate(
+                *args, **kwargs
+            )
+
+        return self.cache_dict[self.name][cache_key]
 
 
 class PluginManager:
@@ -10,6 +55,23 @@ class PluginManager:
         # Memoization for both args and no-args results
         self.__precomputed = defaultdict(dict)
         self.__plugins = {}
+
+        self._available_plugins = self._discover_plugins()
+
+    def _discover_plugins(self):
+        """
+        Discover all plugins available in the contributed plugin module.
+        """
+        plugin_module = "sparrow.sequence_analysis.community_plugins.contributed"
+        try:
+            module = importlib.import_module(plugin_module)
+            return [
+                name
+                for name, obj in inspect.getmembers(module, inspect.isclass)
+                if issubclass(obj, BasePlugin) and obj.__module__ == plugin_module
+            ]
+        except ModuleNotFoundError:
+            return []
 
     def __getattr__(self, name: str):
         """
@@ -22,37 +84,23 @@ class PluginManager:
                     f"sparrow.sequence_analysis.community_plugins.contributed"
                 )
                 plugin_class = getattr(module, name)
+                if not issubclass(plugin_class, BasePlugin):
+                    raise AttributeError(f"{name} is not a valid plugin.")
                 self.__plugins[name] = plugin_class(protein=self.__protein_obj)
             except (ModuleNotFoundError, AttributeError):
                 raise AttributeError(
-                    f"Plugin '{name}' not found. Available plugins are: {list(self.__plugins.keys())}"
+                    f"Plugin '{name}' not found. Available plugins are: {list(self._available_plugins)}"
                 )
 
         plugin_instance = self.__plugins[name]
 
-        # Wrapper class to handle both args and no-args cases
-        class PluginWrapper:
-            def __init__(self, cache_dict):
-                self.cache_dict = cache_dict
-                self.plugin_instance = plugin_instance
+        return PluginWrapper(name, self.__precomputed, plugin_instance)
 
-            def __call__(self, *args, **kwargs):
-                """
-                Call calculate() with or without arguments.
-                Implement caching to avoid recomputation.
-                """
-                # Create hashable cache key for args and kwargs
-                cache_key = (args, frozenset(kwargs.items()))
-
-                # Check if the result is cached
-                if cache_key not in self.cache_dict[name]:
-                    self.cache_dict[name][cache_key] = self.plugin_instance.calculate(
-                        *args, **kwargs
-                    )
-
-                return self.cache_dict[name][cache_key]
-
-        return PluginWrapper(self.__precomputed)
+    def __dir__(self):
+        """
+        Return the list of dynamically available plugins for autocompletion QoL.
+        """
+        return super().__dir__() + self._available_plugins
 
 
 class BasePlugin(ABC):
