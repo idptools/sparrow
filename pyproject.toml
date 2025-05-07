@@ -19,9 +19,9 @@ requires-python = ">=3.7"
 
 # add in as needed  
 dependencies = [      
-    "numpy>=1.14.0,<2.0",
+    "numpy>=2.0",
     "scipy",
-    "cython",
+    "cython>=3",
     "protfasta",
     "metapredict>2",
     "ipython",
