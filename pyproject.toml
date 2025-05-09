@@ -25,7 +25,7 @@ dependencies = [
     "protfasta",
     "metapredict>2",
     "ipython",
-    "idptools-parrot",
+    "idptools-parrot @ git+https://git@github.com/idptools/parrot.git",
     "afrc",
     "tqdm",
     "pyfamsa",
