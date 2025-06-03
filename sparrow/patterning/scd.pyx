@@ -126,11 +126,15 @@ cpdef double compute_shd(str seq, dict hydro_dict=None):
     cdef double[:] h = np.array([hydro_dict[res] for res in seq], dtype=np.double)
     cdef double t = 0.0
     cdef Py_ssize_t m, n
+    cdef double h_m, h_n  # Cache hydrophobicity values
+    cdef int diff  # Cache the difference
     
     for m in range(1, N):
+        h_m = h[m]  # Cache h[m] to avoid repeated array access
         for n in range(m-1):
-            t += (h[m] + h[n]) / abs(m - n)
+            h_n = h[n]
+            diff = m - n  # Since m > n, this is always positive
+            t += (h_m + h_n) / diff  # No need for abs() since diff > 0
 
     return t / N
 
-    
