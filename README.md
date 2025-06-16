@@ -114,6 +114,9 @@ A full public release is planned for spring of 2025.
 
 ## Changelog
 
+#### June 2025 (version 0.2.3 release)
+* Fixed an indexing bug in Sequence Hydropathy Decoration calculations
+
 #### Nover 2024 (version 0.2.3 release)
 * Updated to using pyproject.toml for package data
 * Fixed tests to work with metapredict V3

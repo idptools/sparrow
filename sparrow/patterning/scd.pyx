@@ -128,7 +128,7 @@ cpdef double compute_shd(str seq, dict hydro_dict=None):
     cdef Py_ssize_t m, n
     
     for m in range(1, N):
-        for n in range(m-1):
+        for n in range(m):
             t += (h[m] + h[n]) / abs(m - n)
 
     return t / N
