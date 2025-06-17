@@ -110,12 +110,13 @@ If you use ALBATROSS, please cite:
 ### Roadmap
 An initial public version of SPARROW was released in June 2022 to enable existing tools developed by the Holehouse lab to use this code. This version is not meant for those outside the Holehouse lab to take and use (see **Use and distribution** for their own safety!).
 
-A full public release is planned for spring of 2025.
+A full public release is planned for fall of 2025.
 
 ## Changelog
 
 #### June 2025 (version 0.2.3 release)
 * Fixed an indexing bug in Sequence Hydropathy Decoration calculations
+* Removed numpy < 2.0 requirement in main; numpy now requires `>1.14.0` only. We may move to force `>2.0` in the future but this will be homogenized across the HHL computational infrastructure should it happen.
 
 #### Nover 2024 (version 0.2.3 release)
 * Updated to using pyproject.toml for package data
