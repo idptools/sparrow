@@ -660,7 +660,7 @@ class Protein:
 
         """
 
-        scd.compute_shd(self.sequence, hydro_dict=hydro_dict)
+        return scd.compute_shd(self.sequence, hydro_dict=hydro_dict)
 
     # .................................................................
     #
