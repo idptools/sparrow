@@ -11,7 +11,7 @@ ctypedef np.int64_t INT64_t
 
 @cython.boundscheck(False)
 @cython.wraparound(False)
-def calculate_average_inverse_distance_from_sequence(str sequence, str target_residues):
+def calculate_average_inverse_distance_from_sequence(str sequence, list target_residues):
     """
     Function that takes an amino acid sequence and a set of target residues and
     computes the inverse-weighted distance (IWD) between residues in the 

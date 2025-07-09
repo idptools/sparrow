@@ -54,7 +54,6 @@ def batch_aa_fracts(seq_matrix, seq_lengths):
     # Mapping from index to amino acid letter
     aa_letters = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']
 
-
     # Calculate the fraction of each amino acid in each sequence
     aa_counts = np.apply_along_axis(lambda x: np.bincount(x[~np.isnan(x)].astype(int), minlength=len(all_amino_acids)), axis=1, arr=seq_matrix)
     aa_fracts = aa_counts / seq_lengths[:, np.newaxis]
@@ -473,4 +472,273 @@ def batch_scd(seq_matrix, valid_mask, seq_lengths):
 # still need to implement the following:
 #   • compute_iwd_charged_weighted
 #   • compute_bivariate_iwd_charged_weighted
+
+def batch_aa_fracts_fixed_length(seq_matrix):
+    '''
+    Optimized amino acid fractions calculation for fixed-length sequences.
+    No need for seq_lengths parameter since all sequences are the same length.
+    
+    Parameters
+    ----------
+    seq_matrix : np.ndarray
+        Matrix of sequences, where each row is a sequence and each column is a position.
+        All sequences must be the same length with no NaN values.
+    
+    Returns
+    -------
+    list
+        List of dictionaries with amino acid fractions for each sequence.
+    '''
+    # Mapping from index to amino acid letter
+    aa_letters = ['A', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'V', 'W', 'Y']
+    
+    # Much faster bincount without NaN handling
+    seq_length = seq_matrix.shape[1]
+    aa_counts = np.apply_along_axis(lambda x: np.bincount(x.astype(int), minlength=20), axis=1, arr=seq_matrix)
+    aa_fracts = aa_counts / seq_length
+    
+    return [dict(zip(aa_letters, fracts)) for fracts in aa_fracts]
+
+def batch_hydrophobicity_fixed_length(seq_matrix):
+    '''
+    Optimized hydrophobicity calculation for fixed-length sequences.
+    
+    Parameters
+    ----------
+    seq_matrix : np.ndarray
+        Matrix of sequences with no NaN values.
+    
+    Returns
+    -------
+    np.ndarray
+        Array of hydropathy indices for each sequence.
+    '''
+    hydropathy_index = np.array([6.3, 7.0, 1.0, 1.0, 7.3, 4.1, 1.3, 9.0, 
+                                 0.6, 8.3, 6.4, 1.0, 2.9, 1.0, 0.0, 3.7, 3.8, 8.7, 3.6, 3.2])
+    
+    # Direct indexing without masking - much faster
+    hydropathy_values = hydropathy_index[seq_matrix.astype(int)]
+    return np.mean(hydropathy_values, axis=1)
+
+def batch_FCR_fixed_length(seq_matrix):
+    '''
+    Optimized FCR calculation for fixed-length sequences.
+    
+    Parameters
+    ----------
+    seq_matrix : np.ndarray
+        Matrix of sequences with no NaN values.
+    
+    Returns
+    -------
+    np.ndarray
+        Array of FCR values for each sequence.
+    '''
+    # Charged residues: D(2), E(3), K(8), R(14)
+    charged_mask = (
+        (seq_matrix == 2) |  # D
+        (seq_matrix == 3) |  # E
+        (seq_matrix == 8) |  # K
+        (seq_matrix == 14)   # R
+    )
+    
+    # No need for valid_mask division - just use sequence length
+    return np.mean(charged_mask, axis=1)
+
+def batch_NCPR_fixed_length(seq_matrix):
+    '''
+    Optimized NCPR calculation for fixed-length sequences.
+    
+    Parameters
+    ----------
+    seq_matrix : np.ndarray
+        Matrix of sequences with no NaN values.
+    
+    Returns
+    -------
+    np.ndarray
+        Array of NCPR values for each sequence.
+    '''
+    # Positive: K(8), R(14) = +1, Negative: D(2), E(3) = -1
+    positive_mask = (seq_matrix == 8) | (seq_matrix == 14)
+    negative_mask = (seq_matrix == 2) | (seq_matrix == 3)
+    
+    net_charge = np.sum(positive_mask, axis=1) - np.sum(negative_mask, axis=1)
+    return net_charge / seq_matrix.shape[1]
+
+def batch_frac_aro_fixed_length(seq_matrix):
+    '''
+    Optimized aromatic fraction calculation for fixed-length sequences.
+    '''
+    aromatic_mask = (seq_matrix == 4) | (seq_matrix == 18) | (seq_matrix == 19)  # F, W, Y
+    return np.mean(aromatic_mask, axis=1)
+
+def batch_frac_polar_fixed_length(seq_matrix):
+    '''
+    Optimized polar fraction calculation for fixed-length sequences.
+    '''
+    polar_mask = (
+        (seq_matrix == 5) |   # G
+        (seq_matrix == 6) |   # H
+        (seq_matrix == 11) |  # N
+        (seq_matrix == 13) |  # Q
+        (seq_matrix == 15) |  # S
+        (seq_matrix == 16)    # T
+    )
+    return np.mean(polar_mask, axis=1)
+
+def batch_frac_positive_fixed_length(seq_matrix):
+    '''
+    Optimized positive fraction calculation for fixed-length sequences.
+    '''
+    positive_mask = (seq_matrix == 8) | (seq_matrix == 14)  # K, R
+    return np.mean(positive_mask, axis=1)
+
+def batch_frac_negative_fixed_length(seq_matrix):
+    '''
+    Optimized negative fraction calculation for fixed-length sequences.
+    '''
+    negative_mask = (seq_matrix == 2) | (seq_matrix == 3)  # D, E
+    return np.mean(negative_mask, axis=1)
+
+def batch_frac_ali_fixed_length(seq_matrix):
+    '''
+    Optimized aliphatic fraction calculation for fixed-length sequences.
+    '''
+    aliphatic_mask = (
+        (seq_matrix == 0) |   # A
+        (seq_matrix == 7) |   # I
+        (seq_matrix == 9) |   # L
+        (seq_matrix == 10) |  # M
+        (seq_matrix == 17)    # V
+    )
+    return np.mean(aliphatic_mask, axis=1)
+
+def batch_frac_proline_fixed_length(seq_matrix):
+    '''
+    Optimized proline fraction calculation for fixed-length sequences.
+    '''
+    proline_mask = (seq_matrix == 12)  # P
+    return np.mean(proline_mask, axis=1)
+
+def batch_complexity_fixed_length(seq_matrix):
+    '''
+    Optimized complexity calculation for fixed-length sequences.
+    
+    Parameters
+    ----------
+    seq_matrix : np.ndarray
+        Matrix of sequences with no NaN values.
+    
+    Returns
+    -------
+    np.ndarray
+        Array of complexity values for each sequence.
+    '''
+    seq_length = seq_matrix.shape[1]
+    
+    # Faster bincount without NaN handling
+    aa_counts = np.apply_along_axis(
+        lambda x: np.bincount(x.astype(int), minlength=20), 
+        axis=1, 
+        arr=seq_matrix
+    )
+    
+    # Calculate fractions
+    aa_fractions = aa_counts / seq_length
+    
+    # Vectorized complexity calculation
+    with np.errstate(divide='ignore', invalid='ignore'):
+        log_fractions = np.where(aa_fractions > 0, np.log(aa_fractions) / np.log(20), 0)
+    complexities = -np.sum(aa_fractions * log_fractions, axis=1)
+    
+    return complexities
+
+def batch_molecular_weight_fixed_length(seq_matrix):
+    '''
+    Optimized molecular weight calculation for fixed-length sequences.
+    
+    Parameters
+    ----------
+    seq_matrix : np.ndarray
+        Matrix of sequences with no NaN values.
+    
+    Returns
+    -------
+    np.ndarray
+        Array of molecular weights for each sequence.
+    '''
+    mw_constants = np.array([89.1, 121.2, 133.1, 147.1, 165.2, 75.1, 155.2, 
+                             131.2, 146.2, 130.2, 149.2, 132.1, 115.1, 146.2, 
+                             174.2, 105.1, 119.1, 117.1, 204.2, 181.2])
+    
+    # Direct indexing without masking
+    mw_values = mw_constants[seq_matrix.astype(int)]
+    total_mw = np.sum(mw_values, axis=1)
+    
+    # Subtract water for peptide bonds
+    seq_length = seq_matrix.shape[1]
+    water_weight = 18
+    peptide_bond_water = (seq_length - 1) * water_weight
+    
+    return total_mw - peptide_bond_water
+
+# Smart dispatcher functions that choose the appropriate implementation
+def batch_aa_fracts_smart(seq_matrix, seq_lengths=None):
+    '''
+    Smart dispatcher that chooses optimized version for fixed-length sequences.
+    '''
+    if seq_lengths is None or np.all(seq_lengths == seq_lengths[0]):
+        # All sequences same length - use optimized version
+        return batch_aa_fracts_fixed_length(seq_matrix)
+    else:
+        # Variable lengths - use original version
+        return batch_aa_fracts(seq_matrix, seq_lengths)
+
+def batch_hydrophobicity_smart(seq_matrix, valid_mask=None):
+    '''
+    Smart dispatcher for hydrophobicity calculation.
+    '''
+    if valid_mask is None or np.all(valid_mask):
+        # No masking needed - use optimized version
+        return batch_hydrophobicity_fixed_length(seq_matrix)
+    else:
+        # Masking needed - use original version
+        return batch_hydrophobicity(seq_matrix, valid_mask)
+
+def batch_FCR_smart(seq_matrix, valid_mask=None):
+    '''
+    Smart dispatcher for FCR calculation.
+    '''
+    if valid_mask is None or np.all(valid_mask):
+        return batch_FCR_fixed_length(seq_matrix)
+    else:
+        return batch_FCR(seq_matrix, valid_mask)
+
+def batch_NCPR_smart(seq_matrix, valid_mask=None):
+    '''
+    Smart dispatcher for NCPR calculation.
+    '''
+    if valid_mask is None or np.all(valid_mask):
+        return batch_NCPR_fixed_length(seq_matrix)
+    else:
+        return batch_NCPR(seq_matrix, valid_mask)
+
+def batch_complexity_smart(seq_matrix, seq_lengths=None):
+    '''
+    Smart dispatcher for complexity calculation.
+    '''
+    if seq_lengths is None or np.all(seq_lengths == seq_lengths[0]):
+        return batch_complexity_fixed_length(seq_matrix)
+    else:
+        return batch_complexity(seq_matrix, seq_lengths)
+
+def batch_molecular_weight_smart(seq_matrix, valid_mask=None, seq_lengths=None):
+    '''
+    Smart dispatcher for molecular weight calculation.
+    '''
+    if (valid_mask is None or np.all(valid_mask)) and (seq_lengths is None or np.all(seq_lengths == seq_lengths[0])):
+        return batch_molecular_weight_fixed_length(seq_matrix)
+    else:
+        return batch_molecular_weight(seq_matrix, valid_mask, seq_lengths)
 
