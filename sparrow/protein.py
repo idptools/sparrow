@@ -273,8 +273,8 @@ class Protein:
     @property
     def SHD(self):
         """
-        Returns the default sequence charge decoration (SCD) parameter
-        as defined by Sawle and Ghosh [1]
+        Returns the default sequence hydropathy decoration (SHD) parameter
+        as defined by Zheng et al [1]
 
         Returns
         --------
@@ -283,12 +283,10 @@ class Protein:
 
         Reference
         --------
-        Sawle, L., & Ghosh, K. (2015). A theoretical method to compute sequence
-        dependent configurational properties in charged polymers and proteins.
-        The Journal of Chemical Physics, 143(8), 085101.
-
-
-
+        [1] Zheng, W.; Dignon, G.; Brown, M.; Kim, Y. C.; Mittal, J.
+            Hydropathy Patterning Complements Charge Patterning to Describe
+            Conformational Preferences of Disordered Proteins.
+            J. Phys. Chem. Lett. 2020, 11 (9), 3408–3415.
         """
         if self.__shd is None:
             self.__shd = scd.compute_shd(self.sequence, hydro_dict=None)
