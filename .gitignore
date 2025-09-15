@@ -114,3 +114,4 @@ ENV/
 
 # pytorch weights
 # *pt
+docs/autosummary/

@@ -1,2 +1,13 @@
-versioningit
+sphinx>=8.1
 sphinx_rtd_theme
+myst-parser
+sphinx-copybutton
+sphinx-autodoc-typehints
+numpy
+scipy
+cython
+protfasta
+metapredict
+afrc
+tqdm
+pyfamsa
