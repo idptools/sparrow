@@ -3,4 +3,4 @@
 
 .. currentmodule:: sparrow.patterning.kappa
 
-.. autofunction:: calculate_sigma
+.. autodata:: calculate_sigma

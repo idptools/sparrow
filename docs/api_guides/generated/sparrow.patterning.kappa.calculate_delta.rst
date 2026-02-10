@@ -3,4 +3,4 @@
 
 .. currentmodule:: sparrow.patterning.kappa
 
-.. autofunction:: calculate_delta
+.. autodata:: calculate_delta

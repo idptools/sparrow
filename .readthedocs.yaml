@@ -6,13 +6,9 @@ build:
   jobs:
     pre_build:
       - export SPARROW_DOC_BUILD=1
-    pre_install:
-      - pip install --upgrade pip
 python:
   install:
     - requirements: docs/requirements.txt
-    - method: pip
-      path: .
 sphinx:
   configuration: docs/conf.py
 formats: []

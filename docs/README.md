@@ -26,5 +26,5 @@ The compiled docs are written under `docs/_build/html`.
 
 ## Read the Docs configuration
 
-The canonical Read the Docs config is the repository-level `.readthedocs.yaml`.
-Legacy files should not be used.
+Read the Docs reads the repository-level `readthedocs.yml`.
+`.readthedocs.yaml` is kept in sync for local/developer compatibility.

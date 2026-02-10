@@ -3,4 +3,4 @@
 
 .. currentmodule:: sparrow.patterning.patterning
 
-.. autofunction:: patterning_percentile
+.. autodata:: patterning_percentile
