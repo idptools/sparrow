@@ -13,6 +13,7 @@ from sparrow.data import amino_acids
 from sparrow.patterning import iwd, kappa, scd
 from sparrow.sequence_analysis import (
     elm,
+    patching,
     phospho_isoforms,
     physical_properties,
     sequence_complexity,
@@ -577,12 +578,11 @@ class Protein:
 
         Parameters
         -------------
-        target_residues : list
-            Must be a list of valid amino acid one letter codes.
-            Sanity checking is not performed here (maybe add this?).
-            This defines one set of residues for which patterning
-            is computed against. If a second set is not provided,
-            patterning is done via group1 vs. all other residues.
+        target_residues : str or list
+            One or more valid amino acid one-letter residue codes that define
+            the target set for IWD clustering. This can be passed either as a
+            joined string (for example ``"ILVAM"``) or as an iterable of
+            residues (for example ``["I", "L", "V", "A", "M"]``).
 
         Returns
         --------
@@ -590,16 +590,92 @@ class Protein:
             Float that is positive
 
         """
-
-        # ensure valid amino acids are used
-        for i in target_residues:
-            if i not in amino_acids.VALID_AMINO_ACIDS:
-                raise sparrow_exceptions.ProteinException(
-                    f"Amino acid {i} (in target_residues) is not a standard amino acid"
-                )
+        residues = general_tools.normalize_residue_selector(
+            target_residues,
+            selector_name="target_residues",
+            exception_cls=sparrow_exceptions.ProteinException,
+            uppercase=True,
+            require_nonempty=False,
+            unique=False,
+            sort_unique=False,
+            return_type="str",
+        )
 
         return iwd.calculate_average_inverse_distance_from_sequence(
-            self.sequence, target_residues
+            self.sequence, residues
+        )
+
+    # .................................................................
+    #
+    def compute_patch_fraction(
+        self,
+        residue_selector,
+        interruption=2,
+        min_target_count=4,
+        adjacent_pair_pattern=None,
+        min_adjacent_pair_count=0,
+    ):
+        """
+        Returns the sequence fraction covered by residue patches.
+
+        Parameters
+        ----------
+        residue_selector : str or list
+            One or more amino acid one-letter residue codes defining patch hits.
+        interruption : int, optional
+            Maximum number of non-target residues bridged inside a candidate
+            patch. Default is 2.
+        min_target_count : int or None, optional
+            Minimum number of target residues required for a bridged region to
+            count as a patch. Default is 4. If set to ``None`` this filter is
+            disabled.
+        adjacent_pair_pattern : str or list, optional
+            Optional adjacent residue motif that must occur in a bridged region
+            (for example ``"RG"``). Default is None.
+        min_adjacent_pair_count : int, optional
+            Minimum number of occurrences of ``adjacent_pair_pattern`` required
+            for a bridged region to count. Default is 0.
+
+        Returns
+        -------
+        float
+            Fraction of sequence positions covered by valid patch spans.
+        """
+        return patching.patch_fraction(
+            self.sequence,
+            residue_selector=residue_selector,
+            interruption=interruption,
+            min_target_count=min_target_count,
+            adjacent_pair_pattern=adjacent_pair_pattern,
+            min_adjacent_pair_count=min_adjacent_pair_count,
+        )
+
+    # .................................................................
+    #
+    def compute_rg_patch_fraction(self, interruption=2, min_adjacent_rg_pairs=2):
+        """
+        Returns the sequence fraction covered by RG motif-enriched patches.
+
+        Parameters
+        ----------
+        interruption : int, optional
+            Maximum number of non-R/G residues bridged inside a candidate RG
+            patch. Default is 2.
+        min_adjacent_rg_pairs : int, optional
+            Minimum number of adjacent ``RG`` pairs required for a bridged
+            region to count. Default is 2.
+
+        Returns
+        -------
+        float
+            Fraction of sequence positions covered by valid RG patch spans.
+        """
+        return self.compute_patch_fraction(
+            residue_selector="RG",
+            interruption=interruption,
+            min_target_count=None,
+            adjacent_pair_pattern="RG",
+            min_adjacent_pair_count=min_adjacent_rg_pairs,
         )
 
     # .................................................................
@@ -980,10 +1056,6 @@ class Protein:
         Notes
         -----
         Only the Gutierrez et al. style extraction (``mode='holt'``) is implemented at present.
-
-        References
-        ----------
-        .. [1] TODO
 
         Examples
         --------
