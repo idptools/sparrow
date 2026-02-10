@@ -1,70 +1,51 @@
 API Documentation
 =================
 
-Core API
---------
+The API docs are organized around common workflows instead of a flat module list.
+Start with the guide that matches how you want to use sparrow, then drill into
+module/class references from each page.
 
-.. autosummary::
-   :toctree: autosummary
-   :caption: Core
+.. toctree::
+   :maxdepth: 2
+   :caption: API Guides
 
-   sparrow.protein
-   sparrow.calculate_parameters
-   sparrow.tools.io
+   api_guides/protein
+   api_guides/sequence_analysis
+   api_guides/community_plugins
+   api_guides/patterning
 
-Patterning Metrics
-------------------
+Choosing a Workflow
+-------------------
 
-.. autosummary::
-   :toctree: autosummary
-   :caption: Patterning
+.. list-table::
+   :header-rows: 1
 
-   sparrow.patterning.kappa
-   sparrow.patterning.scd
+   * - Workflow
+     - Start Here
+     - Best For
+     - Primary Modules
+   * - Object-oriented analysis
+     - :doc:`api_guides/protein`
+     - Most routine sequence analysis directly from a ``Protein`` object.
+     - ``sparrow.protein``
+   * - Functional analysis
+     - :doc:`api_guides/sequence_analysis`
+     - Pipeline code and utilities that should run outside the ``Protein`` wrapper.
+     - ``sparrow.calculate_parameters``, ``sparrow.sequence_analysis.alignment``, ``sparrow.sequence_analysis.grammar``, ``sparrow.sequence_analysis.patching``
+   * - Extension and community plugins
+     - :doc:`api_guides/community_plugins`
+     - Using and authoring contributed analyses exposed via ``Protein.plugin``.
+     - ``sparrow.sequence_analysis.plugins``
+   * - Patterning and Cython-backed metrics
+     - :doc:`api_guides/patterning`
+     - Direct access to high-performance sequence patterning functions.
+     - ``sparrow.patterning.kappa``, ``sparrow.patterning.iwd``, ``sparrow.patterning.patterning``
 
-Predictors
-----------
+Focused Predictor Guide
+-----------------------
 
-.. autosummary::
-   :toctree: autosummary
-   :caption: Predictors
-
-   sparrow.predictors.asphericity
-   sparrow.predictors.batch_predict
-   sparrow.predictors.dssp
-   sparrow.predictors.e2e
-   sparrow.predictors.mitochondrial_targeting
-   sparrow.predictors.nes
-   sparrow.predictors.nls
-   sparrow.predictors.phosphorylation
-   sparrow.predictors.prefactor
-   sparrow.predictors.pscore
-   sparrow.predictors.rg
-   sparrow.predictors.scaled_re
-   sparrow.predictors.scaled_rg
-   sparrow.predictors.scaling_exponent
-   sparrow.predictors.tad
-   sparrow.predictors.transmembrane
-
-Accessors
----------
-
-.. autosummary::
-   :toctree: autosummary
-   :caption: Accessors
-
-   sparrow.sequence_analysis.plugins.PluginManager
-   sparrow.predictors.Predictor
-   sparrow.polymer.Polymeric
-
-Utilities
----------
-
-.. autosummary::
-   :toctree: autosummary
-   :caption: Utilities
-
-   sparrow.tools
+Predictor implementation details remain in :doc:`predictors`. This keeps predictor
+training/integration guidance separate from the core API workflows above.
 
 Indices
 -------
