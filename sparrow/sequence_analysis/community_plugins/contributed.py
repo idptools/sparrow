@@ -10,13 +10,13 @@ class MultiplicativeFCR(BasePlugin):
         This analysis doubles the FCR (fraction of charged residues) of the protein.
         This is a simple example of a contributed plugin.
 
-        Parameters: factor (float)
-        -------------
-        factor: float
+        Parameters
+        ----------
+        factor : float
             The factor by which the FCR will be multiplied (default is 2.0)
 
         Returns
-        -------------
+        -------
         float
             Returns the result of the contributed analysis
         """

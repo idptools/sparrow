@@ -6,6 +6,10 @@
 Welcome to sparrow's documentation!
 =========================================================
 
+sparrow provides sequence analysis for intrinsically disordered proteins with both
+an object-oriented API (``Protein``) and functional modules that can be used in
+pipelines.
+
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
@@ -13,8 +17,6 @@ Welcome to sparrow's documentation!
    getting_started
    api
    predictors
-
-
 
 Indices and tables
 ==================

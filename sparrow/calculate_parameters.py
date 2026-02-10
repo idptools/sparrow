@@ -1,27 +1,40 @@
-from sparrow.data import amino_acids
-import numpy as np
+"""Utility functions for computing sequence-derived parameters.
+
+This module contains lightweight, dependency-minimal helpers for amino acid
+composition, sequence complexity, and hydrophobicity calculations.
+"""
+
 import math
+
+import numpy as np
+
+from sparrow.data import amino_acids
+
 from . import sparrow_exceptions
+
 
 # .................................................................
 #
 def calculate_aa_fractions(s):
-    """
-    Standalone function that computes amino-acid fractions for
-    a given sequence.
+    """Compute per-amino-acid fractional composition.
 
-    Parameters:
-    --------------
+    Parameters
+    ----------
     s : str
-        Amino acid sequence
+        Amino acid sequence (uppercase one-letter codes expected).
 
     Returns
-    ---------------
-    dict
-        Returns dictionary with per-residue amino acid fraction
-    
+    -------
+    dict[str, float]
+        Mapping from each standard amino acid to its fractional occurrence
+        (counts divided by total sequence length).
+
+    Examples
+    --------
+    >>> calculate_aa_fractions("ACAA")['A']
+    0.75
     """
-    
+
     aa_dict = {}
     for i in amino_acids.VALID_AMINO_ACIDS:
         aa_dict[i] = 0
@@ -29,119 +42,116 @@ def calculate_aa_fractions(s):
     for i in s:
         aa_dict[i] = aa_dict[i] + 1
 
-    
     len_s = len(s)
     for i in amino_acids.VALID_AMINO_ACIDS:
-        aa_dict[i] = aa_dict[i]/len_s
+        aa_dict[i] = aa_dict[i] / len_s
 
     return aa_dict
- 
 
 
 def calculate_seg_complexity(s, alphabet=amino_acids.VALID_AMINO_ACIDS):
-    """
-    Function to calculate the Wootton-Federhen complexity of a sequence (also called
-    seg complexity, as this the theory used in the classic SEG algorithm.
+    """Calculate Wootton-Federhen (SEG) compositional complexity.
+
+    This is the Shannon-like compositional complexity used by the classic
+    SEG algorithm. Larger negative summed probabilities (before the sign
+    inversion) indicate more diverse composition; the returned value is
+    positive.
 
     Parameters
-    -----------
+    ----------
     s : str
-        Amino acid sequence
-
-    alphabet : list
-        List of amino acids found in alphabet. Note this does not sanity check in the 
-        case of non-standard amino acids. Default is the standard 20 amino acids
+        Amino acid sequence.
+    alphabet : iterable[str], optional
+        Alphabet to consider (default: the 20 standard amino acids). Residues
+        not present in ``alphabet`` are ignored in probability estimates.
 
     Returns
-    ----------
+    -------
     float
-        Returns a float that corresponds to the compositional complexity associated with 
-        the passed sequence.
-
+        Compositional complexity of the sequence (>= 0).
     """
 
     alphabet_size = len(alphabet)
     seq_len = len(s)
 
-    complexity = 0 
+    complexity = 0
     for a in alphabet:
-        p = s.count(a)/seq_len
+        p = s.count(a) / seq_len
 
         if p > 0:
-            complexity = p * math.log(p, alphabet_size) + complexity  
+            complexity = p * math.log(p, alphabet_size) + complexity
 
     return -complexity
-    
-   
+
 
 # .................................................................
 #
-def calculate_hydrophobicity(s, mode='KD', normalize=False):
-    """
-    Standalone function that computes hydrophobicity 
+def calculate_hydrophobicity(s, mode="KD", normalize=False):
+    """Compute mean hydrophobicity for a sequence.
 
-    Parameters:
-    --------------
+    Parameters
+    ----------
     s : str
-        Amino acid sequence
-
-    mode : str 
-        Hydrophobicity mode to be used. Currently only KD supported
-        but can be expanded. Allowed values: 'KD'
-
-    normalize : Bool
-        If set to True hydrophobicity scales are normalized to be between 0
-        and 1. Default = False.
+        Amino acid sequence.
+    mode : {'KD'}, optional
+        Hydrophobicity scale selector. Only ``'KD'`` (Kyte-Doolittle) implemented.
+    normalize : bool, optional
+        If True, use normalized (0-1) scale values.
 
     Returns
-    ---------------
-    Float
-        Returns a floating point value with the mean hydrophobicity 
-        as defined based on the passed scale
+    -------
+    float
+        Mean per-residue hydrophobicity under the selected scale.
 
+    Raises
+    ------
+    sparrow_exceptions.CalculationException
+        If an invalid residue or unknown mode is encountered.
     """
     return np.mean(calculate_linear_hydrophobicity(s, mode, normalize))
-    
+
 
 # .................................................................
 #
-def calculate_linear_hydrophobicity(s, mode='KD', normalize=False):
-    """
-    Compute linear hydrophobicity from sequence using one of several possible 
-    hydrophobicity scales. 
+def calculate_linear_hydrophobicity(s, mode="KD", normalize=False):
+    """Return per-residue hydrophobicity values.
 
-    By default this is Kyte-Doolitle, but, we'll add in additional scales
-    as/when needed.
-
-    Parameters:
-    --------------
+    Parameters
+    ----------
     s : str
-         Amino acid sequence
+        Amino acid sequence.
+    mode : {'KD'}, optional
+        Hydrophobicity scale selector. Only ``'KD'`` implemented.
+    normalize : bool, optional
+        If True, return normalized (0-1) hydrophobicity values.
 
-    mode : str
-        Selector for hydrophobicity table. Options available are
+    Returns
+    -------
+    list[float]
+        Hydrophobicity value for each residue in ``s``.
 
-        'KD'    | Kyte-Doolittle
+    Raises
+    ------
+    sparrow_exceptions.CalculationException
+        If an invalid residue or unknown mode is encountered.
 
-    normalize : bool
-        Boolean that means hydrophobicity scales operate on a normalized
-        dynamic range of 0 to 1
-
-    Returns:
-    ------------
-    list 
-        List of values that correspond to per-residue hydrophobicity based on
-        a given hydrophobicity scale.
-    
+    Examples
+    --------
+    >>> calculate_linear_hydrophobicity('AA', mode='KD')  # doctest: +NORMALIZE_WHITESPACE
+    [1.8, 1.8]
     """
 
-    if mode == 'KD':
+    if mode == "KD":
         try:
             if normalize:
                 return [amino_acids.AA_hydro_KD_normalized[r] for r in s]
             else:
                 return [amino_acids.AA_hydro_KD[r] for r in s]
         except KeyError:
-            raise sparrow_exceptions.CalculationException('Invalid residue found in %s' %(s))
+            raise sparrow_exceptions.CalculationException(
+                "Invalid residue found in %s" % (s)
+            )
     else:
-        raise sparrow_exceptions.CalculationException('Invalid mode passed: %s' %(mode))
+        raise sparrow_exceptions.CalculationException(
+            "Invalid mode passed: %s" % (mode)
+        )

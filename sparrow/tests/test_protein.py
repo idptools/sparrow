@@ -12,6 +12,7 @@ import pytest
 import sparrow
 from sparrow.data.amino_acids import VALID_AMINO_ACIDS
 from sparrow.protein import Protein
+from sparrow.sequence_analysis import patching
 from sparrow.sequence_analysis.elm import (
     ELM,
     compute_gained_elms,
@@ -23,6 +24,29 @@ from sparrow.sequence_analysis.elm import (
 def test_sparrow_imported():
     """Sample test, will always pass so long as import statement worked"""
     assert "sparrow" in sys.modules
+
+
+def test_patch_wrapper_methods():
+    seq = "AAAAQQRGRGTTTAAAQQ"
+    protein = Protein(seq)
+
+    assert np.isclose(
+        protein.compute_patch_fraction("A"),
+        patching.patch_fraction(seq, "A"),
+    )
+    assert np.isclose(
+        protein.compute_rg_patch_fraction(),
+        patching.rg_patch_fraction(seq),
+    )
+    assert np.isclose(
+        protein.compute_patch_fraction(
+            residue_selector="RG",
+            min_target_count=None,
+            adjacent_pair_pattern="RG",
+            min_adjacent_pair_count=2,
+        ),
+        protein.compute_rg_patch_fraction(),
+    )
 
 
 def test_protein_code_coverage():
@@ -59,6 +83,14 @@ def test_protein_code_coverage():
     assert np.isclose(np.mean(P.predictor.disorder()), 0.92875415)
     assert P.hydrophobicity == 3.052459016393442
     assert P.compute_residue_fractions(['P','E','K','R','D']) == 0.09836065573770492
+    assert np.isclose(
+        P.compute_patch_fraction("Q"),
+        patching.patch_fraction(P.sequence, "Q"),
+    )
+    assert np.isclose(
+        P.compute_rg_patch_fraction(),
+        patching.rg_patch_fraction(P.sequence),
+    )
 
     assert np.mean(P.linear_sequence_profile('FCR')) == 0.04918032786885246
     assert np.mean(P.linear_sequence_profile('NCPR')) == -0.02459016393442623
@@ -150,5 +182,3 @@ def test_elm_comparisons():
     assert compute_gained_elms(mut,"p.M1K") == {ELM(regex='KR.', functional_site_name='PCSK cleavage site', start=0, end=3, sequence='KRK'),
                                                  ELM(regex='[KR]R.', functional_site_name='PCSK cleavage site', start=0, end=3, sequence='KRK')}
     assert compute_lost_elms(mut, "p.M1G") == {ELM(regex='^M{0,1}[RK][^P].', functional_site_name='N-degron', start=0, end=4, sequence='MRKK')}
-
-

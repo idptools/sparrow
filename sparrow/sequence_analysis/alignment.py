@@ -23,7 +23,7 @@ class SequenceAlignment:
         """
         Initialize the SequenceAlignment object.
 
-        Parametersip
+        Parameters
         ----------
         input_data : Union[List[Protein], str, Dict[str, str]]
             A list of Protein objects, a path to a FASTA file, or a dictionary

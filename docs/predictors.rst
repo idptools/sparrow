@@ -1,6 +1,10 @@
 Predictors
 =================
 
+.. note::
+   This page is a focused guide for predictor development and integration.
+   For core and public-facing API usage, start with :doc:`api`.
+
 sparrow implements a set of different sequence-based predictors in a modular, extendable way that enables additional predictors to be easily added. 
 
 
@@ -96,11 +100,3 @@ As such, to finally make a new predictor accessible, ``sparrow.predictor.Predict
 3. It should (ideally) memoize the outcome into a local dictionary that means if the same prediction is called again it is simply referenced rather than recomputed.
 
 Rather than going into the details here, the underlying code and example should make this clear. Noteably, see ``dssp()`` and ``transmembrane_regions()`` for good examples of PARROT-based predictors. One important thing is to document these predictors clearly
-
-
-
-
-
-
-
-

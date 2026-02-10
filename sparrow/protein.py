@@ -1,19 +1,27 @@
+"""Core Protein module.
+
+This module exposes the :class:`Protein` class, a lightweight container providing
+on-demand computation of sequence-derived biophysical parameters and access to
+predictors, polymeric properties, plugins, and sequence analysis utilities.
+
+"""
+
 from protfasta import utilities as protfasta_utilities
 
 from sparrow import calculate_parameters, data, sparrow_exceptions
 from sparrow.data import amino_acids
 from sparrow.patterning import iwd, kappa, scd
-from sparrow.polymer import Polymeric
-from sparrow.predictors import Predictor
 from sparrow.sequence_analysis import (
     elm,
+    patching,
     phospho_isoforms,
     physical_properties,
     sequence_complexity,
 )
-from sparrow.sequence_analysis.plugins import PluginManager
 from sparrow.tools import general_tools, track_tools, utilities
 from sparrow.visualize import sequence_visuals
+
+__all__ = ["Protein"]
 
 
 class Protein:
@@ -22,6 +30,12 @@ class Protein:
         Construct for Protein object. Requires only a single sequence as
         input. Note that construction does not trigger any sequence
         parameters to be calculated, all of which are caculated as needed.
+
+        See Also
+        --------
+        :class:`sparrow.sequence_analysis.plugins.PluginManager` : Plugin interface
+        :class:`sparrow.predictors.Predictor` : Sequence-based predictors
+        :class:`sparrow.polymer.Polymeric` : Polymer property calculations
 
         Parameters
         -------------
@@ -247,21 +261,17 @@ class Protein:
     def SCD(self):
         """
         Returns the default sequence charge decoration (SCD) parameter
-        as defined by Sawle and Ghosh [1]
+        as defined by Sawle and Ghosh :cite:`sawle2015theoretical`.
 
         Returns
         --------
         float
             Returns a float that reports on the sequence charge decoration
 
-        Reference
-        --------
-        Sawle, L., & Ghosh, K. (2015). A theoretical method to compute sequence
-        dependent configurational properties in charged polymers and proteins.
-        The Journal of Chemical Physics, 143(8), 085101.
-
-
-
+        References
+        ----------
+        .. bibliography::
+           :filter: key == "sawle2015theoretical"
         """
         if self.__scd is None:
             self.__scd = scd.compute_scd_x(
@@ -274,24 +284,18 @@ class Protein:
     def SHD(self):
         """
         Returns the default sequence hydropathy decoration (SHD) parameter
-        as defined by Zheng et al [1]
+        as defined by Zheng et al. :cite:`zheng2020hydropathy`.
 
         Returns
         --------
         float
-            Returns a float that reports on the sequence charge decoration
+            Returns a float that reports on the sequence hydropathy decoration
 
-        Reference
-        --------
-        [1] Zheng, W.; Dignon, G.; Brown, M.; Kim, Y. C.; Mittal, J.
-            Hydropathy Patterning Complements Charge Patterning to Describe
-            Conformational Preferences of Disordered Proteins.
-            J. Phys. Chem. Lett. 2020, 11 (9), 3408–3415.
+        References
+        ----------
+        .. bibliography::
+           :filter: key == "zheng2020hydropathy"
         """
-        if self.__shd is None:
-            self.__shd = scd.compute_shd(self.sequence, hydro_dict=None)
-
-        return self.__shd
 
     # .................................................................
     #
@@ -416,9 +420,26 @@ class Protein:
     #
     def compute_residue_fractions(self, residue_selector):
         """
-        residue_selector is a list of one or more residue types
-        which are used to query the sequence
+        Compute the total fraction of specified residue types in the protein sequence.
 
+        Parameters
+        ----------
+        residue_selector : list
+            A list of one or more residue types (amino acid codes) to query
+            in the sequence.
+
+        Returns
+        -------
+        float
+            The sum of fractions for all specified residue types. Returns 0.0
+            if none of the specified residues are found in the sequence.
+
+        Examples
+        --------
+        >>> protein.compute_residue_fractions(['A', 'G'])
+        0.15
+        >>> protein.compute_residue_fractions(['X', 'Z'])
+        0.0
         """
 
         f = 0.0
@@ -490,9 +511,6 @@ class Protein:
             group2 in the background of everything else.
 
         window_size : int
-            The window size used for the computation of kappa, by default 6
-
-        window_size : int
             Size over which local sequence patterning will be
             calculated. Default = 6.
 
@@ -560,12 +578,11 @@ class Protein:
 
         Parameters
         -------------
-        target_residues : list
-            Must be a list of valid amino acid one letter codes.
-            Sanity checking is not performed here (maybe add this?).
-            This defines one set of residues for which patterning
-            is computed against. If a second set is not provided,
-            patterning is done via group1 vs. all other residues.
+        target_residues : str or list
+            One or more valid amino acid one-letter residue codes that define
+            the target set for IWD clustering. This can be passed either as a
+            joined string (for example ``"ILVAM"``) or as an iterable of
+            residues (for example ``["I", "L", "V", "A", "M"]``).
 
         Returns
         --------
@@ -573,16 +590,92 @@ class Protein:
             Float that is positive
 
         """
-
-        # ensure valid amino acids are used
-        for i in target_residues:
-            if i not in amino_acids.VALID_AMINO_ACIDS:
-                raise sparrow_exceptions.ProteinException(
-                    f"Amino acid {i} (in target_residues) is not a standard amino acid"
-                )
+        residues = general_tools.normalize_residue_selector(
+            target_residues,
+            selector_name="target_residues",
+            exception_cls=sparrow_exceptions.ProteinException,
+            uppercase=True,
+            require_nonempty=False,
+            unique=False,
+            sort_unique=False,
+            return_type="str",
+        )
 
         return iwd.calculate_average_inverse_distance_from_sequence(
-            self.sequence, target_residues
+            self.sequence, residues
+        )
+
+    # .................................................................
+    #
+    def compute_patch_fraction(
+        self,
+        residue_selector,
+        interruption=2,
+        min_target_count=4,
+        adjacent_pair_pattern=None,
+        min_adjacent_pair_count=0,
+    ):
+        """
+        Returns the sequence fraction covered by residue patches.
+
+        Parameters
+        ----------
+        residue_selector : str or list
+            One or more amino acid one-letter residue codes defining patch hits.
+        interruption : int, optional
+            Maximum number of non-target residues bridged inside a candidate
+            patch. Default is 2.
+        min_target_count : int or None, optional
+            Minimum number of target residues required for a bridged region to
+            count as a patch. Default is 4. If set to ``None`` this filter is
+            disabled.
+        adjacent_pair_pattern : str or list, optional
+            Optional adjacent residue motif that must occur in a bridged region
+            (for example ``"RG"``). Default is None.
+        min_adjacent_pair_count : int, optional
+            Minimum number of occurrences of ``adjacent_pair_pattern`` required
+            for a bridged region to count. Default is 0.
+
+        Returns
+        -------
+        float
+            Fraction of sequence positions covered by valid patch spans.
+        """
+        return patching.patch_fraction(
+            self.sequence,
+            residue_selector=residue_selector,
+            interruption=interruption,
+            min_target_count=min_target_count,
+            adjacent_pair_pattern=adjacent_pair_pattern,
+            min_adjacent_pair_count=min_adjacent_pair_count,
+        )
+
+    # .................................................................
+    #
+    def compute_rg_patch_fraction(self, interruption=2, min_adjacent_rg_pairs=2):
+        """
+        Returns the sequence fraction covered by RG motif-enriched patches.
+
+        Parameters
+        ----------
+        interruption : int, optional
+            Maximum number of non-R/G residues bridged inside a candidate RG
+            patch. Default is 2.
+        min_adjacent_rg_pairs : int, optional
+            Minimum number of adjacent ``RG`` pairs required for a bridged
+            region to count. Default is 2.
+
+        Returns
+        -------
+        float
+            Fraction of sequence positions covered by valid RG patch spans.
+        """
+        return self.compute_patch_fraction(
+            residue_selector="RG",
+            interruption=interruption,
+            min_target_count=None,
+            adjacent_pair_pattern="RG",
+            min_adjacent_pair_count=min_adjacent_rg_pairs,
         )
 
     # .................................................................
@@ -615,11 +708,10 @@ class Protein:
         ---------
         sparrow.protein.scd
 
-        Reference
-        -------------
-        Sawle, L., & Ghosh, K. (2015). A theoretical method to compute
-        sequence dependent configurational properties in charged polymers
-        and proteins. The Journal of Chemical Physics, 143(8), 085101.
+        References
+        ----------
+        .. bibliography::
+           :filter: key == "sawle2015theoretical"
         """
 
         return scd.compute_scd_x(self.sequence, group1=group1, group2=group2)
@@ -647,15 +739,16 @@ class Protein:
         Returns
         -----------
         float
-            Returns the customized sequence hydroph
+            Returns the customized sequence hydropathy decoration
 
-        Reference
-        -------------
-        Zheng, W., Dignon, G. L., Brown, M., Kim, Y. C., & Mittal, J. (2020).
-        Hydropathy Patterning Complements Charge Patterning to Describe
-        Conformational Preferences of Disordered Proteins. Journal of
-        Physical Chemistry Letters. https://doi.org/10.1021/acs.jpclett.0c00288
+        See also
+        ---------
+        sparrow.protein.scd
 
+        References
+        ----------
+        .. bibliography::
+           :filter: key == "zheng2020hydropathy"
         """
 
         return scd.compute_shd(self.sequence, hydro_dict=hydro_dict)
@@ -785,59 +878,43 @@ class Protein:
         Function that returns a vectorized representation of local composition/sequence properties, as defined
         by the passed 'mode', which acts as a selector toggle for a large set of pre-defined analyses types.
 
-
         Parameters
-        -----------
+        ----------
         mode : str
+            Selector for the type of analysis to perform:
 
-            'FCR'               : Fraction of charged residues
-
-            'NCPR'              : Net charge per residue
-
-            'aromatic'          : Fraction of aromatic residues
-
-            'aliphatic'         : Fraction of aliphatic residues
-
-            'polar'             : Fraction of polar residues
-
-            'proline'           : Fraction of proline residues
-
-            'positive'          : Fraction of positive residues
-
-            'negative'          : Fraction of negative residues
-
-            'hydrophobicity'    : Linear hydrophobicity (Kyte-Doolitle)
-
-            'seg-complexity'    : Linear complexity
-
-            'kappa'             : Linear charge patterning
+            * ``'FCR'`` : Fraction of charged residues
+            * ``'NCPR'`` : Net charge per residue
+            * ``'aromatic'`` : Fraction of aromatic residues
+            * ``'aliphatic'`` : Fraction of aliphatic residues
+            * ``'polar'`` : Fraction of polar residues
+            * ``'proline'`` : Fraction of proline residues
+            * ``'positive'`` : Fraction of positive residues
+            * ``'negative'`` : Fraction of negative residues
+            * ``'hydrophobicity'`` : Linear hydrophobicity (Kyte-Doolitle)
+            * ``'seg-complexity'`` : Linear complexity
+            * ``'kappa'`` : Linear charge patterning
 
         window_size : int
             Number of residues over which local sequence properties are calculated. A window stepsize of 1
-            is always used
+            is always used.
 
         end_mode : str
-            Selector that defines how ends are dealt with. Empty string means nothing is
-            done, but extend-ends and zero-ends ensure the track length equals the sequence
-            length which can often be useful. Default is 'extend-ends'.
+            Selector that defines how ends are dealt with. Default is ``'extend-ends'``.
 
-            'extend-ends'   |    The leading/lagging track values are copied from
-                                 the first and last and values.
-
-            ''              |    Empty string means they're ignored,
-
-            'zero-ends'     |    Means leading/lagging track values are set to zero.
+            * ``'extend-ends'`` : The leading/lagging track values are copied from the first and last values.
+            * ``''`` : Empty string means they're ignored.
+            * ``'zero-ends'`` : Leading/lagging track values are set to zero.
 
         smooth : int or None
             Selector which allows you to smooth the data over a windowsize. Note window
             must be an odd number (applies a savgol_filter with a 3rd order polynomial
             which requires an odd number).
 
-
         Returns
-        ----------
+        -------
         list
-            Returns a list with values that correspond to the passed mode
+            Returns a list with values that correspond to the passed mode.
         """
 
         utilities.validate_keyword_option(
@@ -950,87 +1027,47 @@ class Protein:
     # .................................................................
     #
     def low_complexity_domains(self, mode="holt", **kwargs):
-        """
-        Function that extracts low complexity domains from a protein sequence.
-        The arguments passed depend on the mode
-        of extract, as defined below. For now, only 'Holt' is allowed.
+        """Extract low complexity domains (LCDs) from the sequence.
 
-        mode : 'holt'
-            Function which returns the set of low-complexity tracts as defined by Gutierrez et al [1].
-            Specifically, this returns low complexity sequences defined by four key parameters outlined
-            below. The
+        Parameters
+        ----------
+        mode : {'holt'}
+            Extraction method. Only ``'holt'`` currently supported (Gutierrez et al. method).
+        **kwargs
+            Passed through to :func:`sparrow.sequence_analysis.sequence_complexity.low_complexity_domains_holt`.
+            Common options:
 
-            Additional keyword arguments:
-
-                **residue_selector**  : a string of one or more one-letter amino acid codes used to define
-                                        the type of residues to find in LCD. (str). For example 'Q' or 'ED' for
-                                        aspartic acid and glutamic acid.
-
-                **minimum_length**    : an integer that defines the shortes possible LCD (int). Default = 15. Must
-                                        be positive.
-
-                **max_interruption**  : an integer that defines the longest possible interruption allowed between
-                                        any two residues defined by the residue selector within the LCD. This is
-                                        related to but independent of the fractional threshold.
-                                        For Gutierrez et al this was 17 (!). Default  = 5.
-
-                **fractional_threshold**  : a fraction between 0 and 1 that defines the minimum fraction of amino
-                                            acids  found in the residue selector that can be tolerated in the LCD.
-                                            Default = 0.25.
-
-
-        mode : 'holt-permissive'
-
-            DO NOT USE FOR NOW!
-            Function which returns the set of low-complexity tracts in a slightly more permissive manner than
-            was defied by Gutierrez et al.
-
-            Specifically, this returns regions of a sequence where there is a run that contains minimum_length
-            residues which conform to a contigous stretch of the residue(s) defined in residue_selector without
-            more that max_interruption intervening residues.
-
-            For example, if residue_selector = 'Q', minimum_length = 10 and max_interuption = 2, then
-            QQQQQAAQQQQQ and QAQAQAQAQAQAQAQAQAQ would count but QQQQQAAAQQQQQ would not.
-
-            Unlike 'holt' mode, now AAAQAQAQAQAQAQAQAAAA WOULD count (while there are 8 Qs here, there is a
-            region of 13 residues that sit in a Q-rich region with no more than 2 interruptions.
-
-            Additional keyword arguments:
-
-                **residue_selector**  : a string of one or more one-letter amino acid codes used to define
-                                        the type of residues to find in LCD. (str)
-
-                **minimum_length**    : an integer that defines the shortes possible LCD (int). Default = 15
-
-                **max_interruption**  : an integer that defines the longest possible interruption allowed.
-                                        Default  = 2
-
-                **fractional_threshold**  : an fraction between 0 and 1 that defines the longest possible interruption
-                                        allowed. Default = 0.25
-
-
+            ``residue_selector`` : str
+                One or more one-letter amino acid codes (e.g. ``'Q'`` or ``'ED'``).
+            ``minimum_length`` : int, default 15
+                Minimum allowed LCD length.
+            ``max_interruption`` : int, default 5
+                Maximum number of consecutive residues NOT in ``residue_selector`` permitted
+                inside an LCD (Gutierrez et al. used 17).
+            ``fractional_threshold`` : float, default 0.25
+                Minimum fraction (0-1) of residues from ``residue_selector`` required in the LCD.
 
         Returns
-        ---------------
-        list of LCDs:
-            All modes return the same data-structure, a list of lists with zero or more sublists that are defined
-            as:
+        -------
+        list[list]
+            Each LCD represented as ``[sequence, start, end]`` where ``start`` is 0-indexed
+            and ``end`` is exclusive (``sequence[start:end]`` equals the LCD substring).
 
-            [0] - sequence
-            [1] - start position in sequence (slice numbering, indexing from 0)
-            [2] - end position in sequence (slice numbering, such that seq[start:end] gives you the LCD)
+        Notes
+        -----
+        Only the Gutierrez et al. style extraction (``mode='holt'``) is implemented at present.
 
-
+        Examples
+        --------
+        >>> p.low_complexity_domains(mode='holt', residue_selector='Q', minimum_length=10)  # doctest: +SKIP
+        [['QQQQQQQQQQ', 5, 15]]
         """
-
         # utilities.validate_keyword_option(mode, ['holt', 'holt-permissive'], 'mode')
         utilities.validate_keyword_option(mode, ["holt"], "mode")
-
         if mode == "holt":
             return sequence_complexity.low_complexity_domains_holt(
                 self.sequence, **kwargs
             )
-
         if mode == "holt-permissive":
             return sequence_complexity.low_complexity_domains_holt_permissive(
                 self.sequence, **kwargs
@@ -1077,7 +1114,6 @@ class Protein:
             residue is a residue in the string and color is a valid HTML color (which can be a Hexcode, standard HTML color name).
             Note that this also lets you define colors for non-standard amino acids should these be useful. Default is an empty
             dictionary. Note also that the standard amino acid colorings are defined at sparrow.data.amino_acids.AA_COLOR
-
 
         header : str
             If provided, this is a string that provides a FASTA-style header (with a leading carrett included). Default None.
@@ -1136,29 +1172,30 @@ class Protein:
     @property
     def plugin(self):
         """
-        Returns a sparrow.sequence_analysis.PluginManager object which
-        provides programmatic access to the various different plugins
-        implemented in sparrow.
+        Returns a ``sparrow.sequence_analysis.plugins.PluginManager`` object which
+        provides programmatic access to the various different plugins implemented
+        in sparrow.
         """
         if self.__plugin_object is None:
+            from sparrow.sequence_analysis.plugins import PluginManager  # local import
+
             self.__plugin_object = PluginManager(self)
         return self.__plugin_object
 
     @property
     def predictor(self):
         """
-        Returns a sparrow.predictors.Predictor object which provides programatic access
-        to the various different sequence-based predictors implemented in
+        Returns a ``sparrow.predictors.Predictor`` object which provides programatic
+        access to the various different sequence-based predictors implemented in
         sparrow.
 
-        Note that each predictor performance necessary imports at runtime on
-        the first execution for the first protein, minimizing unecessary
-        overhead.
+        Note that each predictor performs necessary imports at runtime on the first
+        execution for the first protein, minimizing unnecessary overhead.
 
-        Currently available predictors are:
+        Currently available predictors include:
 
-            * disorder : predict per-residue disorder
-            * dssp : predict per-residue DSSP score (0,1,or 2)
+            * disorder : per-residue disorder prediction
+            * dssp : per-residue DSSP score (0, 1, or 2)
             * nes : nuclear export signal
             * nis : nuclear import signal
             * phosphorylation
@@ -1166,24 +1203,28 @@ class Protein:
             * tad
             * mitochondrial targeting
             * rg : radius of gyration
-            * transmembrane_region : predict binary classification of transmembrane region
+            * transmembrane_region : binary classification of transmembrane regions
 
         """
         if self.__predictor_object is None:
+            from sparrow.predictors import Predictor  # local import
+
             self.__predictor_object = Predictor(self)
         return self.__predictor_object
 
     @property
     def polymeric(self):
         """
-        Returns a sparrow.Polymeric object which provides programatic access
-        to the various different predicted polymer properties for the sequence.
+        Returns a ``sparrow.polymer.Polymeric`` object which provides programatic
+        access to the various predicted polymer properties for the sequence.
 
-        Note that, of course, many of these would only be valid if the sequence
-        behaved as an intrinsically disordered or unfolded polypeptide.
+        Note that many of these properties assume the sequence behaves as an
+        intrinsically disordered or unfolded polypeptide.
 
         """
         if self.__polymeric_object is None:
+            from sparrow.polymer import Polymeric  # local import
+
             self.__polymeric_object = Polymeric(self)
         return self.__polymeric_object
 
@@ -1204,9 +1245,23 @@ class Protein:
 
     @property
     def sequence(self):
+        """Returns a string representation of the protein sequence.
+
+        Returns
+        -------
+        str
+            The protein sequence.
+        """
         return self.__seq
 
     def __len__(self):
+        """Returns the length of the protein sequence.
+
+        Returns
+        -------
+        int
+            The length of the protein sequence.
+        """
         return len(self.__seq)
 
     def __repr__(self):
