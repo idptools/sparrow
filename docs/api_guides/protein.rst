@@ -15,6 +15,12 @@ Lifecycle and Accessors
 * ``protein.plugin`` for community contributed analyses.
 * ``protein.elms`` for ELM motif annotations.
 
+Dedicated deep-dive guides:
+
+* :doc:`../predictors` for predictor development and integration.
+* :doc:`../polymeric` for polymeric model workflows.
+* :doc:`../plugins` for plugin usage and contribution.
+
 Basic Usage Examples
 --------------------
 

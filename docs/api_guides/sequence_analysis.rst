@@ -49,17 +49,22 @@ feature-vector workflow with optional scramble-based z-scores.
 
 .. code-block:: python
 
-   from sparrow.sequence_analysis.grammar import (
-       GrammarPatterningConfig,
-       compute_feature_vector,
-   )
+   from sparrow.sequence_analysis.grammar import compute_feature_vector
 
-   cfg = GrammarPatterningConfig(
-       backend="kappa_cython",
+   # Default output is a float32 NumPy array.
+   vec = compute_feature_vector(
+       "MEEEKKKKSSSTTTDDD",
        num_scrambles=200,
        seed=1,
    )
-   vec = compute_feature_vector("MEEEKKKKSSSTTTDDD", patterning_config=cfg)
+
+   # Only request names when needed.
+   vec, names = compute_feature_vector(
+       "MEEEKKKKSSSTTTDDD",
+       num_scrambles=200,
+       seed=1,
+       return_feature_names=True,
+   )
 
 Patch Primitives
 ----------------

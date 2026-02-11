@@ -83,6 +83,33 @@ Read proteins from a FASTA file
    first_protein = proteins[first_header]
    print(first_header, len(first_protein), first_protein.FCR)
 
+Extract z-score grammar features
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+   import numpy as np
+   from sparrow import read_fasta
+
+   proteins = read_fasta("example.fasta")
+
+   # Array output is default (float32).
+   matrix = np.vstack(
+       [
+           p.extract_feature_vector(num_scrambles=256, seed=1)
+           for p in proteins.values()
+       ]
+   )
+
+   # Request feature names once when needed.
+   first = next(iter(proteins.values()))
+   vec, feature_names = first.extract_feature_vector(
+       num_scrambles=256,
+       seed=1,
+       return_feature_names=True,
+   )
+   print(matrix.shape, len(feature_names))
+
 Notes
 -----
 
@@ -94,3 +121,5 @@ Next steps
 
 * For the full API by workflow, see :doc:`api`.
 * For predictor-specific guidance, see :doc:`predictors`.
+* For polymer model workflows via ``Protein.polymeric``, see :doc:`polymeric`.
+* For plugin usage and contribution guidance, see :doc:`plugins`.

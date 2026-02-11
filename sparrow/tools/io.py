@@ -1,5 +1,6 @@
 import protfasta
 import urllib3
+import numpy as np
 
 from sparrow.protein import Protein
 from sparrow.sparrow_exceptions import SparrowException
@@ -99,3 +100,50 @@ def read_fasta(filename, **kwargs):
         return [[h, Protein(seq)] for h, seq in F]
     else:
         return {h: Protein(seq) for h, seq in F.items()}
+
+
+def build_grammar_background_from_fasta(
+    fasta_filename,
+    output_filename,
+    dtype=np.float32,
+    compressed=True,
+    **read_fasta_kwargs,
+):
+    """Compute and save grammar composition background stats from a FASTA file.
+
+    This helper reads FASTA records as ``Protein`` objects, computes
+    composition/patch background means and standard deviations, and writes a
+    compact NumPy archive for downstream grammar z-score workflows.
+
+    Parameters
+    ----------
+    fasta_filename : str
+        Input FASTA path.
+    output_filename : str
+        Destination ``.npz`` filename.
+    dtype : numpy dtype, optional
+        Numeric dtype for saved mean/std arrays. Default ``np.float32``.
+    compressed : bool, optional
+        If True, write with ``np.savez_compressed``. Default True.
+    **read_fasta_kwargs
+        Forwarded to :func:`read_fasta`.
+
+    Returns
+    -------
+    sparrow.sequence_analysis.grammar.GrammarCompositionStats
+        Computed background statistics object.
+    """
+    # Local import avoids module-level circular dependency.
+    from sparrow.sequence_analysis import grammar
+
+    proteins = read_fasta(fasta_filename, **read_fasta_kwargs)
+    stats = grammar.compute_composition_background_stats(
+        proteins, dtype=dtype
+    )
+    grammar.save_composition_stats_npz(
+        output_filename=output_filename,
+        composition_stats=stats,
+        dtype=dtype,
+        compressed=compressed,
+    )
+    return stats

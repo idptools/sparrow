@@ -680,6 +680,93 @@ class Protein:
 
     # .................................................................
     #
+    def extract_feature_vector(
+        self,
+        patterning_config=None,
+        composition_stats=None,
+        use_default_composition_stats=True,
+        include_raw=False,
+        return_array=True,
+        return_feature_names=False,
+        backend=None,
+        num_scrambles=None,
+        blob_size=None,
+        min_fraction=None,
+        seed=None,
+        fit_method=None,
+    ):
+        """
+        Returns a grammar feature vector for the current sequence.
+
+        This is a convenience wrapper over
+        :func:`sparrow.sequence_analysis.grammar.compute_feature_vector`.
+
+        This feature extraction interface is currently **alpha**. Breaking
+        changes to arguments, defaults, and returned feature schemas may occur
+        in future releases.
+
+        This implementation is inspired by grammar-style analyses but is **not**
+        an exact replica of the original NARDINI analysis pipeline.
+
+        Parameters
+        ----------
+        patterning_config : GrammarPatterningConfig, optional
+            Full patterning config for advanced control.
+        backend : str, optional
+            Override patterning backend (``"kappa_cython"`` or ``"iwd_combined"``).
+        num_scrambles : int, optional
+            Number of sequence scrambles used for patterning z-score estimation.
+        blob_size : int, optional
+            Patterning window size for kappa-style calculations.
+        min_fraction : float, optional
+            Minimum group fraction required to evaluate a patterning feature.
+        seed : int, optional
+            Random seed used for scramble generation.
+        fit_method : str, optional
+            Distribution fit mode (``"gamma_mle"`` or ``"moments"``).
+        composition_stats : GrammarCompositionStats, optional
+            Optional composition/patch background statistics used to add
+            composition z-scores. The default uses sparrow's built-in human IDR composition background stats.
+        use_default_composition_stats : bool, optional
+            If True and ``composition_stats`` is None, use Sparrow's built-in
+            human-IDR composition background stats. Default True.
+        include_raw : bool, optional
+            Include raw feature block (``raw::`` keys). Default False.
+        return_array : bool, optional
+            If True, return a NumPy array (``np.float32``) instead of an OrderedDict.
+            Default True.
+        return_feature_names : bool, optional
+            If True and ``return_array=True``, also return an ordered tuple of
+            feature names.
+
+        Returns
+        -------
+        numpy.ndarray or collections.OrderedDict
+            Feature vector. Returns an array by default.
+        """
+        # local import to prevent the circular import between this module and
+        # sparrow.sequence_analysis.grammar which uses the Protein class
+        # to calculate many different sequence features.
+        from sparrow.sequence_analysis import grammar
+
+        return grammar.compute_feature_vector(
+            sequence_or_protein=self,
+            patterning_config=patterning_config,
+            composition_stats=composition_stats,
+            use_default_composition_stats=use_default_composition_stats,
+            include_raw=include_raw,
+            return_array=return_array,
+            return_feature_names=return_feature_names,
+            backend=backend,
+            num_scrambles=num_scrambles,
+            blob_size=blob_size,
+            min_fraction=min_fraction,
+            seed=seed,
+            fit_method=fit_method,
+        )
+
+    # .................................................................
+    #
     def compute_SCD_x(self, group1, group2):
         """
         Function that computes the sequence charge decoration (SCD)

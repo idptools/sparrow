@@ -8,7 +8,7 @@ import os
 # Add imports here
 from sparrow.tools import io
 from sparrow.protein import Protein
-from sparrow.tools.io import read_fasta
+from sparrow.tools.io import build_grammar_background_from_fasta, read_fasta
 
 
 # Generate _version.py if missing and in the Read the Docs environment
@@ -22,4 +22,3 @@ else:
 _ROOT = os.path.abspath(os.path.dirname(__file__))
 def get_data(path):
     return os.path.join(_ROOT, 'data', path)
-

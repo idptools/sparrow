@@ -17,6 +17,8 @@ pipelines.
    getting_started
    api
    predictors
+   polymeric
+   plugins
 
 Indices and tables
 ==================

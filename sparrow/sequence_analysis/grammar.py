@@ -7,7 +7,8 @@ primitives and optional scramble/statistics-based z-scoring.
 import math
 import random
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Mapping, Optional, Sequence
 
 import numpy as np
@@ -83,6 +84,16 @@ PATTERN_FEATURES_IWD = tuple(
     for j in range(i, len(PATTERN_NAMES))
 )
 
+DEFAULT_COMPOSITION_BACKGROUND_FILENAME = (
+    "human_idrs_new_grammar_composition_background_f32.npz"
+)
+DEFAULT_COMPOSITION_BACKGROUND_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "data"
+    / DEFAULT_COMPOSITION_BACKGROUND_FILENAME
+)
+_DEFAULT_COMPOSITION_STATS_CACHE = None
+
 
 class GrammarException(RuntimeError):
     """Raised when grammar feature computation fails."""
@@ -142,6 +153,35 @@ def _coerce_protein(sequence_or_protein):
     return protein
 
 
+def _resolve_patterning_config(
+    patterning_config=None,
+    backend=None,
+    num_scrambles=None,
+    blob_size=None,
+    min_fraction=None,
+    seed=None,
+    fit_method=None,
+):
+    """Build effective patterning config from defaults, config object, and overrides."""
+    config = patterning_config or GrammarPatterningConfig()
+    overrides = {}
+    if backend is not None:
+        overrides["backend"] = backend
+    if num_scrambles is not None:
+        overrides["num_scrambles"] = num_scrambles
+    if blob_size is not None:
+        overrides["blob_size"] = blob_size
+    if min_fraction is not None:
+        overrides["min_fraction"] = min_fraction
+    if seed is not None:
+        overrides["seed"] = seed
+    if fit_method is not None:
+        overrides["fit_method"] = fit_method
+    if not overrides:
+        return config
+    return replace(config, **overrides)
+
+
 def _pattern_feature_name(backend, name1, name2):
     if backend == "kappa_cython":
         return f"kappa::{name1}-{name2}"
@@ -199,6 +239,7 @@ def compute_composition_raw(sequence_or_protein):
             continue
         residue = feature_name.split()[0]
         features[feature_name] = float(protein.compute_patch_fraction(residue))
+
     features["RG Frac"] = float(
         protein.compute_patch_fraction(
             residue_selector="RG",
@@ -373,43 +414,191 @@ def merge_feature_blocks(raw_blocks=None, z_blocks=None):
     return out
 
 
+def _finalize_feature_output(
+    vector,
+    return_array=True,
+    return_feature_names=False,
+):
+    if not return_array:
+        return vector
+
+    arr = np.fromiter(vector.values(), dtype=np.float32, count=len(vector))
+    if return_feature_names:
+        return arr, tuple(vector.keys())
+    return arr
+
+
 def compute_feature_vector(
     sequence_or_protein,
     patterning_config=None,
     composition_stats=None,
-    include_raw=True,
-    include_zscores=True,
+    use_default_composition_stats=True,
+    include_raw=False,
+    return_array=True,
+    return_feature_names=False,
+    backend=None,
+    num_scrambles=None,
+    blob_size=None,
+    min_fraction=None,
+    seed=None,
+    fit_method=None,
 ):
-    """Compute an ordered grammar feature vector for one sequence."""
-    if not include_raw and not include_zscores:
-        raise GrammarException(
-            "At least one of include_raw/include_zscores must be True"
-        )
+    """Compute an ordered grammar feature vector for one sequence.
 
+    If ``use_default_composition_stats`` is True and ``composition_stats`` is
+    None, composition z-scores use Sparrow's built-in human-IDR background.
+    Z-score features are always included. Set ``include_raw=True`` to append
+    the raw feature block. By default this returns a ``np.float32`` array.
+
+    ``patterning_config`` is optional. Users can override config fields directly
+    via keyword arguments like ``num_scrambles`` and ``backend``.
+    """
     protein = _coerce_protein(sequence_or_protein)
-    config = patterning_config or GrammarPatterningConfig()
+    config = _resolve_patterning_config(
+        patterning_config=patterning_config,
+        backend=backend,
+        num_scrambles=num_scrambles,
+        blob_size=blob_size,
+        min_fraction=min_fraction,
+        seed=seed,
+        fit_method=fit_method,
+    )
+    if composition_stats is None and use_default_composition_stats:
+        composition_stats = load_default_composition_stats()
 
     raw_patterning = compute_patterning_raw(protein, config)
-    raw_composition = compute_composition_raw(protein)
+    raw_composition = None
 
     raw_blocks = []
     if include_raw:
+        raw_composition = compute_composition_raw(protein)
         raw_blocks = [raw_patterning, raw_composition]
 
-    z_blocks = []
-    if include_zscores:
-        scramble_distribution = compute_patterning_scramble_distribution(
-            protein, config
-        )
-        z_blocks.append(
-            compute_patterning_zscores(raw_patterning, scramble_distribution, config)
-        )
-        if composition_stats is not None:
-            z_blocks.append(
-                compute_composition_zscores(raw_composition, composition_stats)
-            )
+    scramble_distribution = compute_patterning_scramble_distribution(protein, config)
+    z_blocks = [
+        compute_patterning_zscores(raw_patterning, scramble_distribution, config)
+    ]
+    if composition_stats is not None:
+        if raw_composition is None:
+            raw_composition = compute_composition_raw(protein)
+        z_blocks.append(compute_composition_zscores(raw_composition, composition_stats))
 
-    return merge_feature_blocks(raw_blocks=raw_blocks, z_blocks=z_blocks)
+    vector = merge_feature_blocks(raw_blocks=raw_blocks, z_blocks=z_blocks)
+    return _finalize_feature_output(
+        vector,
+        return_array=return_array,
+        return_feature_names=return_feature_names,
+    )
+
+
+def compute_composition_background_stats(sequences_or_proteins, dtype=np.float32):
+    """Compute composition/patch background stats with low memory use.
+
+    Parameters
+    ----------
+    sequences_or_proteins : iterable, mapping, str, or Protein
+        Sequence collection used to estimate background mean/std. If a mapping
+        is passed, values are used.
+    dtype : numpy dtype, optional
+        Output dtype for stored means/stds. Default ``np.float32``.
+
+    Returns
+    -------
+    GrammarCompositionStats
+        Feature names plus background mean/std arrays.
+    """
+    if isinstance(sequences_or_proteins, Mapping):
+        iterator = iter(sequences_or_proteins.values())
+    elif isinstance(sequences_or_proteins, (str, Protein)):
+        iterator = iter([sequences_or_proteins])
+    else:
+        iterator = iter(sequences_or_proteins)
+
+    count = 0
+    feature_names = None
+    mean = None
+    m2 = None
+
+    for entry in iterator:
+        raw = compute_composition_raw(entry)
+        if feature_names is None:
+            feature_names = tuple(raw.keys())
+            mean = np.zeros(len(feature_names), dtype=np.float64)
+            m2 = np.zeros(len(feature_names), dtype=np.float64)
+
+        values = np.asarray([raw[name] for name in feature_names], dtype=np.float64)
+
+        count += 1
+        delta = values - mean
+        mean += delta / count
+        delta2 = values - mean
+        m2 += delta * delta2
+
+    if count == 0:
+        raise GrammarException("Cannot compute composition background from empty input")
+
+    # Population variance (ddof=0) matches np.std default semantics.
+    variance = m2 / count
+    std = np.sqrt(variance)
+
+    out_dtype = np.dtype(dtype)
+    return GrammarCompositionStats(
+        feature_names=feature_names,
+        mean=mean.astype(out_dtype, copy=False),
+        std=std.astype(out_dtype, copy=False),
+    )
+
+
+def save_composition_stats_npz(
+    output_filename, composition_stats, dtype=np.float32, compressed=True
+):
+    """Save grammar composition background stats to a compact NumPy archive."""
+    if len(composition_stats.mean) != len(composition_stats.std) or len(
+        composition_stats.mean
+    ) != len(composition_stats.feature_names):
+        raise GrammarException("GrammarCompositionStats mean/std length mismatch")
+
+    out_dtype = np.dtype(dtype)
+    feature_names = tuple(str(x) for x in composition_stats.feature_names)
+    max_name_len = max(len(name) for name in feature_names) if feature_names else 1
+
+    payload = {
+        "feature_names": np.asarray(feature_names, dtype=f"<U{max_name_len}"),
+        "mean": np.asarray(composition_stats.mean, dtype=out_dtype),
+        "std": np.asarray(composition_stats.std, dtype=out_dtype),
+    }
+
+    if compressed:
+        np.savez_compressed(output_filename, **payload)
+    else:
+        np.savez(output_filename, **payload)
+
+
+def load_composition_stats_npz(input_filename):
+    """Load grammar composition background stats from NumPy archive."""
+    with np.load(input_filename, allow_pickle=False) as data:
+        feature_names = tuple(str(x) for x in data["feature_names"].tolist())
+        mean = np.asarray(data["mean"])
+        std = np.asarray(data["std"])
+
+    return GrammarCompositionStats(feature_names=feature_names, mean=mean, std=std)
+
+
+def load_default_composition_stats():
+    """Load built-in human-IDR composition background stats (cached)."""
+    global _DEFAULT_COMPOSITION_STATS_CACHE
+    if _DEFAULT_COMPOSITION_STATS_CACHE is None:
+        if not DEFAULT_COMPOSITION_BACKGROUND_PATH.exists():
+            raise GrammarException(
+                f"Default composition background file not found at "
+                f"{DEFAULT_COMPOSITION_BACKGROUND_PATH}. "
+                "Pass composition_stats explicitly or set "
+                "use_default_composition_stats=False."
+            )
+        _DEFAULT_COMPOSITION_STATS_CACHE = load_composition_stats_npz(
+            DEFAULT_COMPOSITION_BACKGROUND_PATH
+        )
+    return _DEFAULT_COMPOSITION_STATS_CACHE
 
 
 __all__ = [
@@ -418,6 +607,8 @@ __all__ = [
     "PATTERN_NAMES",
     "PATTERN_FEATURES_KAPPA",
     "PATTERN_FEATURES_IWD",
+    "DEFAULT_COMPOSITION_BACKGROUND_FILENAME",
+    "DEFAULT_COMPOSITION_BACKGROUND_PATH",
     "COMPOSITION_FEATURES",
     "PATCH_FEATURES",
     "GrammarException",
@@ -433,4 +624,8 @@ __all__ = [
     "compute_patterning_zscores",
     "merge_feature_blocks",
     "compute_feature_vector",
+    "compute_composition_background_stats",
+    "save_composition_stats_npz",
+    "load_composition_stats_npz",
+    "load_default_composition_stats",
 ]
