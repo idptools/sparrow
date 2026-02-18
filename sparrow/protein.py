@@ -18,6 +18,7 @@ from sparrow.sequence_analysis import (
     physical_properties,
     sequence_complexity,
 )
+from sparrow.sequence_analysis.plaac.plaac import score_sequence as plaac_score_sequence
 from sparrow.tools import general_tools, track_tools, utilities
 from sparrow.visualize import sequence_visuals
 
@@ -1160,6 +1161,76 @@ class Protein:
                 self.sequence, **kwargs
             )
 
+    def plaac_prion_like_domains(self, simple=True, **kwargs):
+        """Extract prion-like domains (PLDs) from the sequence using the PLAAC algorithm.
+
+        NB: We have re-implemented the PLAAC algorithm in pure Python, and this function 
+        provides a convenient wrapper for running PLAAC on the sequence. PLEASE CITE the 
+        original PLAAC paper (Lancaster et al. 2014) if you use this function in your work.
+
+        Parameters
+        ----------
+        simple : bool, default True
+            If True, returns a simplified output format (list of [sequence, start, end] for each PLD). 
+            If False, returns the full PLAAC output including scores and other metadata for each PLD.
+
+        **kwargs
+            Passed through to :func:`sparrow.sequence_analysis.plaac.plaac_prion_like_domains`.
+            Common options:
+
+            alpha : float, default 1.0
+                Mixing weight for S. cerevisiae vs. custom background frequencies.                
+                ``1.0`` uses pure S. cerevisiae background; ``0.0`` uses only the
+                frequencies supplied via *bg_freqs*.
+
+            core_length : int, default 60
+                Minimum contiguous prion-like domain length.
+
+            window_fi : int, default 41
+                Window size for FoldIndex disorder smoothing.
+
+            window_papa : int, default 41
+                Window size for PAPA propensity smoothing.
+
+            adjust_prolines : bool, default True
+                Apply PAPA proline-adjustment (skip PP / PXP repeats).
+
+            bg_freqs : dict[str, float], optional
+                Background amino-acid frequency dictionary. Keys are one-letter
+                amino acid codes (e.g. ``"A"``, ``"N"``, ``"Q"``), values are
+                the corresponding frequencies.  Only the 20 standard residues
+                (``A C D E F G H I K L M N P Q R S T V W Y``) should be
+                provided; any missing residues default to 0.0.
+
+                Example::
+
+                    bg_freqs={"A": 0.05, "N": 0.04, "Q": 0.04, ...}
+
+                Defaults to S. cerevisiae proteome frequencies when ``None``.
+
+            fg_freqs : dict[str, float], optional
+                Foreground (prion-like) amino-acid frequency dictionary, same
+                format as *bg_freqs*.  Defaults to the Alberti et al. 28-domain
+                S. cerevisiae prion frequencies when ``None``.
+        
+        Returns
+        -------
+        list[list]
+            Each PLD represented as ``[sequence, start, end]`` where ``start`` is 0-indexed
+            and ``end`` is exclusive (``sequence[start:end]`` equals the PLD substring).
+
+        Examples
+        --------
+        >>> p.plaac_prion_like_domains(background='human', window_size=60, step_size=1, score_threshold=0.0)  # doctest: +SKIP
+        [['QQQQQQQQQQ', 5, 15]]
+        """
+        if simple:
+            tmp = plaac_score_sequence(self.sequence, **kwargs).prd_regions
+            return [[r.prd_seq, r.prd_start - 1, r.prd_end] for r in tmp]
+
+        else:            
+            return plaac_score_sequence(self.sequence, **kwargs)
+
     def show_sequence(
         self,
         blocksize=10,
@@ -1229,7 +1300,6 @@ class Protein:
         ----------
         None or str
             If return_raw_string is set to True then an HTML-compatible string is returned.
-
 
         Raises
         -------

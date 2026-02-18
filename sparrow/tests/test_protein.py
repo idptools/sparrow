@@ -1,5 +1,6 @@
 """Unit and regression tests for ``sparrow.protein``."""
 
+import math
 import sys
 
 import numpy as np
@@ -440,3 +441,131 @@ def test_compute_lost_elms_for_mut(mut_protein):
             "MRKK",
         )
     }
+
+
+# ---------------------------------------------------------------------------
+# PLAAC prion-like domain tests
+# ---------------------------------------------------------------------------
+
+PRION_LIKE_SEQUENCE = "QQGNNQQ" * 20  # 140 AA, Q/N-rich
+NON_PRION_SEQUENCE = "A" * 100
+SHORT_SEQUENCE = "MQNQNQ"
+
+
+@pytest.fixture
+def prion_protein():
+    return Protein(PRION_LIKE_SEQUENCE)
+
+
+@pytest.fixture
+def non_prion_protein():
+    return Protein(NON_PRION_SEQUENCE)
+
+
+@pytest.fixture
+def short_protein():
+    return Protein(SHORT_SEQUENCE)
+
+
+def test_plaac_simple_returns_list(canonical_protein):
+    result = canonical_protein.plaac_prion_like_domains()
+    assert isinstance(result, list)
+    assert len(result) > 0
+    assert len(result[0]) == 3  # [sequence, start, end]
+
+
+def test_plaac_returns_plaac_result(canonical_protein):
+    result = canonical_protein.plaac_prion_like_domains(simple=False)
+    assert type(result).__name__ == "PLAACResult"
+
+
+def test_plaac_protein_length_matches_sequence(canonical_protein):
+    result = canonical_protein.plaac_prion_like_domains(simple=False)
+    assert result.protein_length == len(canonical_protein)
+
+
+def test_plaac_canonical_core_score(canonical_protein):
+    result = canonical_protein.plaac_prion_like_domains(simple=False)
+    assert result.core_score == pytest.approx(24.11855753123216)
+
+
+def test_plaac_canonical_core_boundaries(canonical_protein):
+    result = canonical_protein.plaac_prion_like_domains(simple=False)
+    assert result.core_start == 2
+    assert result.core_end == 61
+
+
+def test_plaac_canonical_prd_score(canonical_protein):
+    result = canonical_protein.plaac_prion_like_domains(simple=False)
+    assert result.prd_score == pytest.approx(24.481362958002823)
+
+
+def test_plaac_canonical_prd_spans_full_sequence(canonical_protein):
+    result = canonical_protein.plaac_prion_like_domains(simple=False)
+    assert result.prd_start == 1
+    assert result.prd_end == 61
+
+
+def test_plaac_canonical_llr(canonical_protein):
+    result = canonical_protein.plaac_prion_like_domains(simple=False)
+    assert result.llr == pytest.approx(24.11855753123216)
+    assert result.nllr == pytest.approx(0.40197595885386933)
+
+
+def test_plaac_canonical_mw_score(canonical_protein):
+    result = canonical_protein.plaac_prion_like_domains(simple=False)
+    assert result.mw_score == 14
+
+
+def test_plaac_canonical_viterbi_path_length(canonical_protein):
+    result = canonical_protein.plaac_prion_like_domains(simple=False)
+    assert len(result.viterbi_path) == 61
+    assert len(result.map_path) == 61
+
+
+def test_plaac_canonical_posterior_shape(canonical_protein):
+    result = canonical_protein.plaac_prion_like_domains(simple=False)
+    assert len(result.posterior) == 2
+
+
+def test_plaac_prion_like_sequence_detected(prion_protein):
+    result = prion_protein.plaac_prion_like_domains(simple=False)
+    assert result.protein_length == 140
+    assert result.core_score == pytest.approx(74.94381357265729)
+    assert result.prd_length == 140
+    assert all(v == 1 for v in result.viterbi_path)
+
+
+def test_plaac_prion_like_sequence_prd_boundaries(prion_protein):
+    result = prion_protein.plaac_prion_like_domains(simple=False)
+    assert result.prd_start == 1
+    assert result.prd_end == 140
+
+
+def test_plaac_prion_like_sequence_has_disorder(prion_protein):
+    result = prion_protein.plaac_prion_like_domains(simple=False)
+    assert result.disorder is not None
+
+
+def test_plaac_non_prion_no_prd(non_prion_protein):
+    result = non_prion_protein.plaac_prion_like_domains(simple=False)
+    assert result.protein_length == 100
+    assert math.isnan(result.core_score)
+    assert result.core_seq == "-"
+    assert result.prd_score == pytest.approx(0.0)
+    assert result.prd_seq == "-"
+    assert all(v == 0 for v in result.viterbi_path)
+
+
+def test_plaac_short_sequence_core_is_nan(short_protein):
+    result = short_protein.plaac_prion_like_domains(simple=False)
+    assert result.protein_length == 6
+    assert math.isnan(result.core_score)
+    assert result.core_seq == "-"
+    assert result.prd_seq == "-"
+
+
+def test_plaac_custom_core_length(prion_protein):
+    result = prion_protein.plaac_prion_like_domains(simple=False, core_length=40)
+    assert result.core_score == pytest.approx(50.269372371940136)
+    assert result.core_length == 40
