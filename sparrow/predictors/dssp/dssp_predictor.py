@@ -1,12 +1,7 @@
-from parrot import brnn_architecture
+import numpy as np
 from parrot import encode_sequence
 
-import sparrow
-
-import torch
-import numpy as np
-import os
-from sparrow.sparrow_exceptions import SparrowException
+from sparrow.predictors.base import BaseNetworkPredictor
 
 
 
@@ -53,86 +48,17 @@ def softmax(v):
 
 
 
-class DSSPPredictor():
+class DSSPPredictor(BaseNetworkPredictor):
     """
 
-    Class that loads in a network such that predict_transmebrane_regions() can be called to predict
-    transmembrane regions in a sequence.
+    Class that loads a network such that predict_dssp() and the related methods
+    can be called to predict per-residue DSSP secondary structure.
 
     """
 
-    # .................................................................................
-    #
-    #
-    def __init__(self, version=None):
-        """
-        Constructor for building a TransmembranePredictor object. The version keyword allows specific
-        version(s) of the trained network associated with the HelicityPredictor to be defined. 
-        By default, it's set to None, which leads to the current best/default network being selected
-        and is MOSTLY going to be the right option. However, to preserve backwards compatibility we provide
-        the ability to pass a string as version. This string is inserted at position <X> in the filename
-
-            HelicityPredictor_network_v<X>.pt
-
-        i.e. no need to include the "v" part or the .pt extension
-
-        """
-
-        if version is None:
-            version = DEFAULT_VERSION
-
-        saved_weights = sparrow.get_data(f'networks/dssp/dssp_predictor_network_v{version}.pt')
-
-        if not os.path.isfile(saved_weights):
-            raise SparrowException('Error: could not find saved weights file [%s] for %s predictor' %( saved_weights, type(self).__name__))
-            
-        
-        loaded_model = torch.load(saved_weights, map_location=torch.device('cpu'))
-
-        # this removes this weird appending of 'module.' to the front of the keyes
-        # which I honestly don't know where came from, but this fixes the issue.
-        # 
-        # In some versions of trained models the 'module.' sits in front of the parameters
-        # while in others it doesnt - the code block below, updated in July 2023, provides
-        # a safe approach that removes that keyword if it exists but doesn't cause problems
-        # if its missing.
-        for i in range(len(loaded_model)):
-            key, value = loaded_model.popitem(last=False)
-            if key.find('module.') == 0:
-                new_key = key[7:]
-                loaded_model[new_key] = value
-            else:
-                loaded_model[key] = value
-                
-        
-        # Dynamically read in correct hyperparameters:
-        num_layers = 0
-        while True:
-            s = f'lstm.weight_ih_l{num_layers}'
-            try:
-                temp = loaded_model[s]
-                num_layers += 1
-            except KeyError:
-                break
-                     
-
-        ##  determine the number of classes; note you may need to change the key names here no leading
-        # module. in ther
-        number_of_classes = np.shape(loaded_model['fc.bias'])[0]
-        input_size = 20 # (hardcoded at 20 for 20 amino acids)
-
-        hidden_vector_size = int(np.shape(loaded_model['lstm.weight_ih_l0'])[0] / 4)
-        
-        # set these here so we can sanity check if needed
-        self.number_of_classes = number_of_classes
-        self.input_size = input_size
-        self.number_of_layers = num_layers
-        self.hidden_vector_size = hidden_vector_size
-
-        # Instantiate network weights into object
-        self.network = brnn_architecture.BRNN_MtM(input_size, hidden_vector_size, num_layers, number_of_classes, 'cpu')
-                                                  
-        self.network.load_state_dict(loaded_model)
+    NETWORK_PATH = "networks/dssp/dssp_predictor_network_v{version}.pt"
+    DEFAULT_VERSION = DEFAULT_VERSION
+    ARCHITECTURE = "MtM"
 
 
     # .................................................................................

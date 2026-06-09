@@ -35,10 +35,24 @@ def uniprot_fetch(uniprot_accession):
     r = http.request(
         "GET", f"https://www.uniprot.org/uniprot/{uniprot_accession}.fasta"
     )
-    s = "".join(str(r.data).split("\n")[1:]).replace("'", "")
-    if "Sorry" in s:
+
+    # non-200 responses (e.g. unknown accession) carry no usable FASTA
+    if getattr(r, "status", 200) != 200:
         return None
-    return Protein(s)
+
+    # decode the raw bytes and parse the FASTA: drop header line(s) (those
+    # starting with '>') and concatenate the remaining sequence lines.
+    raw = r.data.decode("utf-8", errors="replace")
+    if "Sorry" in raw:
+        return None
+
+    sequence = "".join(
+        line.strip() for line in raw.splitlines() if line and not line.startswith(">")
+    )
+    if sequence == "":
+        return None
+
+    return Protein(sequence)
 
 
 def read_fasta(filename, **kwargs):

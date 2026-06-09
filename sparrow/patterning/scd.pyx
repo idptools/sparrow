@@ -36,8 +36,8 @@ cpdef double compute_scd_x(str sequence, group1=['E','D'], group2=['R','K']):
         
     for m in range(1, seqlen):
         m_val = m + 1
-            
-        for n in range(0, m-1):
+
+        for n in range(0, m):
             n_val = n + 1
 
             # Access residues using array indexing

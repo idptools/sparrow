@@ -2,7 +2,6 @@ import os
 
 import numpy as np
 import protfasta
-from IPython import embed
 
 from sparrow import Protein
 from sparrow.patterning import scd

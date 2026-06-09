@@ -81,8 +81,13 @@ class PluginWrapper:
         Any
             Result returned by the plugin's ``calculate`` method (cached).
         """
-        # Create hashable cache key for args and kwargs
-        cache_key = (args, frozenset(kwargs.items()))
+        # Create hashable cache key for args and kwargs. If any argument value is
+        # unhashable (e.g. a numpy array, list, or dict) fall back to computing
+        # the result directly without memoization rather than crashing.
+        try:
+            cache_key = (args, frozenset(kwargs.items()))
+        except TypeError:
+            return self.plugin_instance.calculate(*args, **kwargs)
 
         # Check if the result is cached
         if cache_key not in self.cache_dict[self.name]:

@@ -1,24 +1,15 @@
 import torch
 import numpy as np
-from typing import List, Dict
 from torch.utils.data import DataLoader
-from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence, pad_packed_sequence
+from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
 from tqdm import tqdm
-import os
 
 from packaging import version as VERSION_PACKAGE
 
-from parrot import brnn_architecture
 from parrot import encode_sequence
 import sparrow
 
-from .asphericity.asphericity_predictor import AsphericityPredictor
-from .e2e.end_to_end_distance_predictor import RePredictor
-from .rg.radius_of_gyration_predictor import RgPredictor
-from .prefactor.prefactor_predictor import PrefactorPredictor
-from .scaling_exponent.scaling_exponent_predictor import ScalingExponentPredictor
-from .scaled_re.scaled_end_to_end_distance_predictor import ScaledRePredictor
-from .scaled_rg.scaled_radius_of_gyration_predictor import ScaledRgPredictor
+from .network_loader import load_parrot_network
 from ..sparrow_exceptions import SparrowException
 
 from sparrow.data.configs import MIN_LENGTH_ALBATROSS_RE_RG
@@ -50,39 +41,20 @@ def prepare_model(network, version, gpuid):
         An exception is raised if there is no weights file corresponding to the 
         network and version requested.
     """
-    saved_weights = sparrow.get_data(f'networks/{network}/{network}_network_v{version}.pt')
-
-    if not os.path.isfile(saved_weights):
-        raise SparrowException(f'Error: could not find saved weights file {saved_weights} for {network} predictor')
-    
     # Check if GPU is available
     if torch.cuda.is_available():
         device = torch.device(f"cuda:{gpuid}")
     else:
         device = torch.device("cpu")
 
-    loaded_model = torch.load(saved_weights, map_location=device)
-    
+    # the batch predictors are all many-to-one (per-sequence) polymer networks;
+    # the shared loader owns the torch.load + hyper-parameter inference logic
+    relative_path = f'networks/{network}/{network}_network_v{version}.pt'
+    model, _meta = load_parrot_network(relative_path, architecture="MtO", device=device)
 
-    # count number of network layers
-    num_layers = 0
-    while True:
-        s = f'lstm.weight_ih_l{num_layers}'
-        try:
-            temp = loaded_model[s]
-            num_layers += 1
-        except KeyError:
-            break
-                    
-    number_of_classes = np.shape(loaded_model['fc.bias'])[0]
-    
-    # hardcoded for 20 aa, but could change if different encoding scheme.
-    input_size = 20 
-
-    hidden_vector_size = int(np.shape(loaded_model['lstm.weight_ih_l0'])[0] / 4)
-
-    model = brnn_architecture.BRNN_MtO(input_size, hidden_vector_size, num_layers, number_of_classes, device)
-    model.load_state_dict(loaded_model)
+    # inference only: disable dropout/batchnorm-style training behaviour (the
+    # ALBATROSS networks have no dropout, so this does not change outputs)
+    model.eval()
 
     return (device, model)
 
@@ -223,9 +195,12 @@ def __short_seq_fix(protein_objs,
                          for very large sequence sets or sets where there
                          are many sequences of the same length.
 
-        Note that right now the ONLY algorithm available is size-collect,
-        so regardless of what selector your choose here, you'll get
-        size-collect batch algorithm.
+        'pad-n-pack' - Pad each mixed-length batch to its longest member and
+                       use pack_padded_sequence so the padding does not affect
+                       the result. Only available in PyTorch 1.11.0+. Provides
+                       true mixed-length batching and is typically much faster
+                       when sequence lengths vary; it is the default on modern
+                       PyTorch.
 
     return_seq2prediction : bool
         Flag which, if set to true, means the return from this function is 
@@ -445,9 +420,12 @@ def batch_predict(protein_objs,
                          for very large sequence sets or sets where there
                          are many sequences of the same length.
 
-        Note that right now the ONLY algorithm available is size-collect,
-        so regardless of what selector your choose here, you'll get
-        size-collect batch algorithm.
+        'pad-n-pack' - Pad each mixed-length batch to its longest member and
+                       use pack_padded_sequence so the padding does not affect
+                       the result. Only available in PyTorch 1.11.0+. Provides
+                       true mixed-length batching and is typically much faster
+                       when sequence lengths vary; it is the default on modern
+                       PyTorch.
 
     return_seq2prediction : bool
         Flag which, if set to true, means the return from this function is 
@@ -479,26 +457,6 @@ def batch_predict(protein_objs,
     """
 
 
-    ## bonus docstring for when pad-n-pack is working
-    """
-
-
-        'pad-n-pack' -   Use PyTorch'es padding/packing approach to
-                         give the illusion of sequences having the 
-                         same length. Note this is only available in
-                         pytorch version 1.11.0 or higher. Note that
-                         for large sequence datasets this may be slower
-                         than size-collect.
-
-        Default = 'default' which means in pytorch 1.11.0 or higher 
-        pad-n-pack is preferred, although if you're working with large
-        sequence datasets and/or all your sequences are the same length
-        its probably a good idea to request size-collect.
-
-
-
-    """
-
     ## ------------------------------------------------------------------------------------
     ##
     ## Sanitize inputs
@@ -512,15 +470,9 @@ def batch_predict(protein_objs,
     if batch_algorithm not in ['default', 'size-collect', 'pad-n-pack']:
         raise SparrowException("For option 'batch_algorithm': Please choose a valid batch algorithm, one of 'default', 'size-collect', 'pad-n-pack")
 
-    ## OVERRIDE - as of sparrow version 0.2.1 the only batch prediction algorithm working is
-    ## size-collect. An initial draft of pad-n-pack is implemented but it DOES NOT WORK, so we hardcode
-    ## in size-collect for now
-    batch_algorithm = 'size-collect'
-
-    # note this is moot in 0.2.1
-    # pad-n-pack only available in PyTorch 1.11.0 or higher
+    # pad-n-pack relies on pack_padded_sequence, only available in PyTorch 1.11.0+
     if batch_algorithm == 'pad-n-pack' and VERSION_PACKAGE.parse(torch.__version__) < VERSION_PACKAGE.parse("1.11.0"):
-        raise SparrowException("For option 'batch_algorithm': pad-n-pack is only available in PyTorhc 1.11.0 or higher. Please use 'default' or 'size-collect'")
+        raise SparrowException("For option 'batch_algorithm': pad-n-pack is only available in PyTorch 1.11.0 or higher. Please use 'default' or 'size-collect'")
 
     # if we've requested to use rg/re predictions, this function ensures short sequences are appropriately
     # dealt with (this is a recurisve function that calls batch_predict)
@@ -535,9 +487,8 @@ def batch_predict(protein_objs,
                                 show_progress_bar=show_progress_bar)
 
 
-    ## Note in 0.2.1 this does not get called because of the over-ride, but we're leaving
-    # it in in preparation for pad-n-pack working...
-    # set the batch algorith if default was selected, otherwise use the requested version
+    # resolve 'default' to a concrete algorithm: prefer pad-n-pack on modern
+    # PyTorch (true mixed-length batching), falling back to size-collect otherwise
     if batch_algorithm == 'default':
         if VERSION_PACKAGE.parse(torch.__version__) >= VERSION_PACKAGE.parse("1.11.0"):
             batch_algorithm = 'pad-n-pack'
@@ -630,53 +581,51 @@ def batch_predict(protein_objs,
                 # Move padded sequences to device
                 seqs_padded = seqs_padded.to(device)
 
-                outputs = model.forward(seqs_padded).detach().cpu().numpy()
+                # inference only: torch.no_grad() avoids building the autograd
+                # graph, cutting memory and time without changing the result
+                with torch.no_grad():
+                    outputs = model(seqs_padded).cpu().numpy()
 
                 for j, seq in enumerate(batch):
                     pred_dict[seq] = outputs[j][0]
 
     elif batch_algorithm == 'pad-n-pack':
-
-        raise SparrowException('pad-n-pack does not work currently - do not use')
-
-        ## 
-        ## pad-n-pack is not currently working. Do not use.
-        ##
-
+        # pad-n-pack batches mixed-length sequences together: each batch is padded
+        # to its longest member and packed with pack_padded_sequence so the padding
+        # does not contribute to the LSTM state. This mirrors BRNN_MtO.forward
+        # exactly -- it decodes the concatenated final hidden states (h_n) of the
+        # last forward and reverse layers -- but on the packed input, so every
+        # sequence's output is computed from its true final timestep.
         seq_loader = DataLoader(sequence_list, batch_size=batch_size, shuffle=False)
 
         loop_range = tqdm(seq_loader) if show_progress_bar else seq_loader
-                            
-        #for batch in tqdm(seq_loader):
-        for batch in loop_range:
-            # Pad the sequence vector to have the same length as the longest sequence in the batch
-            seqs_padded = pad_sequence([encode_sequence.one_hot(seq).float() for seq in batch], batch_first=True)
 
-            # get lengths for input into pack_padded_sequence
+        for batch in loop_range:
+
+            # one-hot encode and pad to the longest sequence in this batch
+            seqs_padded = pad_sequence(
+                [encode_sequence.one_hot(seq).float() for seq in batch],
+                batch_first=True,
+            ).to(device)
+
+            # lengths must be a CPU tensor for pack_padded_sequence
             lengths = torch.tensor([len(seq) for seq in batch])
 
-            # pack up for vacation
-            packed_and_padded = pack_padded_sequence(seqs_padded, lengths.cpu().numpy(), batch_first=True, enforce_sorted=False)
+            # enforce_sorted=False lets us pass an unsorted batch; the LSTM still
+            # returns h_n in the original (input) order
+            packed = pack_padded_sequence(
+                seqs_padded, lengths, batch_first=True, enforce_sorted=False
+            )
 
-            # input packed_and_padded into loaded lstm
-            packed_output, (ht, ct) = (model.lstm.forward(packed_and_padded))
-            
-            # inverse of pack_padded_sequence
-            output, input_sizes = pad_packed_sequence(packed_output, batch_first=True)
-            
-            # get the outputs by calling fc
-            outputs = model.fc(output).cpu()
+            with torch.no_grad():
+                _, (h_n, _) = model.lstm(packed)
+                # concat final hidden state of the last forward (-2) and reverse
+                # (-1) layers, then decode -- identical to BRNN_MtO.forward
+                final_outs = torch.cat((h_n[-2], h_n[-1]), dim=-1)
+                outputs = model.fc(final_outs).cpu().numpy()
 
-            # get the unpacked, finalized values into the dict.
-            for cur_ind, score in enumerate(outputs):
-                
-                # first detach, flatten, etc
-                cur_score = score.detach().numpy().flatten()
-                
-                # get the sequence from batch from seq_loader
-                cur_seq = batch[cur_ind]
-
-                pred_dict[cur_seq] = cur_score[0]
+            for j, seq in enumerate(batch):
+                pred_dict[seq] = outputs[j][0]
 
     else:
         raise SparrowException('Invalid batch_algorithm passed')

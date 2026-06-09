@@ -32,10 +32,11 @@ def low_complexity_domains_holt_permissive(sequence, residue_selector, minimum_l
         the start index, and the end index
 
     """
-    return __low_complexity_domains_holt_internal(sequence=sequence, 
-                                                  residue_selector=residue_selector, 
-                                                  minimum_length=minimum_length, 
-                                                  max_interruption=max_interruption, 
+    return __low_complexity_domains_holt_internal(sequence=sequence,
+                                                  residue_selector=residue_selector,
+                                                  minimum_length=minimum_length,
+                                                  max_interruption=max_interruption,
+                                                  fractional_threshold=fractional_threshold,
                                                   permissive=True)
 
 

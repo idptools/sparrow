@@ -2179,8 +2179,9 @@ def plot_some_fastas(
               f"{dr.charge[i]:.4f}\t{dr.hydro[i]:.4f}\t{dr.fi[i]:.8f}\t"
               f"{dr.plaac_llr[i]:.4f}\t{dr.papa[i]:.8f}\t"
               f"{dr.fix2[i]:.8f}\t{dr.plaacllr_x2[i]:.4f}\t{dr.papa_x2[i]:.8f}")
-            for j in range(len(hmm1.posterior)):
-                w(f"\t{hmm1.posterior[j][i]:.4f}")
+            if hmm1.posterior is not None:
+                for j in range(len(hmm1.posterior)):
+                    w(f"\t{hmm1.posterior[j][i]:.4f}")
             print()
         print("########################################################")
 

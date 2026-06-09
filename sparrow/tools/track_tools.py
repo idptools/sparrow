@@ -186,6 +186,45 @@ def linear_track_composition(seq, composition_list, window_size, end_mode, smoot
 
 # .................................................................
 #
+def linear_track_property(seq, value_map, window_size, end_mode, smooth=None):
+    """
+    Function that returns a vectorized representation of a per-residue numerical
+    property, averaged over a sliding window. Each residue is mapped to a value
+    via value_map and the track reports the mean value within each window.
+
+    Parameters
+    ------------
+    seq : str
+        Amino acid sequence
+
+    value_map : dict
+        Dictionary mapping each amino acid in seq to a numerical (float) value.
+        Every residue in seq must be present in value_map with a non-None value.
+
+    window_size : int
+        Number of residues over which the local mean is calculated. A window
+        stepsize of 1 is always used.
+
+    end_mode : str
+        Selector that defines how ends are dealt with (see build_track).
+
+    smooth : int or None
+        Optional savgol smoothing window (see build_track).
+
+    Returns
+    ----------
+    np.ndarray
+        Returns an array of the window-averaged property values.
+    """
+
+    def FX(s):
+        return sum(value_map[r] for r in s) / len(s)
+
+    return build_track(seq, FX, window_size, end_mode, smooth)
+
+
+# .................................................................
+#
 def build_track(seq, track_function, window_size=7, end_mode='extend-ends', smooth=None):
     """
     Generic function for the construction of position-specific track parameters. Uses
@@ -267,9 +306,9 @@ def build_track(seq, track_function, window_size=7, end_mode='extend-ends', smoo
     elif end_mode == 'zero-ends':
         front = int(window_size/2)
         track_vals = [0]*front + track_vals
-        
-        end = len(track_vals) - len(seq)
-        track_vals = track_vals + [0]*end 
+
+        end = len(seq) - len(track_vals)
+        track_vals = track_vals + [0]*end
     elif end_mode == '':
         pass
     else:
@@ -279,7 +318,7 @@ def build_track(seq, track_function, window_size=7, end_mode='extend-ends', smoo
     if smooth is not None:
         try:
             track_vals = savgol_filter(track_vals, smooth, 3)
-        except Exception as e:
+        except Exception:
             raise sparrow_exceptions.SparrowException(f'Invalid smoothing parameter passed [smooth={smooth}]. Must be an integer between 3 and the length of the sequence')
         
     return np.array(track_vals)

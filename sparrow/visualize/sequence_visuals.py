@@ -10,11 +10,11 @@ def show_sequence(seq,
                   newline=50, 
                   fontsize=14, 
                   font_family='Courier', 
-                  colors={},
+                  colors=None,
                   header=None,
-                  bold_positions=[],
-                  bold_residues=[],
-                  opaque_positions=[],
+                  bold_positions=None,
+                  bold_residues=None,
+                  opaque_positions=None,
                   return_raw_string=False,
                   warnings = True):
                   
@@ -83,6 +83,16 @@ def show_sequence(seq,
 
     """
     
+    # normalize mutable defaults
+    if colors is None:
+        colors = {}
+    if bold_positions is None:
+        bold_positions = []
+    if bold_residues is None:
+        bold_residues = []
+    if opaque_positions is None:
+        opaque_positions = []
+
     if blocksize > newline:
         newline = blocksize
 
@@ -92,13 +102,13 @@ def show_sequence(seq,
 
 
     if blocksize < 1:
-        raise 
+        raise SparrowException("blocksize must be >= 1")
 
 
     colorString = '<p style="font-family:%s;font-size: %ipx">'%(font_family, fontsize)
 
     if header:
-        colorString = colorString + "><b>%s</b><br>"%(str(header))
+        colorString = colorString + "<b>%s</b><br>"%(str(header))
         
 
     count = -1
@@ -116,7 +126,7 @@ def show_sequence(seq,
 
         if residue not in AA_COLOR and residue not in colors:
             if warnings:
-                print('Warning: found invalid amino acid (%s and position %i'%(residue, count+1))
+                print('Warning: found invalid amino acid (%s) at position %i'%(residue, count+1))
             colorString = colorString + '<span style="color:%s"><b>%s</b></span>' % ('black', residue)
         else:
 

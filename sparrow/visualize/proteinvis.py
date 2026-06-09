@@ -532,17 +532,17 @@ class VisualProtein:
 
 # ..............................................................
 #
-def plot_protein_structure(proteins, horiontal_bands=None, **kwargs):
+def plot_protein_structure(proteins, horizontal_bands=None, **kwargs):
     """
     Stateless function to plot one or more VisualProtein objects.
 
     Parameters:
     ---------------
     proteins : VisualProtein or list of VisualProtein
-        Single VisualProtein object or a list of VisualProtein objects 
+        Single VisualProtein object or a list of VisualProtein objects
         to plot.
 
-    horiontal_bands : list of tuples
+    horizontal_bands : list of tuples
         List of (start, end, color, alpha) tuples defining horizontal bands 
         to highlight specific residue ranges across all tracks.
 
@@ -808,13 +808,17 @@ def plot_protein_structure(proteins, horiontal_bands=None, **kwargs):
 
             current_x_offset += spacing + (local_track_width * 0.5)
 
+    # backwards-compatible alias for the previously-misspelled keyword
+    if horizontal_bands is None and "horiontal_bands" in kwargs:
+        horizontal_bands = kwargs.pop("horiontal_bands")
+
     # Highlight horizontal bands if provided
-    if horiontal_bands is not None:
-        try: 
-            for (start_, end_, color_, alpha_) in horiontal_bands:
+    if horizontal_bands is not None:
+        try:
+            for (start_, end_, color_, alpha_) in horizontal_bands:
                 ax.axhspan(start_, end_, color=color_, alpha=alpha_, zorder=0, lw=0)
         except Exception as e:
-            raise ValueError("horiontal_bands must be a list of (start, end, color, alpha) tuples") from e
+            raise ValueError("horizontal_bands must be a list of (start, end, color, alpha) tuples") from e
 
     # Global Styling
     max_len = max(p.length for p in proteins)
