@@ -2,7 +2,6 @@ import re
 from dataclasses import dataclass
 from typing import List, Set, Tuple, Union
 import pandas as pd
-from IPython import embed
 
 import sparrow
 from sparrow.sparrow_exceptions import SparrowException
@@ -59,7 +58,8 @@ def parse_hgvs(hgvs_notation : str) -> Tuple:
 
     # Extract the position and amino acids
     position = int(''.join(filter(str.isdigit, parts[1]))) # shift indexing to 0
-    assert position > 0, SparrowException(f"Invalid position in HGVS notation, must be a 1 indexed integer greater than 0. Received {position}")
+    if position <= 0:
+        raise SparrowException(f"Invalid position in HGVS notation, must be a 1 indexed integer greater than 0. Received {position}")
     mutation = parts[1][-1]
 
     # position shifted to 0 index

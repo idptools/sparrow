@@ -28,28 +28,21 @@ __all__ = ["Protein"]
 class Protein:
     def __init__(self, s, validate=False):
         """
-        Construct for Protein object. Requires only a single sequence as
-        input. Note that construction does not trigger any sequence
-        parameters to be calculated, all of which are caculated as needed.
+        Construct a Protein object from a single amino acid sequence.
 
-        See Also
-        --------
-        :class:`sparrow.sequence_analysis.plugins.PluginManager` : Plugin interface
-        :class:`sparrow.predictors.Predictor` : Sequence-based predictors
-        :class:`sparrow.polymer.Polymeric` : Polymer property calculations
+        The sequence is stored upper-cased. Construction is lazy: no sequence
+        parameters are computed here, and each property/method calculates (and
+        caches) its value on first access.
 
         Parameters
-        -------------
-        s :  str
-            Amino acid sequence
-
-        validate : bool
-            Flag that can be set if sequence should be validated to ensure
-            it's a good amino acid sequence. Generally not necessary to
-            sometimes useful. If set, the function constructor will
-            automatically convert non-standard amino acids to standard
-
-            amino acids according to the standard rule.
+        ----------
+        s : str
+            Amino acid sequence. Stored upper-cased.
+        validate : bool, optional
+            If True, the sequence is checked for non-standard residues and any
+            that are found are converted to standard amino acids according to
+            the rules below. If a residue cannot be converted, a
+            ``SparrowException`` is raised. Default is False.
 
             * ``B -> N``
             * ``U -> C``
@@ -58,10 +51,17 @@ class Protein:
             * ``* -> <empty string>``
             * ``- -> <empty string>``
 
-        Returns
-        -----------
-            Protein object
+        Raises
+        ------
+        sparrow.sparrow_exceptions.SparrowException
+            If ``validate`` is True and the sequence still contains an invalid
+            residue after attempted conversion.
 
+        See Also
+        --------
+        sparrow.sequence_analysis.plugins.PluginManager : Plugin interface.
+        sparrow.predictors.Predictor : Sequence-based predictors.
+        sparrow.polymer.Polymeric : Polymer property calculations.
         """
 
         # If validation is needed...
@@ -110,13 +110,15 @@ class Protein:
     @property
     def molecular_weight(self):
         """
-        Returns the molecular weight of the the protein.
+        Molecular weight of the protein in Daltons.
+
+        Computed as the sum of the standard residue molecular weights minus one
+        water molecule per peptide bond. Calculated on first access and cached.
 
         Returns
-        ---------
+        -------
         float
-            The molecular weight
-
+            Molecular weight in Daltons (Da).
         """
 
         if self.__molecular_weight is None:
@@ -131,18 +133,16 @@ class Protein:
     @property
     def amino_acid_fractions(self):
         """
-        Returns a dictionary where keys are each of the twenty standard
-        amino acids and the values are the fraction of that amino acid
-        in the sequence.
+        Per-amino-acid fractional composition of the sequence.
+
+        Calculated on first access and cached.
 
         Returns
-        ---------
+        -------
         dict
-            Returns a 20-position dictionary that includes single-letter
-            codes for each amino acid the corresponding fraction of those
-            residues
-
-
+            Dictionary with the 20 standard single-letter amino acid codes as
+            keys and the fraction of the sequence made up by each residue as
+            values (each between 0 and 1; the values sum to 1).
         """
 
         if self.__aa_fracts is None:
@@ -235,17 +235,26 @@ class Protein:
     @property
     def kappa(self):
         """
-        Returns the charge segregation parameter kappa for the sequence.
-        If kappa cannot be calculated (e.g. sequence is shorter than
-        5 residues or a sequence with no charged residues) returns a -1.
+        Charge segregation parameter (kappa) for the sequence.
 
-        Note that kappa defaults to flattening kappa values above 1 to
-        1, but this can be turned off with calculate_kappa_x() functio
+        Kappa measures how the positive (Arg, Lys) and negative (Asp, Glu)
+        residues are patterned along the sequence: values near 0 indicate
+        well-mixed charges and values near 1 indicate segregated (blocky)
+        charges. It is computed as the average of kappa evaluated with window
+        sizes 5 and 6, with values above 1 flattened to 1.
+
+        Returns -1 when kappa is undefined, i.e. the sequence is shorter than 6
+        residues or it lacks residues from one of the charge groups. Calculated
+        on first access and cached.
 
         Returns
-        --------
+        -------
         float
-            Float between 0 and 1, or -1
+            Kappa value between 0 and 1, or -1 if undefined.
+
+        See Also
+        --------
+        compute_kappa_x : Generic kappa for arbitrary residue groups / windows.
         """
 
         if self.__kappa is None:
@@ -261,18 +270,23 @@ class Protein:
     @property
     def SCD(self):
         """
-        Returns the default sequence charge decoration (SCD) parameter
-        as defined by Sawle and Ghosh :cite:`sawle2015theoretical`.
+        Returns the default sequence charge decoration (SCD) parameter,
+        a charge-patterning metric defined by Sawle and Ghosh (2015).
+
+        Charge groups are fixed to the acidic (E, D) and basic (R, K) residues;
+        use :meth:`compute_SCD_x` for arbitrary groups. Calculated on first
+        access and cached.
 
         Returns
-        --------
+        -------
         float
-            Returns a float that reports on the sequence charge decoration
+            The sequence charge decoration.
 
         References
         ----------
-        .. bibliography::
-           :filter: key == "sawle2015theoretical"
+        Sawle, L. & Ghosh, K. A theoretical method to compute sequence-dependent
+        configurational properties in charged polymers and proteins. J. Chem.
+        Phys. 143, 085101 (2015).
         """
         if self.__scd is None:
             self.__scd = scd.compute_scd_x(
@@ -284,19 +298,28 @@ class Protein:
     @property
     def SHD(self):
         """
-        Returns the default sequence hydropathy decoration (SHD) parameter
-        as defined by Zheng et al. :cite:`zheng2020hydropathy`.
+        Returns the default sequence hydropathy decoration (SHD) parameter,
+        a hydrophobicity-patterning metric defined by Zheng et al. (2020).
+
+        Hydrophobicity values use the default (normalized Kyte-Doolittle) scale;
+        use :meth:`compute_SHD_custom` to supply your own. Calculated on first
+        access and cached.
 
         Returns
-        --------
+        -------
         float
-            Returns a float that reports on the sequence hydropathy decoration
+            The sequence hydropathy decoration.
 
         References
         ----------
-        .. bibliography::
-           :filter: key == "zheng2020hydropathy"
+        Zheng, W. et al. Hydropathy Patterning Complements Charge Patterning to
+        Describe Conformational Preferences of Disordered Proteins. J. Phys.
+        Chem. Lett. 11, 3408-3415 (2020).
         """
+        if self.__shd is None:
+            self.__shd = scd.compute_shd(self.sequence)
+
+        return self.__shd
 
     # .................................................................
     #
@@ -346,7 +369,7 @@ class Protein:
     def fraction_polar(self):
         """
         Returns the fraction of polar residues in the sequence.
-        Aliphatic residues are Gly, Ser, Thr, Gln, Asn, His.
+        Polar residues are Gln, Asn, Ser, Thr, His and Gly.
 
         Returns
         --------
@@ -380,14 +403,17 @@ class Protein:
     @property
     def hydrophobicity(self):
         """
-        Returns the linear hydrophobicity from sequence
-        using the Kyte-Doolitle scale.
+        Mean hydrophobicity of the sequence on the Kyte-Doolittle scale.
+
+        Returns the sequence-averaged per-residue hydrophobicity (the mean over
+        all residues). Calculated on first access and cached. For a per-residue
+        hydrophobicity track, use :meth:`linear_sequence_profile` with
+        ``mode='hydrophobicity'``.
 
         Returns
-        ----------
-        list
-            List of values that correspond to per-residue
-            hydrophobicity based on a given hydrophobicity scale
+        -------
+        float
+            Mean per-residue Kyte-Doolittle hydrophobicity.
         """
         if self.__hydrophobicity is None:
             self.__hydrophobicity = calculate_parameters.calculate_hydrophobicity(
@@ -401,14 +427,16 @@ class Protein:
     @property
     def complexity(self):
         """
-        Calculates the Wootton-Federhen complexity of a sequence (also called
-        seg complexity, as this the theory used in the classic SEG algorithm.
+        Wootton-Federhen (SEG) compositional complexity of the sequence.
+
+        This is the Shannon-style compositional complexity used by the classic
+        SEG algorithm; higher values indicate more compositionally diverse
+        sequences. Calculated on first access and cached.
 
         Returns
-        ----------
+        -------
         float
-            Returns a float that corresponds to the compositional complexity
-            associated with the passed sequence.
+            Compositional complexity of the sequence (>= 0).
         """
         if self.__complexity is None:
             self.__complexity = calculate_parameters.calculate_seg_complexity(
@@ -462,14 +490,14 @@ class Protein:
 
         NB1: kappa will return as -1 if
 
-        1. the sequece is shorter than the windowsize
+        1. the sequence is shorter than the window size
         2. There are no residues from either group1 or group2
 
         The function will raise an exception if the windowsize is < 2
 
         NB2: kappa is defined as comparing the ratio of delta with deltamax,
         where *in this implementation* deltamax refers to the delta associated
-        with the most segregated sequece; e.g::
+        with the most segregated sequence; e.g::
 
             (AAA)n-(XXX)m-(BBB)p
 
@@ -478,7 +506,7 @@ class Protein:
         that we can get a kappa greater than 1. This only occurs in situations
         where kappa is probably not a useful metric anyway (i.e 100x excess of
         one group residue vs. another). We recommend setting the 'flatten'
-        keyword to True, which means kappa values over 1 will be flatteed to 1.
+        keyword to True, which means kappa values over 1 will be flattened to 1.
 
         NB3: this implementation differs very slightly from the canonical
         kappa reference implementation; it adds non-contributing 'wings' of
@@ -491,43 +519,39 @@ class Protein:
         This both addresses a previous (subtle) limitation in kappa, but also
         buys a ~100x speedup compared to previous reference implementations.
         As a final note, I (Alex) wrote the original reference implementation
-        in localCIDER, so feel comfortable criticising it's flaws!
+        in localCIDER, so feel comfortable criticising its flaws!
 
         NB4: If no residues are provided in group2 then the function assumes
         all residues not defined in group1 are in group2 and the function
-        becomes a binary patterning function instead of a ternary pattering
+        becomes a binary patterning function instead of a ternary patterning
         function.
 
         Parameters
-        -------------
-        group1 : str
-            Must be a string of valid amino acid one letter codes.
-            This defines one set of residues for which patterning
-            is computed against. If a second set is not provided,
-            patterning is done via group1 vs. all other residues.
+        ----------
+        group1 : str or list
+            One or more valid amino acid one-letter codes defining the first
+            residue set that patterning is computed for. If ``group2`` is not
+            provided, patterning is computed for group1 vs. all other residues.
 
-        group2 : str
-            If provided, this defines the SECOND set of residues,
-            such that patterning is done as residues in group1 vs.
-            group2 in the background of everything else.
+        group2 : str or list, optional
+            If provided, defines the SECOND residue set, so patterning is
+            computed for group1 vs. group2 against the background of all other
+            residues. Default is None.
 
-        window_size : int
-            Size over which local sequence patterning will be
-            calculated. Default = 6.
+        window_size : int, optional
+            Window size over which local sequence patterning is calculated.
+            Default is 6.
 
-        flatten : bool
-            Flag which, if set to True, means if kappa is above 1 the
-            function will flatten the value to 1. Default = True.
+        flatten : bool, optional
+            If True, kappa values above 1 are flattened to 1. Default is True.
 
         Returns
-        -------------
+        -------
         float
-            Returns a value associated with the generalized kappa. If
-            flatten is True this is guarenteed to be between 0 and 1
-            unless it's -1 (see above). If flatten is set to False its
-            VERY likeli this will be between 0 and 1 and if it's above
-            1 the parameter is probably not useful to use.
-
+            The generalized kappa value. If ``flatten`` is True this is
+            guaranteed to be between 0 and 1 (unless it is -1; see above). If
+            ``flatten`` is False values above 1 are possible but indicate kappa
+            is not a useful metric for the sequence.
         """
 
         for i in group1:
@@ -599,7 +623,7 @@ class Protein:
             require_nonempty=False,
             unique=False,
             sort_unique=False,
-            return_type="str",
+            return_type="list",
         )
 
         return iwd.calculate_average_inverse_distance_from_sequence(
@@ -788,18 +812,19 @@ class Protein:
             charged" residues.
 
         Returns
-        -----------
+        -------
         float
-            Returns the custom sequence charge decoration.
+            The custom sequence charge decoration.
 
-        See also
-        ---------
-        sparrow.protein.scd
+        See Also
+        --------
+        SCD : SCD computed with the default charge groups (E/D vs R/K).
 
         References
         ----------
-        .. bibliography::
-           :filter: key == "sawle2015theoretical"
+        Sawle, L. & Ghosh, K. A theoretical method to compute sequence-dependent
+        configurational properties in charged polymers and proteins. J. Chem.
+        Phys. 143, 085101 (2015).
         """
 
         return scd.compute_scd_x(self.sequence, group1=group1, group2=group2)
@@ -808,35 +833,33 @@ class Protein:
     #
     def compute_SHD_custom(self, hydro_dict):
         """
-        Function takes in a sequence and returns Sequence
-        Hydropathy Decoration (SHD), IE. patterning of hydrophobic
-        residues in the sequence. This is computed as define in ref 1
+        Sequence Hydropathy Decoration (SHD) using a custom hydrophobicity scale.
 
-        To define the hydrophobicity values used the user should pass
-        a hydrophobicity dictionary (hydro_dict) which maps amino
-        acid residues to hydrophobicity scores.
+        SHD quantifies the patterning of hydrophobic residues along the
+        sequence, as defined by Zheng et al. (2020). The hydrophobicity values
+        are supplied by the caller via ``hydro_dict``.
 
         Parameters
-        --------------
-
-        hydro : dict
-            Dictionary that maps amino acid to hydrophobicity score.
-            Note that every amino acid in the sequence must exist in the
-            hydro dict or the function raise an exception.
+        ----------
+        hydro_dict : dict
+            Dictionary mapping each amino acid one-letter code to a
+            hydrophobicity score. Every residue present in the sequence must be
+            a key in this dictionary or an exception is raised.
 
         Returns
-        -----------
+        -------
         float
-            Returns the customized sequence hydropathy decoration
+            The custom sequence hydropathy decoration.
 
-        See also
-        ---------
-        sparrow.protein.scd
+        See Also
+        --------
+        SHD : SHD computed with the default (normalized Kyte-Doolittle) scale.
 
         References
         ----------
-        .. bibliography::
-           :filter: key == "zheng2020hydropathy"
+        Zheng, W. et al. Hydropathy Patterning Complements Charge Patterning to
+        Describe Conformational Preferences of Disordered Proteins. J. Phys.
+        Chem. Lett. 11, 3408-3415 (2020).
         """
 
         return scd.compute_shd(self.sequence, hydro_dict=hydro_dict)
@@ -845,28 +868,34 @@ class Protein:
     #
     def compute_iwd_charged_weighted(self, charge=None):
         """
-        Returns the weighted inverse weighted distance (IWD) for either
-        positive or negative residues in the sequence. This is a metric
-        for residue clustering weighted by the NCPR of each target
-        residue.
+        Charge-weighted inverse weighted distance (IWD) for one charge sign.
+
+        Quantifies the clustering of either the positive or the negative
+        residues, with each residue's contribution weighted by the local net
+        charge per residue (NCPR, computed over a window of 8 with extended
+        ends).
 
         Parameters
-        -------------
-
-        charge : ['-','+']
-            Pass '-' to quantify the clustering of negitive residues.
-            Pass '+' to quantify the clustering of positive residues.
+        ----------
+        charge : {'-', '+'}
+            Pass ``'-'`` to quantify clustering of negative residues, or
+            ``'+'`` to quantify clustering of positive residues.
 
         Returns
-        --------
+        -------
         float
-            Float that is positive
+            A non-negative clustering value.
+
+        Raises
+        ------
+        sparrow.sparrow_exceptions.ProteinException
+            If ``charge`` is not ``'-'`` or ``'+'``.
         """
 
         # ensure valid charge is passed
         if charge not in ["-", "+"]:
             raise sparrow_exceptions.ProteinException(
-                f'Passed charge {charge} is not a valid option. Pass "-" for negitive residues and "+" for positive residues.'
+                f'Passed charge {charge} is not a valid option. Pass "-" for negative residues and "+" for positive residues.'
             )
 
         # calculate or retrieve mask of NCPR for sequence
@@ -887,14 +916,17 @@ class Protein:
     #
     def compute_bivariate_iwd_charged_weighted(self):
         """
-        Returns the a weighted bivariate inverse weighted distance (IWD) for
-        between Possitive and Negative residues in the sequence, a metric for
-        residue clustering weighted by the difference in NCPR of the target residues.
+        Charge-weighted bivariate inverse weighted distance (IWD).
+
+        Quantifies the spatial inter-mixing of positive and negative residues
+        in the sequence, with each pair's contribution weighted by the
+        difference in local net charge per residue (NCPR, computed over a window
+        of 8 with extended ends).
 
         Returns
-        --------
+        -------
         float
-            Float that is positive
+            A non-negative clustering value.
         """
 
         # calculate or retrieve mask of NCPR for sequence
@@ -915,43 +947,41 @@ class Protein:
     ##
     def generate_phosphoisoforms(self, mode="all", phospho_rate=1, phosphosites=None):
         """
-        Calls sequence_analysis.phospho_isoforms module to get a list
-        of possible phosphoisoforms sequences. See module header for more documentation.
+        Generate possible phosphoisoform sequences for the protein.
 
-        Phosphosites are replaced with the phosphomimetic 'E', enabling approximate calculation
-        of charge based sequence features with the presence of a phosphorylated residues.
+        Each candidate phosphosite is replaced with the phosphomimetic ``'E'``,
+        enabling approximate calculation of charge-based sequence features in the
+        presence of phosphorylated residues. See the
+        :mod:`sparrow.sequence_analysis.phospho_isoforms` module for details.
 
         Parameters
         ----------
-        sequence : str
-            Valid amino acid sequence
-
         mode : str, optional
-            Defition for how the phosphosites should be determined, by default "all"
+            How candidate phosphosites are determined. Default is ``"all"``.
 
-            'all'       : Assumes all S/T/Y residues are potential phosphosites
+            * ``'all'`` : Treats all S/T/Y residues as potential phosphosites.
+            * ``'predict'`` : Uses the PARROT-trained phosphorylation predictors
+              to predict phosphosites from sequence.
+            * ``'custom'`` : Uses the ``phosphosites`` argument as the phosphosite
+              indices.
 
-            'predict'   : Leverages PARROT trained predictors via _predict_all_phosphosites
-                            to predict phosphorylated sites based on sequence.
-
-            'custom'    : uses the 'phosphosites' parameter as indices for phosphosites.
-
-        phospho_rate : int, optional
-            Value between 0 and 1 which defines the maximum percent of phosphosites
-            can be 'phosphorylated' a each sequence, by default 1 (IE all sites can be
-            phosphorylated)
+        phospho_rate : float, optional
+            Value between 0 and 1 setting the maximum fraction of phosphosites
+            that may be phosphorylated in each generated isoform. Default is 1
+            (all sites may be phosphorylated).
 
         phosphosites : list, optional
-            Custom list of indices for valid phosphosite positions, by default None
+            Custom list of phosphosite indices, used only when ``mode='custom'``.
+            Default is None.
 
         Returns
         -------
         list
-            list of sequences for the possible phosphoisoforms based off the selected method.
-            Phosphorylatable amino acids are replaced with 'E'.
+            List of phosphoisoform sequences for the selected mode, with
+            phosphorylated residues replaced by ``'E'``.
         """
         return phospho_isoforms.get_phosphoisoforms(
-            self.sequence,
+            self,
             mode=mode,
             phospho_rate=phospho_rate,
             phosphosites=phosphosites,
@@ -979,7 +1009,7 @@ class Protein:
             * ``'proline'`` : Fraction of proline residues
             * ``'positive'`` : Fraction of positive residues
             * ``'negative'`` : Fraction of negative residues
-            * ``'hydrophobicity'`` : Linear hydrophobicity (Kyte-Doolitle)
+            * ``'hydrophobicity'`` : Linear hydrophobicity (Kyte-Doolittle)
             * ``'seg-complexity'`` : Linear complexity
             * ``'kappa'`` : Linear charge patterning
 
@@ -1001,8 +1031,8 @@ class Protein:
 
         Returns
         -------
-        list
-            Returns a list with values that correspond to the passed mode.
+        numpy.ndarray
+            Per-position track values corresponding to the requested mode.
         """
 
         utilities.validate_keyword_option(
@@ -1073,10 +1103,9 @@ class Protein:
 
 
         Returns
-        ----------
-        list
-            Returns a list with values that correspond to the passed mode
-
+        -------
+        numpy.ndarray
+            Per-position local density of the residues in ``composition_list``.
         """
 
         utilities.validate_keyword_option(
@@ -1114,16 +1143,116 @@ class Protein:
 
     # .................................................................
     #
+    def linear_property_profile(
+        self, mode, window_size=8, end_mode="extend-ends", smooth=None
+    ):
+        """
+        Returns a vectorized representation of a numerical amino-acid property
+        averaged over a sliding window. Each residue is mapped to a value taken
+        from the AAindex1 database (see :mod:`sparrow.data.aaindex`) and the
+        track reports the mean value within each ``window_size`` window.
+
+        This is the property-based analogue of :meth:`linear_sequence_profile`
+        and takes the same arguments; only ``mode`` differs, selecting an AAindex
+        property instead of a built-in analysis.
+
+        Parameters
+        ----------
+        mode : str
+            Identifier of the AAindex property to use. This is either a slug of
+            the form ``<meaning>-<first-author>-<year>`` (for example
+            ``'hydropathy-kyte-1982'``) or a raw AAindex accession (for example
+            ``'KYTJ820101'``). Use
+            :func:`sparrow.data.aaindex.list_property_indices` to enumerate the
+            500+ available indices, and see the property index reference in the
+            documentation for a description of each.
+
+        window_size : int
+            Number of residues over which the local mean is calculated. A window
+            stepsize of 1 is always used. Default is 8.
+
+        end_mode : str
+            Selector that defines how ends are handled. Default is
+            ``'extend-ends'``.
+
+            * ``'extend-ends'`` : leading/lagging values copied from the first
+              and last window values.
+            * ``''`` : ends are ignored (track is shorter than the sequence).
+            * ``'zero-ends'`` : leading/lagging values set to zero.
+
+        smooth : int or None
+            Optional smoothing window. Must be an odd number (applies a
+            savgol_filter with a 3rd order polynomial). Default is None.
+
+        Returns
+        -------
+        numpy.ndarray
+            Per-position window-averaged property values.
+
+        Raises
+        ------
+        sparrow.sparrow_exceptions.ProteinException
+            If the selected index has no value for a residue present in the
+            sequence.
+        sparrow.sparrow_exceptions.SparrowException
+            If ``mode`` matches no known property identifier or accession.
+
+        Examples
+        --------
+        >>> p.linear_property_profile("hydropathy-kyte-1982", window_size=9)  # doctest: +SKIP
+        array([...])
+        """
+        from sparrow.data import aaindex
+
+        utilities.validate_keyword_option(
+            end_mode, ["extend-ends", "zero-ends", ""], "end_mode"
+        )
+
+        # resolve the requested index (raises SparrowException if unknown)
+        metadata = aaindex.get_property_metadata(mode)
+        value_map = aaindex.get_property_values(mode)
+
+        # the index must provide a value for every residue in the sequence
+        missing = sorted({r for r in self.__seq if value_map.get(r) is None})
+        if missing:
+            raise sparrow_exceptions.ProteinException(
+                "Property index '%s' (%s) has no value for residue(s) %s; "
+                "cannot build a profile for this sequence."
+                % (metadata["identifier"], metadata["accession"], missing)
+            )
+
+        # memoize using the canonical identifier so equivalent modes (slug or
+        # accession) share a cache entry
+        name = "property:%s-window_size=%i-end_mode=%s-smooth=%s" % (
+            metadata["identifier"],
+            window_size,
+            end_mode,
+            smooth,
+        )
+
+        if name not in self.__linear_profiles:
+            self.__linear_profiles[name] = track_tools.linear_track_property(
+                self.__seq, value_map, window_size, end_mode, smooth
+            )
+
+        return self.__linear_profiles[name]
+
+    # .................................................................
+    #
     def low_complexity_domains(self, mode="holt", **kwargs):
         """Extract low complexity domains (LCDs) from the sequence.
 
         Parameters
         ----------
-        mode : {'holt'}
-            Extraction method. Only ``'holt'`` currently supported (Gutierrez et al. method).
+        mode : {'holt', 'holt-permissive'}
+            Extraction method (both based on the Gutierrez et al. approach).
+            ``'holt'`` counts only target residues toward an LCD; in
+            ``'holt-permissive'`` bridged interruption residues also count toward
+            the LCD length and fraction. Default is ``'holt'``.
         **kwargs
-            Passed through to :func:`sparrow.sequence_analysis.sequence_complexity.low_complexity_domains_holt`.
-            Common options:
+            Passed through to the underlying extractor
+            (:func:`sparrow.sequence_analysis.sequence_complexity.low_complexity_domains_holt`
+            or its ``_permissive`` variant). Common options:
 
             ``residue_selector`` : str
                 One or more one-letter amino acid codes (e.g. ``'Q'`` or ``'ED'``).
@@ -1141,17 +1270,12 @@ class Protein:
             Each LCD represented as ``[sequence, start, end]`` where ``start`` is 0-indexed
             and ``end`` is exclusive (``sequence[start:end]`` equals the LCD substring).
 
-        Notes
-        -----
-        Only the Gutierrez et al. style extraction (``mode='holt'``) is implemented at present.
-
         Examples
         --------
         >>> p.low_complexity_domains(mode='holt', residue_selector='Q', minimum_length=10)  # doctest: +SKIP
         [['QQQQQQQQQQ', 5, 15]]
         """
-        # utilities.validate_keyword_option(mode, ['holt', 'holt-permissive'], 'mode')
-        utilities.validate_keyword_option(mode, ["holt"], "mode")
+        utilities.validate_keyword_option(mode, ["holt", "holt-permissive"], "mode")
         if mode == "holt":
             return sequence_complexity.low_complexity_domains_holt(
                 self.sequence, **kwargs
@@ -1175,7 +1299,8 @@ class Protein:
             If False, returns the full PLAAC output including scores and other metadata for each PLD.
 
         **kwargs
-            Passed through to :func:`sparrow.sequence_analysis.plaac.plaac_prion_like_domains`.
+            Passed through to
+            :func:`sparrow.sequence_analysis.plaac.plaac.score_sequence`.
             Common options:
 
             alpha : float, default 1.0
@@ -1215,13 +1340,15 @@ class Protein:
         
         Returns
         -------
-        list[list]
-            Each PLD represented as ``[sequence, start, end]`` where ``start`` is 0-indexed
-            and ``end`` is exclusive (``sequence[start:end]`` equals the PLD substring).
+        list[list] or PLAAC result object
+            If ``simple`` is True, a list where each PLD is ``[sequence, start, end]``
+            with ``start`` 0-indexed and ``end`` exclusive (``sequence[start:end]``
+            equals the PLD substring). If ``simple`` is False, the full PLAAC result
+            object (scores and per-region metadata).
 
         Examples
         --------
-        >>> p.plaac_prion_like_domains(background='human', window_size=60, step_size=1, score_threshold=0.0)  # doctest: +SKIP
+        >>> p.plaac_prion_like_domains(core_length=60)  # doctest: +SKIP
         [['QQQQQQQQQQ', 5, 15]]
         """
         if simple:
@@ -1274,7 +1401,7 @@ class Protein:
             dictionary. Note also that the standard amino acid colorings are defined at sparrow.data.amino_acids.AA_COLOR
 
         header : str
-            If provided, this is a string that provides a FASTA-style header (with a leading carrett included). Default None.
+            If provided, a string giving a FASTA-style header (include the leading caret yourself). Default None.
 
         bold_positions : list
             List of positions (indexing from 1 onwards) which will be bolded. Useful for highlighting specific regions. Note that this
@@ -1285,9 +1412,9 @@ class Protein:
             List of residue types that can be bolded. Useful for highlighting specific residue groups.  Default is an empty list.
 
         opaque_positions : list
-            List of positions (indexing from 1 onwards) which will be grey and slighlty opaque. Useful for highlighting specific regions.
-            Note that this defines individual residues so (for example) to bold residues 10 to 15 would require
-            bold_positions=[10,11,12,13,14,15]. Default is an empty list.
+            List of positions (indexing from 1 onwards) which will be greyed out and slightly opaque. Useful for de-emphasizing specific regions.
+            Note that this defines individual residues so (for example) to grey out residues 10 to 15 would require
+            opaque_positions=[10,11,12,13,14,15]. Default is an empty list.
 
         return_raw_string : bool
             If set to true, the function returns the actual raw HTML string, as opposed to an in-notebook rendering.
@@ -1329,9 +1456,15 @@ class Protein:
     @property
     def plugin(self):
         """
-        Returns a ``sparrow.sequence_analysis.plugins.PluginManager`` object which
-        provides programmatic access to the various different plugins implemented
-        in sparrow.
+        Access to sparrow's sequence-analysis plugins.
+
+        The manager is created on first access and cached.
+
+        Returns
+        -------
+        sparrow.sequence_analysis.plugins.PluginManager
+            Object providing programmatic access to the plugins implemented in
+            sparrow.
         """
         if self.__plugin_object is None:
             from sparrow.sequence_analysis.plugins import PluginManager  # local import
@@ -1342,26 +1475,29 @@ class Protein:
     @property
     def predictor(self):
         """
-        Returns a ``sparrow.predictors.Predictor`` object which provides programatic
-        access to the various different sequence-based predictors implemented in
-        sparrow.
+        Access to sparrow's sequence-based (PARROT/ALBATROSS) predictors.
 
-        Note that each predictor performs necessary imports at runtime on the first
-        execution for the first protein, minimizing unnecessary overhead.
+        The predictor object is created on first access and cached, and each
+        underlying network is loaded lazily on its first use.
 
         Currently available predictors include:
 
             * disorder : per-residue disorder prediction
-            * dssp : per-residue DSSP score (0, 1, or 2)
+            * dssp : per-residue DSSP secondary-structure class
             * nes : nuclear export signal
-            * nis : nuclear import signal
-            * phosphorylation
-            * pscore
-            * tad
-            * mitochondrial targeting
-            * rg : radius of gyration
-            * transmembrane_region : binary classification of transmembrane regions
+            * nls : nuclear import signal
+            * phosphorylation : serine / threonine / tyrosine
+            * pscore : phase-separation propensity
+            * tad : transactivation domains
+            * mitochondrial_targeting
+            * transmembrane_regions
+            * rg / re : radius of gyration / end-to-end distance
+            * asphericity, prefactor, scaling_exponent
 
+        Returns
+        -------
+        sparrow.predictors.Predictor
+            Object providing programmatic access to the predictors.
         """
         if self.__predictor_object is None:
             from sparrow.predictors import Predictor  # local import
@@ -1372,12 +1508,17 @@ class Protein:
     @property
     def polymeric(self):
         """
-        Returns a ``sparrow.polymer.Polymeric`` object which provides programatic
-        access to the various predicted polymer properties for the sequence.
+        Access to predicted polymer properties for the sequence.
 
-        Note that many of these properties assume the sequence behaves as an
-        intrinsically disordered or unfolded polypeptide.
+        Many of these properties are only meaningful if the sequence behaves as
+        an intrinsically disordered or unfolded polypeptide. The object is
+        created on first access and cached.
 
+        Returns
+        -------
+        sparrow.polymer.Polymeric
+            Object providing programmatic access to the predicted polymer
+            properties.
         """
         if self.__polymeric_object is None:
             from sparrow.polymer import Polymeric  # local import
@@ -1422,7 +1563,14 @@ class Protein:
         return len(self.__seq)
 
     def __repr__(self):
+        """Return a concise developer representation showing length and prefix.
+
+        Returns
+        -------
+        str
+            A short string of the form ``Protein|L = <length>|<first 5 residues>...``.
+        """
         s = self.__seq[0:5]
         if len(s) < 5:
             s = s + "." * (5 - len(s))
-        return f"Protein|L = {len(self)}]|{s}..."
+        return f"Protein|L = {len(self)}|{s}..."

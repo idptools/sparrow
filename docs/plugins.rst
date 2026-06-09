@@ -3,7 +3,7 @@ Plugins
 
 .. note::
    This page is a focused guide for plugin usage and contribution.
-   For core API workflows, start with :doc:`api`.
+   For everything reachable from a ``Protein`` object, see :doc:`api_guides/protein`.
 
 Plugins extend Sparrow analyses through ``Protein.plugin``.
 The plugin manager discovers subclasses of
@@ -91,9 +91,14 @@ Plugin class names are user-facing API names via ``protein.plugin.<ClassName>``.
 Reference: Plugin Infrastructure
 --------------------------------
 
-Key user entrypoint:
+Key user entrypoint: :attr:`sparrow.protein.Protein.plugin`.
 
-* :attr:`sparrow.protein.Protein.plugin`
+.. autosummary::
+   :nosignatures:
+
+   sparrow.sequence_analysis.plugins.PluginManager
+   sparrow.sequence_analysis.plugins.BasePlugin
+   sparrow.sequence_analysis.community_plugins.contributed.MultiplicativeFCR
 
 .. autoclass:: sparrow.sequence_analysis.plugins.PluginManager
    :no-index:

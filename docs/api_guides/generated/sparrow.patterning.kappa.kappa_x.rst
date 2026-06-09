@@ -3,4 +3,4 @@
 
 .. currentmodule:: sparrow.patterning.kappa
 
-.. autodata:: kappa_x
+.. autofunction:: kappa_x

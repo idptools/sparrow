@@ -15,7 +15,7 @@ if str(ROOT) not in sys.path:
 # -- Project information -----------------------------------------------------
 
 project = "sparrow"
-author = "Jeffrey Lotthammer"
+author = "Alex Holehouse, Ryan Emenecker, Jeffrey Lotthammer"
 copyright = f"2020-{datetime.now().year}, {author}"
 
 try:
@@ -125,3 +125,39 @@ suppress_warnings = [
 bibtex_bibfiles = ["references.bib"]
 bibtex_default_style = "unsrt"
 bibtex_reference_style = "author_year"
+
+
+# -- Auto-generated AAindex property index reference table ------------------
+def _generate_property_index_table(app):
+    """Write the AAindex property reference table included by api_guides/properties.
+
+    Regenerated on every build so the table always matches the shipped database.
+    """
+    try:
+        from sparrow.data import aaindex
+
+        rows = aaindex.list_property_indices()
+    except Exception:  # pragma: no cover - keep docs building if data is unavailable
+        return
+
+    out_path = Path(app.srcdir) / "api_guides" / "_property_index_table.rst"
+    lines = [
+        ".. list-table::",
+        "   :header-rows: 1",
+        "   :widths: 32 13 55",
+        "",
+        "   * - Identifier",
+        "     - Accession",
+        "     - Description",
+    ]
+    for identifier, accession, description in sorted(rows):
+        desc = description.replace("\n", " ").replace("_", r"\_").strip()
+        lines.append(f"   * - ``{identifier}``")
+        lines.append(f"     - {accession}")
+        lines.append(f"     - {desc}")
+    out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def setup(app):
+    app.connect("builder-inited", _generate_property_index_table)
+    return {"parallel_read_safe": True, "parallel_write_safe": True}

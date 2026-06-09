@@ -138,7 +138,7 @@ def calculate_linear_hydrophobicity(s, mode="KD", normalize=False):
     Examples
     --------
     >>> calculate_linear_hydrophobicity('AA', mode='KD')  # doctest: +NORMALIZE_WHITESPACE
-    [1.8, 1.8]
+    [6.3, 6.3]
     """
 
     if mode == "KD":

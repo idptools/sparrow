@@ -33,7 +33,25 @@ from sparrow.tools.utilities import validate_keyword_option
 
 
 class Predictor:
-    """Base class for sequence-based predictors."""
+    """Programmatic access to sparrow's sequence-based predictors.
+
+    A ``Predictor`` is not created directly; it is reached as the cached
+    ``Protein.predictor`` accessor and operates on that protein's sequence::
+
+        from sparrow import Protein
+        p = Protein("MEEEKKKKSSSTTTDDD")
+        p.predictor.disorder()
+        p.predictor.radius_of_gyration()
+
+    Each method loads its underlying network lazily on first use and memoizes
+    the result, so repeated calls are cheap and unused predictors incur no cost.
+    The available predictions span disorder and secondary structure, polymer
+    dimensions (Rg, Re, asphericity, prefactor, scaling exponent), residue-level
+    phosphorylation, localization signals (NLS/NES), transactivation domains,
+    transmembrane regions, mitochondrial targeting, and phase-separation pscore.
+
+    See the per-method documentation below for inputs, outputs, and options.
+    """
 
     # .................................................................
     #
@@ -115,7 +133,7 @@ class Predictor:
 
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = (
-                self.__transmembrane_predictor_object.predict_transmebrane_regions(
+                self.__transmembrane_predictor_object.predict_transmembrane_regions(
                     self.__protein.sequence
                 )
             )
@@ -156,15 +174,13 @@ class Predictor:
         np.ndarray or tuple
             Return data depends on mode selector
 
-            * class : An np.ndarray of length equal to the sequence where each element
-            is a 1 or a 0 (1=helical, 0 non-helocal)
-
-            * probability : An np.ndarray of length equal to the sequence where each
-            element is between 0 and 1 and reports on the probability that the residue
-            is in a helix
-
-            * both : A tuple where first element is the class np.ndarray and the second
-            element is the probability np.ndarray
+            * class : An np.ndarray of length equal to the sequence where each
+              element is a 1 or a 0 (1=helical, 0=non-helical).
+            * probability : An np.ndarray of length equal to the sequence where
+              each element is between 0 and 1 and reports on the probability that
+              the residue is in a helix.
+            * both : A tuple where the first element is the class np.ndarray and
+              the second element is the probability np.ndarray.
 
         """
 
@@ -228,15 +244,13 @@ class Predictor:
         np.ndarray or tuple
             Return data depends on mode selector
 
-            * class : An np.ndarray of length equal to the sequence where each element
-            is a 1 or a 0 (1=coil, 0=non-coil)
-
-            * probability : An np.ndarray of length equal to the sequence where each
-            element is between 0 and 1 and reports on the probability that the residue
-            is in a coil
-
-            * both : A tuple where first element is the class np.ndarray and the second
-            element is the probability np.ndarray
+            * class : An np.ndarray of length equal to the sequence where each
+              element is a 1 or a 0 (1=coil, 0=non-coil).
+            * probability : An np.ndarray of length equal to the sequence where
+              each element is between 0 and 1 and reports on the probability that
+              the residue is in a coil.
+            * both : A tuple where the first element is the class np.ndarray and
+              the second element is the probability np.ndarray.
 
         """
 
@@ -298,15 +312,13 @@ class Predictor:
         np.ndarray or tuple
             Return data depends on mode selector
 
-            * class : An np.ndarray of length equal to the sequence where each element
-            is a 1 or a 0 (1=extended, 0=non-coil)
-
-            * probability : An np.ndarray of length equal to the sequence where each
-            element is between 0 and 1 and reports on the probability that the residue
-            is in an extended state
-
-            * both : A tuple where first element is the class np.ndarray and the second
-            element is the probability np.ndarray
+            * class : An np.ndarray of length equal to the sequence where each
+              element is a 1 or a 0 (1=extended, 0=non-extended).
+            * probability : An np.ndarray of length equal to the sequence where
+              each element is between 0 and 1 and reports on the probability that
+              the residue is in an extended state.
+            * both : A tuple where the first element is the class np.ndarray and
+              the second element is the probability np.ndarray.
 
         """
 
@@ -926,7 +938,7 @@ class Predictor:
 
         if raw_values and return_sites_only:
             raise SparrowException(
-                "When calling the serine_phosphorylation() predictor you cannot request both raw_valus and return_sites only"
+                "When calling the serine_phosphorylation() predictor you cannot request both raw_values and return_sites_only"
             )
 
         if raw_values is True:
@@ -1009,7 +1021,7 @@ class Predictor:
 
         if raw_values and return_sites_only:
             raise SparrowException(
-                "When calling the serine_phosphorylation() predictor you cannot request both raw_valus and return_sites only"
+                "When calling the threonine_phosphorylation() predictor you cannot request both raw_values and return_sites_only"
             )
 
         if raw_values is True:
@@ -1092,7 +1104,7 @@ class Predictor:
 
         if raw_values and return_sites_only:
             raise SparrowException(
-                "When calling the serine_phosphorylation() predictor you cannot request both raw_valus and return_sites only"
+                "When calling the tyrosine_phosphorylation() predictor you cannot request both raw_values and return_sites_only"
             )
 
         if raw_values is True:
@@ -1177,7 +1189,7 @@ class Predictor:
 
         if use_scaled:
             selector = "scaled_rg"
-            if self.__scaled_rg_predictor_object is None or recompute is True:
+            if self.__scaled_rg_predictor_object is None:
                 from .scaled_rg.scaled_radius_of_gyration_predictor import (
                     ScaledRgPredictor,
                 )
@@ -1194,7 +1206,7 @@ class Predictor:
 
         else:
             selector = "rg"
-            if self.__rg_predictor_object is None or recompute is True:
+            if self.__rg_predictor_object is None:
                 from .rg.radius_of_gyration_predictor import RgPredictor
 
                 self.__rg_predictor_object = RgPredictor()
@@ -1213,7 +1225,7 @@ class Predictor:
         use_scaled = True then the predictor uses a network that was trained on
         sequences after normalizing out the length contribution, whereas if
         use_scaled=False then the prediction is done on a network trained using
-        end-to-end distance data directly data directly.
+        end-to-end distance data directly.
 
         In principle both networks should give near-identical predictions. However,
         in general we have found the scaled networks are slightly more accurate.
@@ -1236,12 +1248,6 @@ class Predictor:
             for re prediction regardless of the sequence length. NOT RECOMMENDED.
             Default = True.
 
-        Parameters
-        --------------
-        recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
-            the prediction has run already
-
         Returns
         -------------
         float
@@ -1255,7 +1261,7 @@ class Predictor:
 
         if use_scaled:
             selector = "scaled_re"
-            if self.__scaled_re_predictor_object is None or recompute is True:
+            if self.__scaled_re_predictor_object is None:
                 from .scaled_re.scaled_end_to_end_distance_predictor import (
                     ScaledRePredictor,
                 )
@@ -1272,7 +1278,7 @@ class Predictor:
 
         else:
             selector = "re"
-            if self.__re_predictor_object is None or recompute is True:
+            if self.__re_predictor_object is None:
                 from .e2e.end_to_end_distance_predictor import RePredictor
 
                 self.__re_predictor_object = RePredictor()

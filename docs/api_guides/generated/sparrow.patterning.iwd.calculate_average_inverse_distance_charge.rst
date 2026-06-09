@@ -3,4 +3,4 @@
 
 .. currentmodule:: sparrow.patterning.iwd
 
-.. autodata:: calculate_average_inverse_distance_charge
+.. autofunction:: calculate_average_inverse_distance_charge

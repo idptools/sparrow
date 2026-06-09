@@ -71,6 +71,10 @@ instance/
 
 # Sphinx documentation
 docs/_build/
+docs/generated/
+docs/api_guides/generated/
+# auto-generated at build time by docs/conf.py
+docs/api_guides/_property_index_table.rst
 
 # PyBuilder
 target/

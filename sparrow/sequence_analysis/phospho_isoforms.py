@@ -185,7 +185,7 @@ def get_phosphoisoforms(protein, mode="all", phospho_rate=1, phosphosites=None):
     elif mode == 'predict':
         _phosphosites = _predict_all_phosphosites(protein)
     elif mode == 'custom':
-        if phosphosites != None:
+        if phosphosites is not None:
             _phosphosites = phosphosites
         else:
             raise Exception('To use custom phosphosites must be defined')

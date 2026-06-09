@@ -92,7 +92,10 @@ class KMerCompressor:
                 # Split known = prefix + last_char so that we can emit a token
                 # that reconstructs the last step. Find prefix index.
                 prefix, last_char = known[:-1], known[-1]
-                prefix_index = dictionary[prefix] if prefix else 0
+                # prefix is guaranteed to be a previously-seen phrase by
+                # construction; fall back to the root (0) defensively rather
+                # than raising a KeyError on an unexpected edge state.
+                prefix_index = dictionary.get(prefix, 0) if prefix else 0
                 tokens.append(Token(prefix_index, last_char))
                 # No need to add new dictionary entry; we're done.
                 break

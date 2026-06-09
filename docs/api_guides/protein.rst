@@ -1,112 +1,282 @@
-Protein API (Core Workflow)
-===========================
+The Protein Object
+==================
 
-The :class:`sparrow.protein.Protein` class is the primary user entrypoint.
-It wraps sequence-derived calculations with lazy evaluation and memoization, so
-values are computed only when requested and cached for repeated access.
+:class:`sparrow.protein.Protein` is the one object you need. Create it from a
+sequence and read everything off it -- parameters, properties, deep-learning
+predictions, polymer dimensions, and visualizations. Values are computed lazily
+on first access and cached, so you only pay for what you use.
 
-Lifecycle and Accessors
------------------------
-
-``Protein`` exposes three major accessor namespaces that are created lazily:
-
-* ``protein.predictor`` for predictor models.
-* ``protein.polymeric`` for polymer-related metrics.
-* ``protein.plugin`` for community contributed analyses.
-* ``protein.elms`` for ELM motif annotations.
-
-Dedicated deep-dive guides:
-
-* :doc:`../predictors` for predictor development and integration.
-* :doc:`../polymeric` for polymeric model workflows.
-* :doc:`../plugins` for plugin usage and contribution.
-
-Basic Usage Examples
---------------------
-
-Construction and optional validation
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+This page lists **everything you can do with a protein, organized by what you
+want to compute**. The deep-learning predictors and polymer-model properties are
+reached through the ``predictor`` and ``polymeric`` accessors, but they are
+documented here alongside everything else so you never have to hunt across pages.
 
 .. code-block:: python
 
    from sparrow import Protein
 
    p = Protein("MGSQSSRSSSQQQQQQQ")
-   p_validated = Protein("MGSQXU--", validate=True)  # sequence normalization enabled
+   p.FCR                      # a property
+   p.compute_kappa_x("ED", "KR")        # a method
+   p.predictor.disorder()     # a prediction
+   p.polymeric.predicted_nu   # a polymer-model property
 
-Composition and charge metrics
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+.. contents:: Capabilities
+   :local:
+   :depth: 1
+
+Creating a protein
+------------------
 
 .. code-block:: python
+
+   from sparrow import Protein
 
    p = Protein("MGSQSSRSSSQQQQQQQ")
+   p = Protein("MGSQXU--", validate=True)   # convert non-standard residues
 
-   aa_fractions = p.amino_acid_fractions
-   fcr = p.FCR
-   ncpr = p.NCPR
-   frac_pos = p.fraction_positive
-   frac_neg = p.fraction_negative
+   len(p)            # sequence length
+   p.sequence        # the (upper-cased) sequence string
 
-Patterning and clustering
-^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: python
-
-   p = Protein("MEEEKKKKSSSTTTDDD")
-
-   default_kappa = p.kappa
-   default_scd = p.SCD
-
-   custom_kappa = p.compute_kappa_x(group1="ED", group2="KR", window_size=6, flatten=True)
-   acidic_iwd = p.compute_iwd(target_residues=["D", "E"])
-   q_patch = p.compute_patch_fraction(residue_selector="Q")
-   rg_patch = p.compute_rg_patch_fraction()
-
-Profiles and low-complexity domains
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. code-block:: python
-
-   p = Protein("QQQQQQAASSSSTTTTQQQQQ")
-
-   ncpr_track = p.linear_sequence_profile(mode="NCPR", window_size=8)
-   q_track = p.linear_composition_profile(composition_list=["Q"], window_size=8)
-   lcds = p.low_complexity_domains(mode="holt", residue_selector="Q", minimum_length=8)
-
-Curated API Index
------------------
+Sequence & composition
+----------------------
 
 .. autosummary::
-   :toctree: generated
    :nosignatures:
 
    sparrow.protein.Protein.sequence
+   sparrow.protein.Protein.molecular_weight
+   sparrow.protein.Protein.amino_acid_fractions
+   sparrow.protein.Protein.compute_residue_fractions
+   sparrow.protein.Protein.fraction_aromatic
+   sparrow.protein.Protein.fraction_aliphatic
+   sparrow.protein.Protein.fraction_polar
+   sparrow.protein.Protein.fraction_proline
+
+.. code-block:: python
+
+   p.amino_acid_fractions["Q"]
+   p.fraction_aromatic
+   p.compute_residue_fractions(["S", "T"])
+
+Charge & charge patterning
+--------------------------
+
+.. autosummary::
+   :nosignatures:
+
    sparrow.protein.Protein.FCR
    sparrow.protein.Protein.NCPR
+   sparrow.protein.Protein.fraction_positive
+   sparrow.protein.Protein.fraction_negative
    sparrow.protein.Protein.kappa
-   sparrow.protein.Protein.SCD
    sparrow.protein.Protein.compute_kappa_x
+   sparrow.protein.Protein.SCD
+   sparrow.protein.Protein.compute_SCD_x
+
+.. code-block:: python
+
+   p.FCR, p.NCPR
+   p.kappa                                   # charge segregation (0-1, or -1)
+   p.compute_kappa_x("ED", "KR", window_size=6)
+   p.SCD                                     # sequence charge decoration
+
+Hydrophobicity
+--------------
+
+.. autosummary::
+   :nosignatures:
+
+   sparrow.protein.Protein.hydrophobicity
+   sparrow.protein.Protein.SHD
+   sparrow.protein.Protein.compute_SHD_custom
+
+Complexity, clustering & patches
+--------------------------------
+
+.. autosummary::
+   :nosignatures:
+
+   sparrow.protein.Protein.complexity
    sparrow.protein.Protein.compute_iwd
+   sparrow.protein.Protein.compute_iwd_charged_weighted
+   sparrow.protein.Protein.compute_bivariate_iwd_charged_weighted
    sparrow.protein.Protein.compute_patch_fraction
    sparrow.protein.Protein.compute_rg_patch_fraction
+
+.. code-block:: python
+
+   p.compute_iwd(["D", "E"])                 # clustering of acidic residues
+   p.compute_patch_fraction("Q")            # fraction in Q-rich patches
+
+Linear (per-residue) profiles
+-----------------------------
+
+Windowed tracks with one value per residue -- ideal for plotting (see
+:doc:`../examples`).
+
+.. autosummary::
+   :nosignatures:
+
    sparrow.protein.Protein.linear_sequence_profile
+   sparrow.protein.Protein.linear_composition_profile
+   sparrow.protein.Protein.linear_property_profile
+
+.. code-block:: python
+
+   p.linear_sequence_profile(mode="NCPR", window_size=7)
+   p.linear_composition_profile(["Q", "N"], window_size=8)
+   p.linear_property_profile("hydropathy-kyte-1982", window_size=9)  # AAindex
+
+The 500+ AAindex scales usable with ``linear_property_profile`` are catalogued in
+:doc:`properties`.
+
+Domains, motifs & isoforms
+--------------------------
+
+.. autosummary::
+   :nosignatures:
+
    sparrow.protein.Protein.low_complexity_domains
-   sparrow.protein.Protein.predictor
-   sparrow.protein.Protein.polymeric
-   sparrow.protein.Protein.plugin
+   sparrow.protein.Protein.plaac_prion_like_domains
    sparrow.protein.Protein.elms
+   sparrow.protein.Protein.generate_phosphoisoforms
 
-Gotchas and Edge Behavior
--------------------------
+Predictions -- disorder & secondary structure
+---------------------------------------------
 
-* ``kappa``/``compute_kappa_x`` can return ``-1`` for non-computable cases
-  (for example, too-short sequences or absent group residues).
+Reached via ``protein.predictor``; networks load lazily and results are cached.
+
+.. autosummary::
+   :nosignatures:
+
+   sparrow.predictors.Predictor.disorder
+   sparrow.predictors.Predictor.disorder_domains
+   sparrow.predictors.Predictor.binary_disorder
+   sparrow.predictors.Predictor.pLDDT
+   sparrow.predictors.Predictor.dssp_helicity
+   sparrow.predictors.Predictor.dssp_extended
+   sparrow.predictors.Predictor.dssp_coil
+
+.. code-block:: python
+
+   p.predictor.disorder()
+   p.predictor.dssp_helicity()
+
+Predictions -- polymer dimensions
+---------------------------------
+
+Single-value predictions via ``protein.predictor``; richer polymer-model
+properties and distance distributions via ``protein.polymeric``.
+
+.. autosummary::
+   :nosignatures:
+
+   sparrow.predictors.Predictor.radius_of_gyration
+   sparrow.predictors.Predictor.end_to_end_distance
+   sparrow.predictors.Predictor.scaling_exponent
+   sparrow.predictors.Predictor.asphericity
+   sparrow.predictors.Predictor.prefactor
+   sparrow.polymer.Polymeric.predicted_nu
+   sparrow.polymer.Polymeric.predicted_rg
+   sparrow.polymer.Polymeric.predicted_re
+   sparrow.polymer.Polymeric.predicted_asphericity
+   sparrow.polymer.Polymeric.predicted_prefactor
+   sparrow.polymer.Polymeric.get_afrc_end_to_end_distribution
+   sparrow.polymer.Polymeric.get_afrc_radius_of_gyration_distribution
+
+.. code-block:: python
+
+   p.predictor.radius_of_gyration()
+   p.polymeric.predicted_nu
+   re_distance, probability = p.polymeric.get_afrc_end_to_end_distribution()
+
+(The full polymer-model surface is documented in the ``Polymeric`` reference at
+the bottom of this page.)
+
+Predictions -- modification, localization & phase behavior
+----------------------------------------------------------
+
+.. autosummary::
+   :nosignatures:
+
+   sparrow.predictors.Predictor.serine_phosphorylation
+   sparrow.predictors.Predictor.threonine_phosphorylation
+   sparrow.predictors.Predictor.tyrosine_phosphorylation
+   sparrow.predictors.Predictor.nuclear_import_signal
+   sparrow.predictors.Predictor.nuclear_export_signal
+   sparrow.predictors.Predictor.transactivation_domains
+   sparrow.predictors.Predictor.transmembrane_regions
+   sparrow.predictors.Predictor.mitochondrial_targeting_sequence
+   sparrow.predictors.Predictor.pscore
+
+.. code-block:: python
+
+   p.predictor.serine_phosphorylation()
+   p.predictor.transmembrane_regions()
+   p.predictor.pscore()
+
+Machine-learning feature vectors
+--------------------------------
+
+.. autosummary::
+   :nosignatures:
+
+   sparrow.protein.Protein.extract_feature_vector
+
+.. code-block:: python
+
+   vec = p.extract_feature_vector(num_scrambles=256, seed=1)
+
+Visualization
+-------------
+
+.. autosummary::
+   :nosignatures:
+
+   sparrow.protein.Protein.show_sequence
+
+.. code-block:: python
+
+   p.show_sequence(bold_residues=["E", "D"])   # coloured HTML (e.g. in a notebook)
+
+Good to know
+------------
+
+* ``kappa`` / ``compute_kappa_x`` return ``-1`` when undefined (sequence shorter
+  than the window, or missing a required residue group).
+* ``hydrophobicity`` returns the **mean** value; for a per-residue track use
+  ``linear_sequence_profile(mode='hydrophobicity')``.
 * Accessor objects (``predictor``, ``polymeric``, ``plugin``) are created on
-  first access and then reused.
-* Repeated calls to many methods return cached values where possible.
+  first access and reused; predictor networks load on first use.
 
-Full Class Reference
---------------------
+----
+
+Full reference
+==============
+
+``Protein``
+-----------
 
 .. autoclass:: sparrow.protein.Protein
-   :no-index:
+   :members:
+   :undoc-members:
+
+The ``predictor`` accessor
+--------------------------
+
+Reached as ``protein.predictor``. See also the developer guide for
+:doc:`adding a predictor <../predictors>`.
+
+.. autoclass:: sparrow.predictors.Predictor
+   :members:
+   :undoc-members:
+
+The ``polymeric`` accessor
+--------------------------
+
+Reached as ``protein.polymeric``.
+
+.. autoclass:: sparrow.polymer.Polymeric
+   :members:
+   :undoc-members:

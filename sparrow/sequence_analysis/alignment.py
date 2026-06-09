@@ -149,7 +149,6 @@ class SequenceAlignment:
             fasta_data, filename, linelength=linelength, append_to_fasta=append_to_fasta
         )
 
-    @property
     def display_msa(self, ljust: int = 10, html: bool = False):
         """
         Print the multiple sequence alignment using the cached MSA.
@@ -166,7 +165,7 @@ class SequenceAlignment:
 
         for seq in msa:
             if html:
-                print(seq.id.decode().ljust(ljust), end=None)
+                print(seq.id.decode().ljust(ljust), end="")
                 show_sequence(seq.sequence.decode())
             else:
                 print(seq.id.decode().ljust(ljust), seq.sequence.decode())

@@ -2,8 +2,9 @@ Predictors
 =================
 
 .. note::
-   This page is a focused guide for predictor development and integration.
-   For core and public-facing API usage, start with :doc:`api`.
+   This page is a focused guide for **adding** a predictor. To **use** the
+   existing predictors from a ``Protein`` object, see
+   :doc:`The Protein Object <api_guides/protein>`.
 
 sparrow implements a set of different sequence-based predictors in a modular, extendable way that enables additional predictors to be easily added. 
 
@@ -64,7 +65,14 @@ The reason to make a separate package (directory) for every predictor is that if
 
 ``__init__.py``` should probably just be empty - it's what tells Python that this directory is a package. 
 
-``<relevant_name>_predictor.py`` should NOT be empty, but should be based on the template file found under ``sparrow/predictors/predictor_template.py``. The template is REALTIVELY simple, but provides code for reading in a PARROT-trained network and performing a prediction. You could re-implement this yourself if you really wanted, but, assuming you're using one-hot encoding on the trained network, this code should work out of the box. The template itself walks through the various small configuration tweaks needed to make this work with your specific network of interest. Note that for classification vs. regression there are some small difference, but the template file provides code for both, so just delete/comment out the irrelevant lines (these are clearly marked).
+``<relevant_name>_predictor.py`` should NOT be empty. As of the current backend, all network loading is centralized: each predictor is a thin subclass of :class:`sparrow.predictors.base.BaseNetworkPredictor`, which handles reading the ``.pt`` file, inferring the network hyper-parameters, and the forward pass via the shared :func:`sparrow.predictors.network_loader.load_parrot_network`. A new predictor therefore only declares what differs from the common pattern:
+
+* ``NETWORK_PATH`` -- a ``{version}`` template for the weights file under ``sparrow/data/networks/`` (for example ``"networks/rg/rg_network_v{version}.pt"``).
+* ``DEFAULT_VERSION`` -- the default network version string.
+* ``ARCHITECTURE`` -- ``"MtO"`` (one value per sequence) or ``"MtM"`` (one value per residue).
+* a single ``predict_<thing>(self, seq)`` method that turns the raw network output into the desired result, typically using a helper from :mod:`sparrow.predictors.outputs` (``scalar_regression``, ``per_residue_class1_probability``, or ``argmax_per_residue``).
+
+See ``sparrow/predictors/rg/radius_of_gyration_predictor.py`` (regression / MtO) and ``sparrow/predictors/nls/nuclear_import_signal_predictor.py`` (per-residue / MtM) for minimal worked examples.
 
 Once this is done, it's worth seeing if you can import and run predictions using this class/function as a stand-alone predictor i.e. you should be able to do::
 
