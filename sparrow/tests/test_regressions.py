@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from sparrow import Protein
+from sparrow.data.amino_acids import VALID_AMINO_ACIDS
 from sparrow.sequence_analysis import phospho_isoforms
 from sparrow.sequence_analysis.physical_properties import calculate_molecular_weight
 from sparrow.sparrow_exceptions import (
@@ -84,11 +85,15 @@ def test_nudep_saw_rg_varies_with_nu():
     assert low != pytest.approx(high)
 
     # and the first value is still retrievable (i.e. the cache is per-nu)
-    assert p.polymeric.get_mean_nudep_saw_radius_of_gyration(nu=0.40) == pytest.approx(low)
+    assert p.polymeric.get_mean_nudep_saw_radius_of_gyration(nu=0.40) == pytest.approx(
+        low
+    )
 
     # cross-check against a protein that only ever saw nu=0.6
     fresh = Protein(TEST_SEQ)
-    assert fresh.polymeric.get_mean_nudep_saw_radius_of_gyration(nu=0.60) == pytest.approx(high)
+    assert fresh.polymeric.get_mean_nudep_saw_radius_of_gyration(
+        nu=0.60
+    ) == pytest.approx(high)
 
 
 def test_nudep_saw_re_varies_with_nu_and_prefactor():
@@ -103,9 +108,9 @@ def test_nudep_saw_re_varies_with_nu_and_prefactor():
 
 def test_saw_values_vary_with_prefactor():
     p = Protein(TEST_SEQ)
-    assert p.polymeric.get_mean_saw_radius_of_gyration(
-        prefactor=5.5
-    ) != pytest.approx(p.polymeric.get_mean_saw_radius_of_gyration(prefactor=8.0))
+    assert p.polymeric.get_mean_saw_radius_of_gyration(prefactor=5.5) != pytest.approx(
+        p.polymeric.get_mean_saw_radius_of_gyration(prefactor=8.0)
+    )
 
     p2 = Protein(TEST_SEQ)
     assert p2.polymeric.get_mean_saw_end_to_end_distance(
@@ -178,7 +183,9 @@ def test_show_sequence_defaults_are_not_shared_between_calls():
 
     first = p.show_sequence(return_raw_string=True)
     # a call that supplies its own lists must not contaminate the defaults
-    p.show_sequence(bold_positions=[1, 2, 3], bold_residues=["A"], return_raw_string=True)
+    p.show_sequence(
+        bold_positions=[1, 2, 3], bold_residues=["A"], return_raw_string=True
+    )
     second = p.show_sequence(return_raw_string=True)
 
     assert first == second
@@ -236,9 +243,7 @@ def test_compute_kappa_x_rejects_empty_group1():
 def test_compute_kappa_x_group_order_is_irrelevant():
     """Group ordering must not produce distinct cache entries / values."""
     p = Protein(TEST_SEQ)
-    assert p.compute_kappa_x("ED", "KR") == pytest.approx(
-        p.compute_kappa_x("DE", "RK")
-    )
+    assert p.compute_kappa_x("ED", "KR") == pytest.approx(p.compute_kappa_x("DE", "RK"))
 
 
 def test_elms_returns_a_set_of_floats():
@@ -260,7 +265,25 @@ def test_elm_equality_with_unrelated_type():
 
 
 # .................................................................
-# sparrow.sequence_analysis.grammar -- the PATCH_FEATURES schema
+# sparrow.sequence_analysis.grammar
+
+
+def test_grammar_module_is_deprecated_in_favour_of_nardini():
+    """grammar.py is superseded by sparrow.nardini but must still work."""
+    from sparrow.sequence_analysis import grammar
+
+    with pytest.warns(DeprecationWarning, match="sparrow.nardini"):
+        vector = grammar.compute_feature_vector(TEST_SEQ, num_scrambles=10, seed=1)
+    assert vector.shape == (86,)
+
+    with pytest.warns(DeprecationWarning, match="sparrow.nardini"):
+        grammar.compute_composition_background_stats([TEST_SEQ, "QQQQNNNNSSSS"])
+
+
+def test_extract_feature_vector_still_works_while_deprecated():
+    p = Protein(TEST_SEQ)
+    with pytest.warns(DeprecationWarning):
+        assert p.extract_feature_vector(num_scrambles=10, seed=1).shape == (86,)
 
 
 def test_patch_features_exclude_tryptophan_only():
@@ -287,7 +310,9 @@ def test_patch_features_match_bundled_background():
     assert list(stats.feature_names) == expected
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_zscore_feature_vector_length():
+    # the deprecation itself is asserted separately, above
     from sparrow.sequence_analysis import grammar
 
     vec = grammar.compute_feature_vector(TEST_SEQ, num_scrambles=10, seed=1)
@@ -334,6 +359,233 @@ def test_linear_profiles_return_arrays():
 
     assert isinstance(p.linear_sequence_profile("NCPR"), np.ndarray)
     assert isinstance(p.linear_composition_profile(["Q", "N"]), np.ndarray)
-    assert isinstance(
-        p.linear_property_profile("hydropathy-kyte-1982"), np.ndarray
+    assert isinstance(p.linear_property_profile("hydropathy-kyte-1982"), np.ndarray)
+
+
+# .................................................................
+# physical properties shared between Protein and sparrow.nardini
+
+
+PHYSICAL_PROPERTY_PAIRS = {
+    "Frac Chain Expanding": "fraction_chain_expanding",
+    "Disorder Promoting": "fraction_disorder_promoting",
+    "Iso point": "isoelectric_point",
+    "PPII": "PPII_propensity",
+    "FCR": "FCR",
+    "NCPR": "NCPR",
+    "Hydrophobicity": "hydrophobicity",
+    "Frac K+R": "fraction_positive",
+    "Frac D+E": "fraction_negative",
+    "Frac Aromatic": "fraction_aromatic",
+    "Frac Aliphatic": "fraction_aliphatic",
+    "R/K Ratio": "RK_ratio",
+    "E/D Ratio": "ED_ratio",
+}
+
+
+@pytest.mark.parametrize("feature,attribute", sorted(PHYSICAL_PROPERTY_PAIRS.items()))
+def test_protein_property_matches_nardini_feature(feature, attribute):
+    """These four are general sequence properties, computed in exactly one place.
+
+    They used to be implemented inside sparrow.nardini.composition. They now live
+    in sequence_analysis.physical_properties, are exposed on Protein, and NARDINI
+    reads them from there. The values must be *bit* identical, not merely close:
+    the bundled per-species backgrounds and GIN centroids are defined against
+    them, so a change in the last decimal place would silently shift every
+    compositional z-score and every cluster distance.
+    """
+    import random
+
+    from sparrow.nardini import composition_values
+
+    rng = random.Random(99)
+    sequences = [
+        "".join(rng.choice(VALID_AMINO_ACIDS) for _ in range(rng.randint(12, 200)))
+        for _ in range(25)
+    ]
+    sequences += ["Q" * 40, "E" * 40, "K" * 40, "GRGRGGYGG" * 5, "MEEEKKKSSSTTT"]
+
+    for sequence in sequences:
+        expected = composition_values(sequence)[feature]
+        assert getattr(Protein(sequence), attribute) == expected, sequence[:30]
+
+
+def test_no_duplicate_implementation_remains_in_nardini():
+    """nardini must delegate, not carry its own copy.
+
+    Guards against the obvious regression: someone re-inlines one of these into
+    the composition module and the two drift apart.
+    """
+    import inspect
+
+    from sparrow.nardini import composition
+    from sparrow.sequence_analysis import physical_properties
+
+    assert composition.charge_at_pH is physical_properties.charge_at_pH
+    assert composition.isoelectric_point is physical_properties.isoelectric_point
+
+    source = inspect.getsource(composition)
+    for helper in (
+        "fraction_chain_expanding",
+        "fraction_disorder_promoting",
+        "polyproline_II_propensity",
+    ):
+        assert f"physical_properties.{helper}" in source, (
+            f"composition_values should call physical_properties.{helper}"
+        )
+
+
+def test_charge_at_ph_and_isoelectric_point_are_consistent():
+    """The pI is where the titratable charge crosses zero, by construction."""
+    for sequence in ["MEEEKKKSSSTTT", "EEEEDDDD", "KKKKRRRR", "GSGSGSGS"]:
+        protein = Protein(sequence)
+        assert abs(protein.charge_at_pH(protein.isoelectric_point)) <= 0.02
+
+
+def test_charge_at_ph_is_monotonic_in_ph():
+    """More acidic conditions cannot make a sequence more negative."""
+    protein = Protein("MEEEKKKSSSTTTDDDRRRHHHYYYCCC")
+    charges = [protein.charge_at_pH(pH) for pH in (2.0, 5.0, 7.4, 9.0, 12.0)]
+
+    assert charges == sorted(charges, reverse=True)
+
+
+def test_charge_at_ph_normalize_flag():
+    protein = Protein("EEEEKKKK")
+
+    summed = protein.charge_at_pH(normalize=False)
+    mean = protein.charge_at_pH(normalize=True)
+
+    assert mean == pytest.approx(summed / 8)
+
+
+def test_physical_properties_handle_a_sequence_with_no_titratable_residues():
+    protein = Protein("GSGSGSGSAAA")
+
+    assert protein.charge_at_pH() == 0.0
+    assert protein.isoelectric_point == 7.0
+
+
+def test_new_physical_properties_are_cached():
+    protein = Protein(TEST_SEQ)
+
+    for attribute in (
+        "fraction_chain_expanding",
+        "fraction_disorder_promoting",
+        "isoelectric_point",
+        "PPII_propensity",
+    ):
+        first = getattr(protein, attribute)
+        assert (
+            getattr(protein, attribute) is first or getattr(protein, attribute) == first
+        )
+
+
+def test_amino_acid_fractions_match_nardini():
+    """The 20 single-residue fractions come from one implementation."""
+    from sparrow.nardini import composition_values
+
+    for sequence in [TEST_SEQ, "QQQQNNNN" * 4, "GRGRGGYGG" * 4, "MEEEKKKCCC"]:
+        features = composition_values(sequence)
+        fractions = Protein(sequence).amino_acid_fractions
+        for residue in VALID_AMINO_ACIDS:
+            assert fractions[residue] == features[f"Frac {residue}"], (
+                f"{residue} in {sequence[:20]}"
+            )
+
+
+def test_patch_features_match_nardini():
+    """Patch fractions come from sequence_analysis.patching, used by both."""
+    from sparrow.nardini.composition import (
+        PATCH_INTERRUPTION,
+        PATCH_MIN_TARGET_COUNT,
+        PATCH_RESIDUES,
+        RG_MIN_ADJACENT_PAIRS,
+        composition_values,
     )
+
+    for sequence in ["QQQQQQAAAQQQQQQ" * 3, "GRGRGGYGGRGGYGG" * 3, TEST_SEQ]:
+        features = composition_values(sequence)
+        protein = Protein(sequence)
+
+        for residue in PATCH_RESIDUES:
+            assert (
+                protein.compute_patch_fraction(
+                    residue_selector=residue,
+                    interruption=PATCH_INTERRUPTION,
+                    min_target_count=PATCH_MIN_TARGET_COUNT,
+                )
+                == features[f"{residue} Patch"]
+            )
+
+        assert (
+            protein.compute_rg_patch_fraction(
+                interruption=PATCH_INTERRUPTION,
+                min_adjacent_rg_pairs=RG_MIN_ADJACENT_PAIRS,
+            )
+            == features["RG Frac"]
+        )
+
+
+def test_polar_definitions_differ_only_by_cysteine():
+    """The one deliberate disagreement, pinned so it stays deliberate.
+
+    NARDINI+ counts cysteine as polar ('Frac Polar' = QNSTGCH); sparrow's own
+    POLAR set does not (GHNQST). Both conventions are used in the literature, and
+    the bundled backgrounds and GIN centroids are defined against the NARDINI one,
+    so neither can be quietly changed to match the other. The gap must be exactly
+    the cysteine content - anything else means one of them has drifted.
+    """
+    import random
+
+    from sparrow.nardini import composition_values
+
+    rng = random.Random(17)
+    sequences = [
+        "".join(rng.choice(VALID_AMINO_ACIDS) for _ in range(rng.randint(30, 200)))
+        for _ in range(20)
+    ]
+    sequences += ["CCCCSSSSTTTT", "SSSSTTTTQQQQ"]
+
+    saw_cysteine = False
+    for sequence in sequences:
+        features = composition_values(sequence)
+        protein = Protein(sequence)
+        gap = features["Frac Polar"] - protein.fraction_polar
+
+        assert gap == pytest.approx(features["Frac C"], abs=1e-12), sequence[:30]
+        saw_cysteine = saw_cysteine or features["Frac C"] > 0
+
+    assert saw_cysteine, "this test proves nothing without a cysteine-containing case"
+
+
+def test_nardini_composition_has_no_arithmetic_of_its_own():
+    """Every compositional feature must be delegated, not computed in place.
+
+    The failure this guards against is someone re-inlining a formula for speed or
+    convenience, after which the NARDINI feature and its Protein property drift
+    apart silently - and the bundled reference data quietly stops matching.
+    """
+    import inspect
+
+    from sparrow.nardini import composition
+
+    source = inspect.getsource(composition.composition_values)
+
+    for helper in (
+        "calculate_aa_fractions",
+        "fraction_in_set",
+        "log_residue_ratio",
+        "fraction_chain_expanding",
+        "fraction_charged",
+        "net_charge_per_residue",
+        "mean_residue_scale",
+        "fraction_disorder_promoting",
+        "isoelectric_point",
+        "polyproline_II_propensity",
+    ):
+        assert helper in source, f"composition_values should delegate to {helper}"
+
+    # no residue-set arithmetic left inline
+    assert "sum(fractions[" not in source
+    assert "np.log10" not in source

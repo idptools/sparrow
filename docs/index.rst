@@ -27,7 +27,9 @@ What can it do?
 ^^^^^^^^^^^^^^^
 
 * **Sequence parameters** -- composition, molecular weight, charge (FCR, NCPR,
-  kappa, SCD, SHD), hydrophobicity, sequence complexity, residue clustering
+  kappa, SCD, SHD, isoelectric point, charge at any pH), hydrophobicity,
+  conformational propensity (chain-expanding and disorder-promoting fractions,
+  polyproline II), R/K and E/D ratios, sequence complexity, residue clustering
   (IWD) and patches.
 * **Linear profiles** -- per-residue windowed tracks for any of the above, plus
   500+ published amino-acid property scales (AAindex).
@@ -43,6 +45,10 @@ What can it do?
   scaling relationships from the literature.
 * **Domains and motifs** -- low-complexity domains, prion-like domains (a
   pure-Python PLAAC implementation), ELM annotations, and phosphoisoforms.
+* **Molecular grammars** -- a native :doc:`NARDINI / NARDINI+ <api_guides/nardini>`
+  implementation for detecting non-random residue patterning, with user-buildable
+  compositional backgrounds, assignment to the 30 published human GIN grammars,
+  clustering to derive your own, and parallel computation across a whole proteome.
 * **Scale-up tools** -- batch prediction over whole sequence sets, and
   fixed-length feature vectors for machine learning.
 * **Extensible** -- a simple plugin system for adding new sequence analyses.
@@ -78,6 +84,7 @@ Where to start
 
    api_guides/batch
    api_guides/properties
+   api_guides/nardini
    plugins
    api_guides/sequence_analysis
    api_guides/patterning

@@ -149,21 +149,44 @@ def _generate_property_index_table(app):
     except Exception:  # pragma: no cover - keep docs building if data is unavailable
         return
 
+    def clean(text):
+        """Flatten to one line and escape the RST characters that appear in AAindex text."""
+        text = str(text or "").replace("\n", " ").strip()
+        # a trailing underscore makes RST try to resolve a reference; backticks and
+        # pipes break table cells
+        return text.replace("\\", "").replace("_", r"\_").replace("|", r"\|").replace("`", "'")
+
     out_path = Path(app.srcdir) / "api_guides" / "_property_index_table.rst"
     lines = [
         ".. list-table::",
         "   :header-rows: 1",
-        "   :widths: 32 13 55",
+        "   :widths: 26 11 38 25",
         "",
         "   * - Identifier",
         "     - Accession",
         "     - Description",
+        "     - Source",
     ]
     for identifier, accession, description in sorted(rows):
-        desc = description.replace("\n", " ").replace("_", r"\_").strip()
+        # the citation makes an index interpretable; the description alone often
+        # does not say which of several similar scales this is
+        try:
+            metadata = aaindex.get_property_metadata(identifier)
+        except Exception:  # pragma: no cover - never fail the build over metadata
+            metadata = {}
+
+        source = clean(metadata.get("journal"))
+        reference = str(metadata.get("reference") or "")
+        if reference.startswith("PMID:"):
+            pmid = reference.split(":", 1)[1].strip()
+            if pmid.isdigit():
+                link = f"`PMID {pmid} <https://pubmed.ncbi.nlm.nih.gov/{pmid}/>`__"
+                source = f"{source} {link}" if source else link
+
         lines.append(f"   * - ``{identifier}``")
         lines.append(f"     - {accession}")
-        lines.append(f"     - {desc}")
+        lines.append(f"     - {clean(description)}")
+        lines.append(f"     - {source or '--'}")
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 

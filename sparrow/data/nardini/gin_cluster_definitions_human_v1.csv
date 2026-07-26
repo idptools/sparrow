@@ -1,0 +1,31 @@
+cluster,description,num_idrs
+0,Blocks of G & polar residues,561
+1,Blocks of P & polar residues,718
+2,"Blocks of negative, P, & G residues",163
+3,Small negative blocks,1097
+4,"Weak negative charge, high N fraction",1537
+5,"Blocks of positive, negative & P residues",254
+6,S patches,1833
+7,D/E-tracts,763
+8,Blocks of negative & A residues,187
+9,Blocks of positive & negative residues,939
+10,"Well-mixed hydrophobics, enriched in M",575
+11,Q-tracts,338
+12,"Blocks of positive, negative & polar residues",434
+13,"Blocks of negative, P, & polar residues",579
+14,Blocks of positive & P residues,507
+15,T patches,539
+16,Blocks of polar residues,610
+17,Weak positive charge,1739
+18,Large negative blocks with positive blocks,413
+19,"High negative fraction, specifically Es",1375
+20,A blocks,803
+21,"Blocks of P, G, A, & polar residues",225
+22,Well-mixed P and G,142
+23,K blocks,1043
+24,Weak negative charge,1810
+25,Blocks of positive residues,1234
+26,R patches,454
+27,P patches,1386
+28,"High aromatic fraction, specifically Ys",768
+29,High R fraction,1482

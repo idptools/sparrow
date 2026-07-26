@@ -32,10 +32,11 @@ SPARROW integrates direct sequence calculations with per-residue predictions fro
 
 ## Features
 
-- **Sequence parameters** — composition, charge (FCR, NCPR, κ, SCD, SHD), hydrophobicity, sequence complexity, residue clustering (IWD) and patches.
+- **Sequence parameters** — composition, charge (FCR, NCPR, κ, SCD, SHD, isoelectric point, charge at any pH), hydrophobicity, conformational propensity (chain-expanding and disorder-promoting fractions, polyproline II), R/K and E/D ratios, sequence complexity, residue clustering (IWD) and patches.
 - **Linear profiles** — per-residue windowed tracks for any of the above, plus **500+ published amino-acid property scales** (AAindex).
 - **Deep-learning predictions** via `Protein.predictor` — disorder and pLDDT, DSSP secondary structure, polymer dimensions (Rg, Re, scaling exponent, asphericity, prefactor), phosphorylation, localization signals, transactivation domains, transmembrane regions, and phase-separation propensity. Built on the [ALBATROSS](https://www.nature.com/articles/s41592-023-02159-5) networks.
 - **Polymer-model properties** via `Protein.polymeric` — analytical and simulation-derived dimensions and distance distributions.
+- **Molecular grammars** — a native NARDINI / NARDINI+ implementation (`sparrow.nardini`) for detecting non-random residue patterning, with user-buildable compositional backgrounds, assignment to the 30 published human GIN grammars, clustering to derive your own, and parallel computation across a whole proteome.
 - **Scale-up tools** — fast batch prediction across whole sequence sets, and fixed-length feature vectors for machine learning.
 - **Extensible** — a simple plugin system for adding new sequence analyses.
 
@@ -130,6 +131,116 @@ than 35 residues to their scaled counterparts.
 
 See [the batch prediction guide](https://idptools-sparrow.readthedocs.io/en/latest/api_guides/batch.html)
 for all options.
+
+## NARDINI / NARDINI+ molecular grammars
+
+`sparrow.nardini` is a native implementation of the [NARDINI](https://www.sciencedirect.com/science/article/pii/S0022283621006100) analysis:
+it asks whether the residues in an IDR are arranged non-randomly by comparing each
+sequence against scrambles of itself. NARDINI+ adds a block of compositional
+features scored against a reference set of IDRs that you build yourself.
+
+For a single sequence, everything hangs off `Protein.nardini`:
+
+```python
+from sparrow import Protein
+
+p = Protein("MENDPRVRKFASDGAQWAIKWQKK...")
+
+p.nardini.vector(seed=42)        # 90-feature NARDINI+ vector
+p.nardini.patterning(seed=42)    # just the 36 patterning z-scores
+p.nardini.composition()          # just the 54 compositional z-scores
+p.nardini.gin_cluster(seed=42)   # nearest published human GIN grammar
+print(p.nardini.gin_report(seed=42))
+```
+
+For a set of sequences:
+
+```python
+from sparrow.nardini import load_reference_background, nardini_vectors
+
+# 1. a compositional background: published per-species, or built from your own IDRs
+background = load_reference_background("human")     # bundled GIN prior
+# background = build_background("my_idrome.fasta")  # or your own
+
+# 2. NARDINI+ vectors (36 patterning + 54 compositional z-scores)
+result = nardini_vectors("my_idrs.fasta", background=background,
+                         num_scrambles=10000, seed=42)
+
+result.to_table()                   # 90 columns, one row per IDR
+result.top_features("IDR1", n=5)    # the most non-random features
+
+# 3. assign each IDR to one of the 30 published human GIN clusters
+result.gin_clusters().records()
+```
+
+For a whole proteome, `nardini_proteins()` does the same work across multiple processes and hands back `Protein` objects with the vectors already attached, so nothing is recomputed afterwards:
+
+```python
+from sparrow import read_fasta
+from sparrow.nardini import nardini_proteins
+
+proteins = nardini_proteins(read_fasta("my_idrs.fasta"), num_scrambles=10000,
+                            seed=42, show_progress=True, on_error="skip")
+
+proteins["IDR1"].nardini.vector(seed=42, num_scrambles=10000)   # cached, instant
+proteins["IDR1"].nardini.gin_cluster(seed=42, num_scrambles=10000)
+```
+
+It takes sequences or `Protein` objects, as a dict or a list, and returns the same shape back — `Protein` objects are populated in place. On 160 IDRs at 1,000 scrambles: 18.7 s on one core, 2.7 s on eight. Parallelism does not change the numbers; per-sequence seeds derive from the sequence rather than its position in the batch, so the result is identical however it was chunked.
+
+You can also **derive your own grammars** instead of assigning to the human ones, which is what you want for a non-human proteome or a designed library:
+
+```python
+from sparrow.nardini import build_gin_reference, compare_gin_references
+
+reference = build_gin_reference(result, k=30, seed=0)   # k-means, as GIN does
+reference.save("my_grammars.npz")                      # the vectors cost hours
+compare_gin_references(reference)                      # how close is this to GIN?
+```
+
+**NumPy, not DataFrames.** Results are plain NumPy arrays, optionally with the feature names attached so you can say `v["Frac K+R"]` instead of remembering an index. The raw array is always `.values`, so filtering/sorting/plotting happen with NumPy as usual. `.to_dataframe()` is there if you would rather have pandas.
+
+Patterning z-scores are computed against each sequence's own scrambles, so they
+need no background and are comparable across sequences: **positive means blockier
+than composition alone predicts, negative means more evenly interspersed**. Only
+the compositional half uses the background — omit it to get just the 36 patterning
+features.
+
+Three patterning statistics are selectable via `backend`:
+
+| `backend` | statistic | notes |
+|---|---|---|
+| `'nardini'` (default) | published NARDINI omega/kappa window asymmetry | **required for GIN** |
+| `'kappa'` | sparrow's generalized `kappa_x`, normalized | bounded 0–1 |
+| `'iwd'` | sparrow's inverse-weighted distance | ignores `blob_size` |
+
+The last two supersede the `kappa_cython` / `iwd_combined` backends of the now-deprecated `sparrow.sequence_analysis.grammar`, and reproduce its values to ~1e-6 (sparrow computes them in double precision where `grammar` used single). All three are vectorized over scrambles and cost about the same — at L=1000 and 2,000 scrambles, 0.49 s / 0.43 s / 0.37 s — so pick a backend on scientific grounds rather than budget. Values are **not** comparable across backends, though; `result.backend` records which one produced them.
+
+GIN cluster assignment maps sequences onto the published human grammars
+(`'D/E-tracts'`, `'S patches'`, ...). Nearest-centroid assignment never abstains,
+so three diagnostics tell you when not to believe a label: `separation` (gap to the
+runner-up — small means the IDR sits *between* grammars), `composition_rms_z` (how
+far the sequence is from the reference IDRome — ~1 is typical, >2 is not), and
+`n_saturated`. `is_typical` combines the latter two, and `gin_report()` spells it
+out in prose.
+
+**Because the clusters describe the human IDRome, a label on something very unlike
+a human IDR is an extrapolation** — sparrow flags this rather than hiding it. The
+patterning half of the vector is unaffected and stays meaningful for any sequence,
+since it is scored against the sequence's own scrambles.
+
+The patterning calculation is vectorized over scrambles, so it is 20-40x faster
+than the reference implementation; a 1000-residue IDR at the published 100,000
+scrambles takes ~15 s rather than ~9 min.
+
+Two worked example notebooks are in [`examples/`](examples): `nardini_from_protein_objects.ipynb` for the single-sequence interface and `nardini_module.ipynb` for the batch one. Both are executed, so you can read the outputs without running anything.
+
+The bundled per-species backgrounds and GIN centroids are redistributed from the
+[GIN resource](https://github.com/kierstenruff/RUFF_KING_Grammars_of_IDRs_using_NARDINI-)
+under the MIT licence. **Please cite the original work** (Cohan et al. 2022 for
+NARDINI; Ruff et al. 2025 for GIN) — see
+[the NARDINI guide](https://idptools-sparrow.readthedocs.io/en/latest/api_guides/nardini.html)
+for the full citation list.
 
 ## Amino-acid property profiles
 

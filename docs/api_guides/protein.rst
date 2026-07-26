@@ -73,6 +73,8 @@ Charge & charge patterning
    sparrow.protein.Protein.compute_kappa_x
    sparrow.protein.Protein.SCD
    sparrow.protein.Protein.compute_SCD_x
+   sparrow.protein.Protein.isoelectric_point
+   sparrow.protein.Protein.charge_at_pH
 
 .. code-block:: python
 
@@ -80,6 +82,15 @@ Charge & charge patterning
    p.kappa                                   # charge segregation (0-1, or -1)
    p.compute_kappa_x("ED", "KR", window_size=6)
    p.SCD                                     # sequence charge decoration
+
+   p.isoelectric_point                       # pI, from side-chain pKa values
+   p.charge_at_pH(5.5)                       # mean titratable charge at any pH
+
+``FCR`` and ``NCPR`` count *formal* charges and assume full ionization.
+``charge_at_pH`` instead applies Henderson-Hasselbalch with the EMBOSS side-chain
+pKa values, so it also sees H, Y and C, and it is the quantity
+``isoelectric_point`` bisects to zero. Termini are not included in either, matching
+localCIDER.
 
 Hydrophobicity
 --------------
@@ -90,6 +101,55 @@ Hydrophobicity
    sparrow.protein.Protein.hydrophobicity
    sparrow.protein.Protein.SHD
    sparrow.protein.Protein.compute_SHD_custom
+
+Conformational propensity
+-------------------------
+
+Compositional summaries that speak to how expanded a disordered chain is likely to
+be.
+
+.. autosummary::
+   :nosignatures:
+
+   sparrow.protein.Protein.fraction_chain_expanding
+   sparrow.protein.Protein.fraction_disorder_promoting
+   sparrow.protein.Protein.PPII_propensity
+   sparrow.protein.Protein.RK_ratio
+   sparrow.protein.Protein.ED_ratio
+
+.. code-block:: python
+
+   p.fraction_chain_expanding      # fraction that is E, D, R, K or P
+   p.fraction_disorder_promoting   # fraction in the disorder-promoting set
+   p.PPII_propensity               # mean polyproline II propensity (Hilser scale)
+
+   p.RK_ratio                      # log10 (R+1)/(K+1); positive means R-rich
+   p.ED_ratio                      # log10 (E+1)/(D+1); positive means E-rich
+
+``RK_ratio`` and ``ED_ratio`` split residue pairs that share a formal charge but
+behave differently -- arginine supports cation-pi and stacking interactions that
+lysine does not -- so they say something net charge cannot. The ``+1`` pseudo-count
+keeps them finite when a residue is absent.
+
+.. _protein-shared-with-nardini:
+
+Shared with NARDINI+
+^^^^^^^^^^^^^^^^^^^^
+
+Most of these properties are *also* NARDINI+ compositional features. There is one
+implementation of each, in
+:mod:`sparrow.sequence_analysis.physical_properties`, read by both -- so a
+``Protein`` property and its corresponding feature are bit-identical by
+construction, and a test pins that for every one of them.
+
+.. warning::
+   The single exception is **polar**. NARDINI+ counts cysteine as polar
+   (``'Frac Polar'`` = QNSTGCH); :attr:`~sparrow.protein.Protein.fraction_polar`
+   does not (GHNQST). Both conventions are used in the literature, and the bundled
+   per-species backgrounds and GIN centroids are defined against the NARDINI one,
+   so neither can be quietly changed to match the other. The two differ by exactly
+   the cysteine content, and only the residue set differs -- the implementation is
+   shared like everything else.
 
 Complexity, clustering & patches
 --------------------------------
@@ -253,6 +313,35 @@ Predictions -- modification, localization & phase behavior
    p.predictor.transmembrane_regions()
    p.predictor.pscore()
 
+Molecular grammar (NARDINI / NARDINI+)
+--------------------------------------
+
+.. autosummary::
+   :nosignatures:
+
+   sparrow.protein.Protein.nardini
+
+.. code-block:: python
+
+   p.nardini.vector(seed=42)        # 90-feature NARDINI+ z-score vector
+   p.nardini.patterning(seed=42)    # just the 36 patterning z-scores
+   p.nardini.composition()          # just the 54 compositional z-scores
+   p.nardini.gin_cluster(seed=42)   # nearest published human GIN grammar
+   print(p.nardini.gin_report(seed=42))
+
+Results are labelled NumPy containers -- ``v["Frac K+R"]``, ``v.values``,
+``v.to_dict()`` -- not DataFrames. Compositional z-scores default to the
+published human IDRome background; the patterning half needs no reference at all.
+
+GIN labels only mean something for sequences that resemble human IDRs, so check
+``is_typical`` (or read ``gin_report()``) before trusting one. See
+:doc:`nardini` for the full guide.
+
+Each result is memoized per set of options, so repeated access is free. For many
+proteins at once, :func:`~sparrow.nardini.batch.nardini_proteins` computes the
+vectors in parallel and attaches them to the ``Protein`` objects, after which the
+calls above cost nothing -- see :ref:`nardini-proteome`.
+
 Machine-learning feature vectors
 --------------------------------
 
@@ -264,6 +353,9 @@ Machine-learning feature vectors
 .. code-block:: python
 
    vec = p.extract_feature_vector(num_scrambles=256, seed=1)
+
+.. deprecated::
+   Superseded by ``Protein.nardini`` above -- see :ref:`nardini-migration`.
 
 Visualization
 -------------

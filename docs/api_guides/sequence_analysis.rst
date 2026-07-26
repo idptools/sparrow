@@ -108,6 +108,22 @@ Key function entry points:
 * :func:`sparrow.sequence_analysis.patching.patch_fraction`
 * :func:`sparrow.sequence_analysis.patching.rg_patch_fraction`
 
+Physical properties
+-------------------
+
+Stateless functions computing sequence-dependent physical properties. These are the
+single implementation behind the corresponding
+:class:`~sparrow.protein.Protein` properties *and* the matching NARDINI+
+compositional features, so the two cannot disagree.
+
+.. automodule:: sparrow.sequence_analysis.physical_properties
+   :members: calculate_molecular_weight, charge_at_pH, isoelectric_point,
+             fraction_chain_expanding, fraction_disorder_promoting,
+             polyproline_II_propensity, fraction_positive, fraction_negative,
+             fraction_charged, net_charge_per_residue, fraction_aromatic,
+             fraction_aliphatic, fraction_polar, log_residue_ratio,
+             fraction_in_set, mean_residue_scale
+
 .. automodule:: sparrow.calculate_parameters
    :no-index:
 

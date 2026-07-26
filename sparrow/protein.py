@@ -8,7 +8,7 @@ predictors, polymeric properties, plugins, and sequence analysis utilities.
 
 from protfasta import utilities as protfasta_utilities
 
-from sparrow import calculate_parameters, data, sparrow_exceptions
+from sparrow import calculate_parameters, sparrow_exceptions
 from sparrow.data import amino_acids
 
 # The patterning metrics come from the vectorized NumPy implementations rather
@@ -105,9 +105,16 @@ class Protein:
         self.__kappa_x = {}
         self.__linear_profiles = {}
         self.__molecular_weight = None
+        self.__fraction_chain_expanding = None
+        self.__fraction_disorder_promoting = None
+        self.__isoelectric_point = None
+        self.__PPII_propensity = None
+        self.__RK_ratio = None
+        self.__ED_ratio = None
         self.__predictor_object = None
         self.__polymeric_object = None
         self.__plugin_object = None
+        self.__nardini_object = None
         self.__elms = None
 
     # .................................................................
@@ -170,9 +177,7 @@ class Protein:
 
         """
         if self.__FCR is None:
-            self.__FCR = 0
-            for i in data.amino_acids.CHARGE:
-                self.__FCR = self.amino_acid_fractions[i] + self.__FCR
+            self.__FCR = physical_properties.fraction_charged(self.__seq)
         return self.__FCR
 
     # .................................................................
@@ -190,9 +195,7 @@ class Protein:
 
         """
         if self.__f_positive is None:
-            self.__f_positive = 0
-            for i in data.amino_acids.POS:
-                self.__f_positive = self.__f_positive + self.amino_acid_fractions[i]
+            self.__f_positive = physical_properties.fraction_positive(self.__seq)
 
         return self.__f_positive
 
@@ -210,9 +213,7 @@ class Protein:
             Float between 0 and 1
         """
         if self.__f_negative is None:
-            self.__f_negative = 0
-            for i in data.amino_acids.NEG:
-                self.__f_negative = self.__f_negative + self.amino_acid_fractions[i]
+            self.__f_negative = physical_properties.fraction_negative(self.__seq)
 
         return self.__f_negative
 
@@ -341,9 +342,7 @@ class Protein:
         """
 
         if self.__aro is None:
-            self.__aro = 0
-            for i in data.amino_acids.ARO:
-                self.__aro = self.amino_acid_fractions[i] + self.__aro
+            self.__aro = physical_properties.fraction_aromatic(self.__seq)
 
         return self.__aro
 
@@ -362,9 +361,7 @@ class Protein:
         """
 
         if self.__ali is None:
-            self.__ali = 0
-            for i in data.amino_acids.ALI:
-                self.__ali = self.amino_acid_fractions[i] + self.__ali
+            self.__ali = physical_properties.fraction_aliphatic(self.__seq)
 
         return self.__ali
 
@@ -383,9 +380,7 @@ class Protein:
         """
 
         if self.__polar is None:
-            self.__polar = 0
-            for i in data.amino_acids.POLAR:
-                self.__polar = self.amino_acid_fractions[i] + self.__polar
+            self.__polar = physical_properties.fraction_polar(self.__seq)
 
         return self.__polar
 
@@ -426,6 +421,188 @@ class Protein:
             )
 
         return self.__hydrophobicity
+
+    # .................................................................
+    #
+    @property
+    def fraction_chain_expanding(self):
+        """
+        Fraction of residues that are chain-expanding (E, D, R, K, P).
+
+        Chain-expanding residues drive a disordered chain towards more expanded
+        conformations, through a mix of charge-charge repulsion and backbone
+        stiffening. Calculated on first access and cached.
+
+        Returns
+        -------
+        float
+            Fraction between 0 and 1.
+        """
+        if self.__fraction_chain_expanding is None:
+            self.__fraction_chain_expanding = (
+                physical_properties.fraction_chain_expanding(self.__seq)
+            )
+
+        return self.__fraction_chain_expanding
+
+    # .................................................................
+    #
+    @property
+    def fraction_disorder_promoting(self):
+        """
+        Fraction of residues that are disorder-promoting.
+
+        Uses the standard disorder-promoting set (T, A, G, R, D, H, Q, K, S, E, P);
+        see :data:`sparrow.data.amino_acids.DISORDER_PROMOTING`. Calculated on
+        first access and cached.
+
+        Returns
+        -------
+        float
+            Fraction between 0 and 1.
+        """
+        if self.__fraction_disorder_promoting is None:
+            self.__fraction_disorder_promoting = (
+                physical_properties.fraction_disorder_promoting(self.__seq)
+            )
+
+        return self.__fraction_disorder_promoting
+
+    # .................................................................
+    #
+    @property
+    def isoelectric_point(self):
+        """
+        Estimated isoelectric point (pI) of the sequence.
+
+        Found by bisecting on pH until the mean charge of the titratable side
+        chains reaches zero, using the EMBOSS side-chain pKa values. Termini are
+        not included, matching localCIDER's ``get_isoelectric_point()``. A sequence
+        with no titratable residues returns 7.0. Calculated on first access and
+        cached.
+
+        Returns
+        -------
+        float
+            The estimated pI.
+
+        See Also
+        --------
+        charge_at_pH : The charge this bisects on, at a pH of your choosing.
+        """
+        if self.__isoelectric_point is None:
+            self.__isoelectric_point = physical_properties.isoelectric_point(self.__seq)
+
+        return self.__isoelectric_point
+
+    # .................................................................
+    #
+    @property
+    def PPII_propensity(self):
+        """
+        Mean polyproline II (PPII) propensity on the Hilser scale.
+
+        PPII is an extended left-handed helical conformation that disordered
+        regions sample readily; a high mean propensity is associated with more
+        expanded ensembles. Calculated on first access and cached.
+
+        Returns
+        -------
+        float
+            Mean per-residue PPII propensity
+            (:data:`sparrow.data.amino_acids.AA_PPII_HILSER`).
+        """
+        if self.__PPII_propensity is None:
+            self.__PPII_propensity = physical_properties.polyproline_II_propensity(
+                self.__seq
+            )
+
+        return self.__PPII_propensity
+
+    # .................................................................
+    #
+    @property
+    def RK_ratio(self):
+        """
+        ``log10`` of the arginine-to-lysine ratio, with a +1 pseudo-count.
+
+        Positive means R-rich, negative means K-rich, zero means balanced. R and K
+        carry the same formal charge but behave differently - arginine's guanidinium
+        group supports cation-pi and stacking interactions that lysine does not - so
+        the split between them is informative where net charge alone is not.
+
+        The +1 pseudo-count keeps the value finite when either residue is absent,
+        which is common in short IDRs. This matches the NARDINI+ ``'R/K Ratio'``
+        feature. Calculated on first access and cached.
+
+        Returns
+        -------
+        float
+            ``log10((count(R) + 1) / (count(K) + 1))``.
+        """
+        if self.__RK_ratio is None:
+            self.__RK_ratio = physical_properties.log_residue_ratio(
+                self.__seq, "R", "K"
+            )
+
+        return self.__RK_ratio
+
+    # .................................................................
+    #
+    @property
+    def ED_ratio(self):
+        """
+        ``log10`` of the glutamate-to-aspartate ratio, with a +1 pseudo-count.
+
+        Positive means E-rich, negative means D-rich. As with
+        :attr:`RK_ratio`, the two residues share a formal charge but differ in
+        side-chain length and helix propensity. Matches the NARDINI+
+        ``'E/D Ratio'`` feature. Calculated on first access and cached.
+
+        Returns
+        -------
+        float
+            ``log10((count(E) + 1) / (count(D) + 1))``.
+        """
+        if self.__ED_ratio is None:
+            self.__ED_ratio = physical_properties.log_residue_ratio(
+                self.__seq, "E", "D"
+            )
+
+        return self.__ED_ratio
+
+    # .................................................................
+    #
+    def charge_at_pH(self, pH=7.4, normalize=True):
+        """
+        Mean charge of the titratable side chains at a given pH.
+
+        Henderson-Hasselbalch with the EMBOSS side-chain pKa values, treating
+        K/R/H as bases and E/D/Y/C as acids. Termini are not included, so this is
+        not the same quantity as :attr:`NCPR` (which counts formal charges and
+        assumes full ionization).
+
+        Not cached, since it depends on ``pH`` and is cheap to recompute.
+
+        Parameters
+        ----------
+        pH : float, optional
+            pH at which to evaluate the charge. Default 7.4.
+        normalize : bool, optional
+            If True (default) divide by the number of titratable residues, giving
+            a mean charge per titratable group. If False, return the summed charge.
+
+        Returns
+        -------
+        float
+            The (mean) net charge. 0.0 if there are no titratable residues.
+
+        See Also
+        --------
+        isoelectric_point : The pH at which this reaches zero.
+        NCPR : Net charge per residue from formal charges.
+        """
+        return physical_properties.charge_at_pH(self.__seq, pH=pH, normalize=normalize)
 
     # .................................................................
     #
@@ -737,12 +914,25 @@ class Protein:
         This is a convenience wrapper over
         :func:`sparrow.sequence_analysis.grammar.compute_feature_vector`.
 
-        This feature extraction interface is currently **alpha**. Breaking
-        changes to arguments, defaults, and returned feature schemas may occur
-        in future releases.
+        .. deprecated::
+           Superseded by :mod:`sparrow.nardini`, which computes a superset of
+           these features and is validated against the published NARDINI /
+           NARDINI+ reference implementation::
+
+               from sparrow.nardini import load_reference_background, nardini_vectors
+
+               result = nardini_vectors({"my_idr": p.sequence},
+                                        background=load_reference_background("human"),
+                                        backend="kappa")   # this method's default
+
+           ``backend='kappa'`` and ``backend='iwd'`` there reproduce this
+           method's two backends exactly, and ``backend='nardini'`` (the default)
+           gives the published NARDINI statistic plus GIN cluster assignment.
+           This method will be removed in a future release.
 
         This implementation is inspired by grammar-style analyses but is **not**
-        an exact replica of the original NARDINI analysis pipeline.
+        an exact replica of the original NARDINI analysis pipeline - use
+        :mod:`sparrow.nardini` if that is what you need.
 
         Parameters
         ----------
@@ -1503,6 +1693,49 @@ class Protein:
 
             self.__plugin_object = PluginManager(self)
         return self.__plugin_object
+
+    @property
+    def nardini(self):
+        """
+        Access to NARDINI / NARDINI+ analysis for this sequence.
+
+        NARDINI asks whether the residues in an IDR are arranged non-randomly, by
+        comparing the sequence against scrambles of itself. NARDINI+ adds a block
+        of compositional features scored against a reference set of IDRs, and the
+        GIN resource groups the human IDRome into 30 clusters of shared molecular
+        grammar that a sequence can be matched to.
+
+        The accessor is created on first access and cached, and each result is
+        memoized per unique set of options.
+
+        Everything returns labelled NumPy containers
+        (:class:`~sparrow.nardini.table.FeatureVector`), not pandas objects.
+
+        Returns
+        -------
+        sparrow.nardini.protein_interface.ProteinNardini
+            Object providing ``vector()``, ``patterning()``, ``composition()``,
+            ``gin_cluster()`` and ``gin_report()``.
+
+        Examples
+        --------
+        >>> p = Protein("MENDPRVRKFASDGAQWAIKWQKK")     # doctest: +SKIP
+        >>> p.nardini.vector(seed=42)["Frac K+R"]       # doctest: +SKIP
+        >>> p.nardini.patterning(seed=42)["pol-neg"]    # doctest: +SKIP
+        >>> p.nardini.gin_cluster(seed=42)              # doctest: +SKIP
+
+        Notes
+        -----
+        Compositional z-scores need a reference IDR set; these methods default to
+        the published human IDRome background bundled with sparrow. The patterning
+        features never use it. See :mod:`sparrow.nardini` for the full API and
+        :mod:`sparrow.nardini.gin` for when a GIN label should not be trusted.
+        """
+        if self.__nardini_object is None:
+            from sparrow.nardini.protein_interface import ProteinNardini
+
+            self.__nardini_object = ProteinNardini(self)
+        return self.__nardini_object
 
     @property
     def predictor(self):

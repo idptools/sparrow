@@ -50,6 +50,186 @@ Consequences:
 
 **Validation was preserved rather than dropped.** The cross-checks in `test_patterning_vectorized.py` compared against the extensions, which would have become self-comparisons once the shims were in place. Before deleting, the original `.pyx` sources were rebuilt in isolation and used to capture 400 randomly-generated golden cases — every metric, both kappa flatten modes, the charge-weighted IWD variants, custom SCD groups, and the deterministic half of `patterning_percentile` — into `sparrow/tests/test_data/cython_patterning_golden_v1.npz` (86 KB). The tests now assert against that fixture, so the agreement with the compiled implementation stays pinned permanently and independently of whether it exists.
 
+### Added — `Protein.nardini`, and NARDINI results are NumPy by default
+
+**`Protein.nardini`** is a first-class accessor for single-sequence NARDINI work, cached and memoized per option set:
+
+```python
+p.nardini.vector(seed=42)        # 90-feature NARDINI+ vector
+p.nardini.patterning(seed=42)    # just the 36 patterning z-scores
+p.nardini.composition()          # just the 54 compositional z-scores
+p.nardini.gin_cluster(seed=42)   # nearest published human GIN grammar
+print(p.nardini.gin_report(seed=42))
+```
+
+Compositional z-scores need a reference IDR set and there is nothing to build one from for a single protein, so these default to the bundled published human IDRome background — which is also the space the GIN centroids live in. Override with a species key, an `.npz` path, or a `NardiniBackground`. The patterning half never uses it.
+
+**Nothing returns a DataFrame by default any more.** Results are plain NumPy arrays, optionally wrapped in one of two deliberately thin containers — `FeatureVector` (one sequence) and `FeatureTable` (several) — whose only job is to let you address a feature by name rather than by index: `v["Frac K+R"]`, `table["pol-neg"]`, `table.row("IDR1")["Frac K+R"]`, plus `.values`, `.names`/`.column_names`, `.to_numpy()` and `.to_dict()`. Filtering, sorting, reshaping and export are left to NumPy and pandas rather than reimplemented.
+
+* `NardiniResult.to_table()` / `.vector(name)` replace `.to_dataframe()` as the default view.
+* `GINAssignment.records()` returns plain dicts and replaces `.to_dataframe()` as the default.
+* `gin_cluster_definitions()` now returns a list of dicts; pass `as_dataframe=True` for the old behaviour.
+
+`.to_dataframe()` still exists everywhere for anyone who would rather have pandas — it is opt-in rather than gone.
+
+**Fixed: pandas was an undeclared dependency.** `sparrow.sequence_analysis.elm` imported it at module level, so `import sparrow` required pandas despite it never appearing in `pyproject.toml` — sparrow only worked because pandas happened to be installed. It is now declared in `dependencies`, and imported lazily at the few points that actually build a DataFrame rather than at import time. The ELM class table is parsed with the standard library instead (new `read_elm_table()`, which returns a header and a list of rows); `generate_elm_df()` is unchanged for callers who want the DataFrame.
+
+### Added — GIN typicality diagnostics
+
+Nearest-centroid assignment never abstains, so every sequence gets a label including ones that look nothing like a human IDR. `GINAssignment` now reports:
+
+* **`composition_rms_z`** — the direct answer to "is this anything like a human IDR?". The 54 compositional features are standardized against the reference IDRome, so a member of that population has z ~ N(0,1) per feature and an RMS near 1. Measured: real and simulated IDRs 0.6–0.9, uniformly random sequence 1.6, homopolymers and other extremes 3–13. Computed before clipping so it is not capped.
+* **`n_saturated`** — how many of the 90 features were pinned at the ±3 clip. A clipped feature contributes identically to every centroid distance, so it cannot discriminate between clusters; all 30 centroids lie within −2.32 to 2.99.
+* **`is_typical`** — a coarse triage screen combining the two, plus a prose explanation from `Protein.nardini.gin_report()`.
+
+Note that *distance to the nearest centroid is not usable as an absolute measure of typicality*, and an earlier draft of this that used it was wrong: in 90 dimensions even a perfectly ordinary z-vector sits about five times further from its nearest centroid than the centroids sit from each other, because centroids are cluster means rather than members. Distances remain meaningful compared between sequences, and `GINReference.separation_scale` documents the pitfall.
+
+### Added — `sparrow.nardini`
+
+A new module implementing the [NARDINI](https://www.sciencedirect.com/science/article/pii/S0022283621006100) and NARDINI+ analyses natively in sparrow, reproducing the analysis performed by the NARDINI+ Colab notebook. Three entry points:
+
+* `build_background(source, ...)` estimates the mean and standard deviation of the 54 NARDINI+ compositional features over a reference set of IDRs, supplied as a FASTA file, a dict, or any iterable of sequences / `Protein` objects. Statistics accumulate online (Welford), so memory does not scale with the size of the IDRome. Backgrounds carry provenance `metadata` and save/load as `.npz` (`NardiniBackground.save` / `.load`). Alternatively, `load_reference_background(species)` returns a published per-species IDRome background bundled with sparrow (`human`, `mouse`, `rat`, `xenopus`, `fly`, `zebrafish`, `yeast`, `worm`, `arabidopsis`).
+* `nardini_vectors(sequences, background=..., ...)` returns a `NardiniResult` holding the 90-feature NARDINI+ z-score vector per sequence: 36 patterning features z-scored against per-sequence scrambles, plus 54 compositional features z-scored against the background. `background` is optional — omit it for the 36 patterning features alone, which need no reference set. `NardiniResult` exposes `.zscores`, `.to_dataframe(raw=False)` and `.top_features(name, n)`.
+* `assign_gin_clusters(result)` — also reachable as `result.gin_clusters()` — assigns each sequence to one of the 30 published human GIN clusters of shared molecular grammar (`'D/E-tracts'`, `'S patches'`, `'Well-mixed P and G'`, ...) by nearest centroid in ±3-clipped z-score space. Returns a `GINAssignment` with the cluster, its published description, the centroid distance, and the `separation` from the runner-up cluster as a confidence measure, plus `.ranked_clusters(name, n)` for the alternatives when that separation is small. `gin_cluster_definitions()` returns the 30 published descriptions and IDR counts.
+
+Supporting public API: `patterning_zscores()`, `patterning_values()`, `composition_values()`, `composition_matrix()`, `load_gin_reference()`, `resolve_backend()`, the `TYPES_8` / `TYPES_9` residue groupings, and the feature-name helpers.
+
+**Selectable patterning statistics.** The 36 patterning features can be computed three ways via `backend`:
+
+* `'nardini'` (default) — the published NARDINI omega/kappa window asymmetry. Required for GIN cluster assignment.
+* `'kappa'` — sparrow's generalized kappa (`kappa_x`), normalized against the maximally-segregated sequence and bounded 0–1.
+* `'iwd'` — sparrow's inverse-weighted distance, a clustering metric that ignores `blob_size`.
+
+The latter two are ports of the `kappa_cython` and `iwd_combined` backends from `sparrow.sequence_analysis.grammar` and reproduce its values **exactly** (verified bit-for-bit across a range of sequences); the legacy names are accepted as aliases. Only the patterning block is affected — the compositional block is identical across backends. The choice is recorded as `result.backend`, and `assign_gin_clusters()` refuses anything but `'nardini'`, since the published centroids are defined in that statistic's space and another backend would yield plausible-looking but meaningless cluster labels.
+
+All three backends are vectorized over scrambles and cost about the same: at L=1000 and 2,000 scrambles, 0.49 s / 0.43 s / 0.37 s for nardini / kappa / iwd. The `kappa` and `iwd` backends originally delegated to the Cython extensions and were 9–22x slower (11.05 s and 4.77 s respectively at L=1000); they now use `sparrow.patterning.vectorized`. As a consequence their values agree with `sparrow.sequence_analysis.grammar` to ~1e-6 rather than bit-for-bit, because grammar goes through the single-precision Cython path while these use double — the NumPy value being the more accurate of the two. The `test_ported_backends_match_grammar` assertion was relaxed from `array_equal` to a 1e-5 relative tolerance to match.
+
+### Deprecated — `sparrow.sequence_analysis.grammar`
+
+Superseded by `sparrow.nardini`, which computes a strict superset of its features. `grammar.compute_feature_vector()`, `grammar.compute_composition_background_stats()`, `Protein.extract_feature_vector()` and `sparrow.build_grammar_background_from_fasta()` now emit a `DeprecationWarning` and will be removed in a future release. They continue to work unchanged in the meantime.
+
+Migration is documented in the NARDINI guide. Two notes: the `'kappa'` / `'iwd'` backends reproduce the old patterning values exactly so those numbers do not move, but the two modules bundle *different* human IDR backgrounds (mean `Hydrophobicity` 3.81 vs. the published 3.41, `FCR` 0.24 vs. 0.27), so compositional z-scores will shift unless you rebuild your own background with `build_background()`.
+
+**Bundled reference data.** `sparrow/data/nardini/` now holds the published GIN centroids (30 × 90), the human cluster definitions, and the nine per-species compositional backgrounds. These are redistributed from the [GIN resource](https://github.com/kierstenruff/RUFF_KING_Grammars_of_IDRs_using_NARDINI-) under its MIT licence and **must be cited** (Ruff et al. 2025) — see `sparrow/data/nardini/SOURCES.md` for full provenance. Bundling rather than downloading at runtime (as the notebook does) means analyses are reproducible offline and pinned to a known version. `devtools/scripts/build_nardini_reference_data.py` rebuilds them from the canonical sources, and verifies the upstream feature ordering still matches sparrow's own definitions before writing anything.
+
+Notes on the implementation:
+
+* **No new dependencies.** The four features the reference notebook takes from localCIDER (`Frac Chain Expanding`, `Disorder Promoting`, `Iso point`, `PPII`) are implemented directly and agree with localCIDER to floating-point noise. The Hilser PPII scale, EMBOSS side-chain pKa values, and the disorder-promoting and chain-expanding residue sets were added to `sparrow.data.amino_acids`.
+* **Verified against the reference.** The patterning statistics are bit-identical to a direct transcription of the notebook algorithm across hand-picked and randomly-generated sequences; that transcription is kept in `sparrow/tests/test_nardini.py` as a permanent oracle.
+* **20-40x faster patterning.** The asymmetry calculation is vectorized over scrambles by reducing each sequence to an integer type-label array (the groupings are exact partitions of the 20 amino acids) and deriving all window counts from one cumulative sum. A 1000-residue IDR at the published 100,000 scrambles takes ~15 s rather than ~9 min, so the notebook's limits of 20 sequences and 1000 residues are unnecessary.
+* **More robust gamma fitting.** Each scramble distribution is summarized with a maximum-likelihood 3-parameter gamma fit, as in the reference. `scipy.stats.gamma.fit` is unreliable on these distributions: it raises `FitError` on some inputs (which aborts the reference implementation outright) and on others converges to a local optimum whose moments do not describe the data — a fitted mean 6x and variance 170x the sample values was observed, silently collapsing one z-score from ~12.6 to ~0.4. Fits are now sanity-checked against the sample moments and rejected when they disagree, which makes the z-scores stable across seeds and scramble counts. Where the reference fit is sound, results match it bit for bit.
+* **GIN assignments match the reference exactly**, including all 30 centroid distances per sequence. The only deliberate difference is cosmetic: the notebook computes the runner-up gap using `100` as a sentinel value, so a true gap above 100 would be reported as exactly 100; sparrow reports the true gap. No clipped z-vector reaches a separation that large, so in practice the numbers are identical.
+* Sanity check on the assignment: designed test sequences land in the semantically matching published clusters — a D/E tract in `'D/E-tracts'`, a poly-Q in `'Q-tracts'`, an S-rich sequence in `'S patches'`, a K-block sequence in `'K blocks'`.
+
+### Added — example notebooks for NARDINI
+
+Two executed notebooks in `examples/`, both worked through on a real human IDR (BARD1, whose disordered regions are located with sparrow's own disorder predictor rather than hard-coded):
+
+* `nardini_from_protein_objects.ipynb` — the single-sequence interface via `Protein.nardini`: reading a `FeatureVector`, the residue typesets, why some patterning features are exactly zero, the compositional half and the choice of background, GIN assignment, and when a GIN label should not be believed.
+* `nardini_module.ipynb` — the batch interface: building and saving your own compositional background, `nardini_vectors()` over a set, the `NardiniResult` and `FeatureTable` surfaces, GIN assignment across a dataset with the typicality diagnostics, and reading from FASTA.
+
+Writing them surfaced three bugs, below. All three were cases where the documented behaviour was right and the implementation was not.
+
+### Changed — nardini no longer computes anything twice
+
+Following on from the four properties below, every remaining compositional quantity NARDINI+ computes now comes from the same code `Protein` uses. Audited feature by feature rather than by inspection: of the 50 features with a `Protein` counterpart, **49 are now bit-identical** and the 50th differs deliberately (below).
+
+* The 20 amino acid fractions come from `calculate_parameters.calculate_aa_fractions`; the grouped fractions, FCR, NCPR, hydrophobicity and the R/K and E/D ratios from `sequence_analysis.physical_properties`; the 20 patch features already came from `sequence_analysis.patching`. `Protein.FCR`, `fraction_positive/negative/polar/aromatic/aliphatic` and `NCPR` now delegate to the same functions rather than re-summing inline.
+* New `p.RK_ratio` and `p.ED_ratio` (`log10` with a +1 pseudo-count), which previously existed only as NARDINI features. They split residue pairs that share a formal charge but behave differently.
+* On the patterning side there was never any duplication to remove: the `'kappa'` and `'iwd'` backends already call `sparrow.patterning.vectorized`, and the NARDINI omega/kappa window asymmetry is implemented once, in `sparrow.nardini.patterning`, because nothing else in sparrow computes it.
+
+**`Protein` values shift by at most 5.6e-17**, and nardini's do not move at all. That asymmetry is deliberate: the bundled backgrounds and GIN centroids are defined against the NARDINI values, so those are the ones that had to be preserved bit for bit — verified against a 305-sequence snapshot taken before the refactor, compared with `array_equal`. The shift affects `FCR`, `fraction_aliphatic`, `fraction_aromatic` and `fraction_polar` on roughly a fifth of sequences.
+
+The cause is worth recording, because it looks like a bug and is not: CPython 3.12 gave `sum()` compensated (Neumaier) summation for floats, while `Protein` accumulated in a manual `for` loop. Same residue sets, same order, same inputs — the loop was simply the less accurate of the two. Delegating adopts the better value.
+
+**One feature deliberately still differs.** NARDINI+ counts cysteine as polar (`'Frac Polar'` = QNSTGCH); `Protein.fraction_polar` does not (GHNQST). The gap equals the cysteine fraction in 400/400 test sequences. Both conventions are in use, and the published reference data is defined against the NARDINI one, so the definitions are kept side by side and documented in both guides rather than silently reconciled — they share an implementation and differ only in the residue set. A test asserts the gap is exactly the cysteine content, so if either drifts for another reason it fails.
+
+Two further tests guard the arrangement: one checks every shared feature against its `Protein` property, the other asserts `composition_values()` contains no residue-set arithmetic of its own, since the realistic regression is someone re-inlining a formula and the two quietly diverging.
+
+### Changed — four compositional features are now `Protein` properties
+
+`'Frac Chain Expanding'`, `'Disorder Promoting'`, `'Iso point'` and `'PPII'` were implemented inside `sparrow.nardini.composition`, which made them reachable only through a NARDINI+ vector even though they are ordinary sequence properties. There is now one implementation, in `sparrow.sequence_analysis.physical_properties`, read by both:
+
+```python
+p.fraction_chain_expanding      # 'Frac Chain Expanding'
+p.fraction_disorder_promoting   # 'Disorder Promoting'
+p.isoelectric_point             # 'Iso point'
+p.PPII_propensity               # 'PPII'
+p.charge_at_pH(5.5)             # the charge isoelectric_point bisects to zero
+```
+
+`charge_at_pH()` comes along for the ride, since it was the machinery behind the pI and is generally useful — note it differs from `NCPR`, which counts formal charges and assumes full ionization, whereas this applies Henderson-Hasselbalch with the EMBOSS side-chain pKa values and so also sees H, Y and C.
+
+**The values are bit-identical, not merely close**, which was the constraint that shaped the refactor: the bundled per-species backgrounds and GIN centroids are defined against these exact numbers, so a shift in the last decimal place would silently move every compositional z-score and every centroid distance. Verified across 305 sequences before and after — the full 54-feature matrix compares equal under `array_equal`, not just `allclose`. That required care in one place: the fraction features sum per-residue fractions (`a/n + b/n`) rather than dividing a summed count (`(a+b)/n`), and those are not always the same float, so `fraction_in_set()` preserves the original summation order and says why.
+
+`charge_at_pH` and `isoelectric_point` remain importable from `sparrow.nardini.composition` as re-exports, so nothing that used them breaks. New tests pin the Protein-property/NARDINI-feature equality per feature, and assert that nardini still delegates rather than carrying its own copy.
+
+### Documentation
+
+The NARDINI guide, the examples page, the README and the notebooks now cover everything above:
+
+* The compositional feature list in the NARDINI guide now maps each feature onto its `Protein` equivalent, and `examples/nardini_from_protein_objects.ipynb` demonstrates the equality directly — including the deliberate `'Frac Polar'` / cysteine exception, shown numerically. Both make the point that what NARDINI+ adds over reading those properties one by one is the z-scoring.
+* `sequence_analysis/physical_properties.py` gained a real module docstring. It had only `##` comments, which autodoc cannot render, so the rendered page jumped straight from the heading to the first function — unhelpful for what is now the shared home for these calculations.
+* **The AAindex reference table now cites its sources.** The auto-generated table of all 569 shipped indices (regenerated from the bundled database on every build, so it cannot drift) used only 3 of the 7 metadata fields available. It gained a **Source** column carrying the journal citation and a PubMed link — 452 of the 569 resolve to a PMID; one entry records a literal `PMID:` with no number and falls back to the journal rather than emitting a broken link. The introduction now explains each column, notes that several near-identical descriptions cover scales derived quite differently (so the source is worth checking), and shows how to filter the list programmatically instead of scrolling 569 rows.
+* A programmatic audit of `Protein`'s public surface against the guide: all 45 members are documented, as are all 16 `physical_properties` functions.
+
+* `docs/examples.rst` gained a worked proteome walkthrough — FASTA → parallel vectors → cached reads → GIN — plus pointers to the two executed notebooks, which it had never mentioned.
+* `examples/nardini_module.ipynb` gained sections on parallel computation and on deriving your own grammars. The clustering demo plants four grammars (D/E tracts, poly-Q, S-rich, K blocks) and recovers all four 10/10; matching them against the published reference pairs them with `'D/E-tracts'`, `'Q-tracts'` and `'K blocks'` from centroid geometry alone. The distances are nonetheless far above the published centroid spacing, because designed sequences sit far from anything in the human IDRome — the guide and the notebook both now make that distinction explicit, since "recognisably analogous grammar" and "same coordinates" are not the same claim.
+* The warning hierarchy (`SparrowWarning`, `BackgroundQualityWarning`, `ClusteringQualityWarning`) is documented as a reference section with the filtering recipe; `ClusteringQualityWarning` had not been named in the docs at all.
+* The feature summaries in `README.md` and `docs/index.rst` described only the original NARDINI surface, with no mention of GIN clustering or parallel computation.
+
+### Added — `nardini_proteins()`, a whole proteome in parallel
+
+`nardini_proteins()` takes sequences or `Protein` objects, computes every NARDINI+ vector across multiple processes, and returns Protein objects with the results already attached — so `p.nardini.vector(...)` afterwards is free rather than recomputed. Input and output shapes match: a dict returns a dict with the same keys, anything else a list in input order. Sequences become new Protein objects; Protein objects passed in are populated **in place** and handed back. Mixed input works.
+
+Measured on 160 IDRs at 1,000 scrambles: 18.7 s serial → 9.8 s (2 processes) → 5.1 s (4) → **2.7 s (8), a 6.9x speed-up**.
+
+**Parallelism does not change the numbers**, and that is not an accident — it rests on the seeding fix above. Because per-sequence seeds derive from the sequence rather than its batch position, results are independent of chunking, process count and completion order. The parallel result is bit-identical to the serial one and to what each Protein computes alone; the tests assert exactly that across process counts, chunk sizes and both start methods. Nothing about the calculation is reimplemented — the work is chunked through the ordinary `nardini_vectors`, so there is no second code path to drift.
+
+`on_error='skip'` drops sequences NARDINI cannot score (non-standard residues, too short) and warns with a summary, rather than losing an hours-long run to one malformed entry. A failing chunk is retried one sequence at a time, so a bad sequence never costs more than itself.
+
+**Start method.** sparrow defaults to `fork` where it exists (Linux, macOS) rather than the platform default. Under `spawn` every worker re-imports the calling `__main__`, so a script calling this at module level calls it again in each worker — recursively spawning, which is a fork bomb rather than an error message, and a Jupyter notebook has no `__main__` guard available at all. `fork` re-imports nothing. As a backstop on `spawn` platforms, sparrow detects that it is running inside a worker and computes serially instead of building a nested pool, so the worst case is wasted work rather than a runaway process.
+
+### Fixed — `patterning()` recomputed work it already had
+
+`ProteinNardini.patterning()` keys its cache on `background=None`, since the patterning half needs no background. But that made it miss whenever the cached result had been computed *with* a background — so it re-ran the scrambling, which is essentially the entire cost. Anyone calling `patterning()` after `vector()`, or after `nardini_proteins()` had populated a proteome, paid for it twice. The patterning block is genuinely background-independent (verified: identical against the human and yeast backgrounds and against `patterning()` alone), so any cached result with matching patterning options now satisfies the call.
+
+### Added — build your own GIN-style clusters
+
+`sparrow.nardini` could only *assign* sequences to the 30 published human grammars. `build_gin_reference()` now does the other half — it runs the same procedure (clip to ±3, then k-means) over your own vectors and returns a `GINReference` that `assign_gin_clusters()` accepts in place of the bundled one. That is what you want for a non-human proteome, a filtered sub-proteome, or a designed library, where forcing sequences onto human grammars is the wrong move.
+
+* **Any backend works.** Centroids live in the space of whatever statistic produced them, so a reference records its backend and assignment refuses to mix spaces. `'kappa'` vectors against `'kappa'` centroids is now fine; `'kappa'` vectors against the published `'nardini'` centroids is still refused. Previously the guard hard-coded `'nardini'` and so blocked the legitimate case along with the dangerous one.
+* **`GINReference.save()` / `.load()`**, because the vectors behind a real IDRome cost hours and re-clustering with a different seed gives different (equally valid) centroids.
+* **Derived descriptions.** Clustering cannot regenerate the published human-authored labels, so each cluster gets one built from its centroid's most extreme features — `'blocky neg-neg, high Frac E, D patches'`. Pass `descriptions=` to override. Clusters are numbered largest-first, which makes the numbering stable within a run but still meaningless across runs.
+* **`compare_gin_references()`** answers "did I recover GIN?". Cluster numbering is arbitrary, so it pairs centroids one-to-one by solving the optimal assignment (Hungarian algorithm) and reports per-cluster distances plus *both* references' `separation_scale`. Both matter: a clustering that found no structure leaves its centroids near the origin, which makes them close to everything and produces a flatteringly small match distance — the giveaway is your own separation scale sitting far below the published one.
+* `build_gin_reference()` warns via `ClusteringQualityWarning` below `MIN_SEQUENCES_PER_CLUSTER` (10) sequences per cluster on average, since k-means returns k centroids whether or not the data supports that many and will happily assign every query to one of them. The published analysis had ~800 IDRs per cluster.
+
+No new dependency — k-means comes from `scipy.cluster.vq.kmeans2` with k-means++ init, run with restarts (lowest inertia wins) and with empty-cluster or non-finite solutions discarded as failed restarts rather than silently accepted.
+
+Validated by planting four deliberately different grammars (D/E tracts, poly-Q, S-rich, K-blocks) and checking the clustering puts them back into four groups: 48/48 sequences recovered, with the derived descriptions correctly naming each planted grammar.
+
+**Fixed while building this:** `GINReference.separation_scale` returns a *squared* distance (matching the module's convention throughout, including the distances on `GINAssignment`) but its docstring described it as a distance. `compare_gin_references` initially used true Euclidean, which made its `mean_distance` silently incomparable to the `separation_scale` it is meant to be read against — a degenerate clustering looked like close agreement (6.8 against a scale of 17.8) when the correct comparison shows the opposite (47.1 against 17.8). Both now use squared Euclidean and the docstring says so.
+
+### Added — `build_background` warns about a background you should not trust
+
+A NARDINI+ compositional background fails quietly rather than loudly. If a feature never varies across your reference set there is no scale to divide by, so its z-score comes back as exactly `0.0` for every sequence you ever score — which reads as "perfectly average" but means "unmeasurable". `build_background()` now emits a `BackgroundQualityWarning` for the two ways this happens:
+
+* **Fewer than 50 sequences** (`MIN_RECOMMENDED_SEQUENCES`). The relative standard error on an estimated standard deviation is about `1 / sqrt(2(n-1))`, so 50 puts the per-feature scale within ~10%; 13 sequences gives ~20%.
+* **More than 10% of the 54 features constant** (`MAX_DEGENERATE_FRACTION`). Calibrated against real data: of the nine published IDRomes, seven have zero constant features and two have one, so a genuine reference set sits at 0–2%. Sixty random IDR-like sequences give about 8 of 54; one sequence gives all 54.
+
+The count is recorded in `background.metadata["num_degenerate_features"]` regardless, and the background is still returned and still usable — this is advice, not an error. New `SparrowWarning` base class (mirroring `SparrowException`) so sparrow's advisory warnings can be filtered as a group; `BackgroundQualityWarning` derives from it. The bundled backgrounds are loaded rather than built, so they never warn.
+
+### Fixed — NARDINI edge cases
+
+* **A degenerate null distribution produced a confident-looking z-score of 2.0 instead of 0.** Some statistics genuinely cannot vary under scrambling for some sequences — IWD on a sequence whose target group covers every position, for instance, where the merged `{D,E,K,R}` group spans an E/K-only sequence. The null is then a point mass and `z = 0` is the correct report, which `_fit_gamma_moments` handled with an `if sample_var == 0` guard. But `np.var` over N identical values does not reliably return exactly zero — the mean subtraction rounds, and whether the result is `0.0` or `3e-30` depends on N, because NumPy blocks pairwise summation differently. At 500, 1000 and 2000 scrambles it returned `3e-30`, so the guard missed and the caller divided a ~1e-15 numerator by a ~1e-15 denominator, reporting `z = 2.0`. The guard now tests the spread directly. A test asserting exactly this behaviour already existed but only ran at 200 scrambles, which happens to land in a lucky bucket; it is now parametrized across both.
+* **Per-sequence seeds were derived from batch position, so the documented batch-independence guarantee did not hold.** `nardini_vectors()` derived each sequence's seed as `seed + index`. That is reproducible for an identical set in an identical order and nothing more: re-scoring one sequence out of a batch, or inserting a sequence ahead of it, silently changed its patterning z-scores. Seeds are now derived from the master seed and the sequence itself (via `hashlib.blake2b` — Python salts `hash()` per process, so it is not reproducible across runs), which makes the guarantee true: a sequence gets the same scramble stream scored alone, in a set, or in a differently-ordered set, and `Protein.nardini` now agrees exactly with `nardini_vectors()` on the same sequence. Again, a test for the property existed but only ever compared index 0 — precisely where the old derivation happened to agree.
+* **`Protein.nardini` memoized on `id(background)`, which could return another background's answer.** The cache stored only the key and held no reference to the background, so once the caller dropped theirs the object was collected and CPython was free to allocate the next background at the same address — at which point `vector()`, `gin_cluster()` and `gin_report()` silently returned the *previous* background's result. It reproduces within a handful of allocations (4 address reuses in 300 in one run) and was observed reporting a compositional z-score of **+19.8 where the correct answer was −4.7**. Backgrounds are now keyed by a hash of their feature names and mean/std arrays, which is both sound and lets two separately-built but identical backgrounds share a cache entry. Same bug class as the `Protein.polymeric` caching fixed above, just with object identity standing in for the missing parameters.
+* **`pathlib.Path` was rejected wherever a path was accepted.** `build_background(Path(...))` and `nardini_vectors(Path(...))` fell through the `isinstance(source, str)` check to the "iterable of sequences" branch and failed with `'PosixPath' object is not iterable`. Every path argument now accepts `os.PathLike`, including the `background=` argument on both `nardini_vectors()` and the `Protein.nardini` methods.
+
+Per-sequence seed derivation runs before residue validation, so it encodes as UTF-8 rather than ASCII — otherwise a non-standard character raised `UnicodeEncodeError` instead of sparrow's "no NARDINI type" message.
+
+Also corrected: the README claimed the `'kappa'` and `'iwd'` backends run 9–22x slower than `'nardini'`. That was true before those statistics were vectorized and is not any more — all three cost about the same, as the NARDINI guide already said.
+
 ### Fixed / Documentation
 
 The rest of this entry is a correctness and documentation pass. The headline items are a class of memoization bugs in which cached results were keyed on too little information and were therefore returned for calls made with *different* parameters, and a validation helper that silently did nothing when given a custom error message.

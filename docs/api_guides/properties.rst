@@ -76,9 +76,34 @@ Module reference
 Property Index Reference
 ------------------------
 
-The full list of available indices is below. The **Description** is the original
-AAindex summary of what each score measures; use the **Identifier** (or
-**Accession**) as the ``mode`` argument to
-:meth:`~sparrow.protein.Protein.linear_property_profile`.
+Every index sparrow ships is listed below -- all **569** of them. The table is
+regenerated from the bundled database on every documentation build, so it cannot
+fall out of step with what is actually installed.
+
+* **Identifier** -- the readable slug. Pass this (or the accession) as the ``mode``
+  argument to :meth:`~sparrow.protein.Protein.linear_property_profile`.
+* **Accession** -- the canonical AAindex1 accession, if you want to cross-reference
+  against the `AAindex database <https://www.genome.jp/aaindex/>`_ directly.
+* **Description** -- the original AAindex summary of what the score measures.
+* **Source** -- the publication the scale comes from, linked to PubMed where the
+  database records a PMID (453 of the 569 do). Worth checking: many descriptions
+  are terse, and several scales with near-identical descriptions differ in how they
+  were derived.
+
+The table is long, so use your browser's find (:kbd:`Ctrl+F` / :kbd:`Cmd+F`) to
+search it, or filter programmatically:
+
+.. code-block:: python
+
+   from sparrow.data import aaindex
+
+   # every (identifier, accession, description)
+   everything = aaindex.list_property_indices()
+
+   # e.g. all the hydrophobicity-related scales
+   hydro = [row for row in everything if "hydroph" in row[2].lower()]
+
+   # full metadata, including authors, title, journal and PMID
+   aaindex.get_property_metadata("hydropathy-kyte-1982")
 
 .. include:: _property_index_table.rst

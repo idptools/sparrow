@@ -1,9 +1,18 @@
-"""Tests for grammar feature-vector extraction."""
+"""Tests for grammar feature-vector extraction.
+
+``sparrow.sequence_analysis.grammar`` is deprecated in favour of
+:mod:`sparrow.nardini`, but these tests keep the deprecated behaviour pinned for
+as long as it ships. The deprecation warning itself is asserted in
+``test_regressions.py``; it is silenced here so the suite output stays readable.
+"""
 
 import numpy as np
+import pytest
 
 from sparrow import Protein
 from sparrow.sequence_analysis import grammar
+
+pytestmark = pytest.mark.filterwarnings("ignore::DeprecationWarning")
 
 SEQ = "MEEEKKKKSSSTTTDDDQQQQNNNNGGGGSSSS"
 

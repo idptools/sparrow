@@ -2,10 +2,41 @@
 
 This module implements sequence-to-feature-vector workflows using Sparrow-native
 primitives and optional scramble/statistics-based z-scoring.
+
+.. deprecated::
+   Superseded by :mod:`sparrow.nardini`, which computes a superset of these
+   features and is validated against the published NARDINI / NARDINI+ reference
+   implementation. Everything this module offers is available there:
+
+   =========================================  ==========================================
+   here                                       ``sparrow.nardini``
+   =========================================  ==========================================
+   ``compute_feature_vector(...)``            ``nardini_vectors(...)``
+   ``backend='kappa_cython'``                 ``backend='kappa'``
+   ``backend='iwd_combined'``                 ``backend='iwd'``
+   (no equivalent)                            ``backend='nardini'`` -- the published
+                                              NARDINI statistic, and the only one that
+                                              supports GIN cluster assignment
+   50 composition features                    the same 50, plus ``Frac Chain Expanding``,
+                                              ``Disorder Promoting``, ``Iso point``,
+                                              ``PPII``
+   ``compute_composition_background_stats``   ``build_background``
+   bundled sparrow human background           ``load_reference_background(species)`` for
+                                              nine published IDRomes
+   =========================================  ==========================================
+
+   The ``'kappa'`` and ``'iwd'`` backends in :mod:`sparrow.nardini` reproduce this
+   module's values exactly, so migrating does not change any numbers. Note that
+   the two modules' bundled human backgrounds are *different datasets*, so
+   composition z-scores will shift if you switch to
+   ``load_reference_background('human')``.
+
+   This module will be removed in a future release.
 """
 
 import math
 import random
+import warnings
 from collections import OrderedDict
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -17,6 +48,21 @@ from scipy import stats
 from sparrow.data import amino_acids
 from sparrow.protein import Protein
 from sparrow.tools import general_tools
+
+_DEPRECATION_MESSAGE = (
+    "sparrow.sequence_analysis.grammar is deprecated and will be removed in a "
+    "future release; use sparrow.nardini instead. The 'kappa_cython' and "
+    "'iwd_combined' backends are available there as backend='kappa' and "
+    "backend='iwd' and produce identical values, and backend='nardini' (the "
+    "default) additionally gives the published NARDINI statistic and GIN "
+    "cluster assignment. See the NARDINI guide in the documentation."
+)
+
+
+def _warn_deprecated(stacklevel=3):
+    """Emit the module-level deprecation warning."""
+    warnings.warn(_DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=stacklevel)
+
 
 AMINO_ACIDS = tuple(amino_acids.VALID_AMINO_ACIDS)
 
@@ -441,7 +487,13 @@ def compute_feature_vector(
 
     ``patterning_config`` is optional. Users can override config fields directly
     via keyword arguments like ``num_scrambles`` and ``backend``.
+
+    .. deprecated::
+       Use :func:`sparrow.nardini.nardini_vectors` instead - see the module
+       docstring for the migration table.
     """
+    _warn_deprecated()
+
     protein = _coerce_protein(sequence_or_protein)
     config = _resolve_patterning_config(
         patterning_config=patterning_config,
@@ -495,7 +547,14 @@ def compute_composition_background_stats(sequences_or_proteins, dtype=np.float32
     -------
     GrammarCompositionStats
         Feature names plus background mean/std arrays.
+
+    .. deprecated::
+       Use :func:`sparrow.nardini.build_background` instead, which covers four
+       more compositional features and produces a background usable for GIN
+       cluster assignment.
     """
+    _warn_deprecated()
+
     if isinstance(sequences_or_proteins, Mapping):
         iterator = iter(sequences_or_proteins.values())
     elif isinstance(sequences_or_proteins, (str, Protein)):

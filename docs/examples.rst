@@ -4,6 +4,17 @@ Worked Examples
 Short, copy-pasteable walkthroughs. Each one starts from a ``Protein`` object
 and builds toward a figure or a result you can use.
 
+.. tip::
+   Two longer, fully executed Jupyter notebooks live in ``examples/`` in the
+   repository:
+
+   * ``nardini_from_protein_objects.ipynb`` -- NARDINI+ for a single sequence via
+     ``Protein.nardini``, worked through on a real human IDR.
+   * ``nardini_module.ipynb`` -- the batch interface: building a compositional
+     background, scoring a set of sequences, and GIN cluster assignment.
+
+   Both have their outputs saved, so you can read them without running anything.
+
 .. contents:: On this page
    :local:
    :depth: 1
@@ -117,6 +128,88 @@ beneath the NCPR profile.
    ax2.set_xlabel("Residue position")
    fig.tight_layout()
    plt.show()
+
+NARDINI+ vectors for a whole proteome
+-------------------------------------
+
+The realistic molecular-grammar workflow: read IDRs from a FASTA, compute every
+NARDINI+ vector in parallel, and get back ``Protein`` objects with the results
+attached so nothing is recomputed afterwards. See :doc:`api_guides/nardini` for the
+full guide.
+
+Step 1 -- read the sequences
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. code-block:: python
+
+   from sparrow import read_fasta
+
+   idrs = read_fasta("my_idrs.fasta")        # {header: Protein}
+
+Step 2 -- compute every vector in parallel
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:func:`~sparrow.nardini.batch.nardini_proteins` accepts sequences or ``Protein``
+objects, as a dict or a list, and returns the same shape back. The expensive part
+is the scramble-based patterning null, which is why this is worth parallelizing:
+on 160 IDRs at 1,000 scrambles it takes 18.7 s on one core and 2.7 s on eight.
+
+.. code-block:: python
+
+   from sparrow.nardini import nardini_proteins
+
+   proteins = nardini_proteins(
+       idrs,
+       num_scrambles=10000,     # the published protocol uses 100,000
+       seed=42,                 # pass one, or the numbers are not reproducible
+       show_progress=True,
+       on_error="skip",         # real proteomes contain unscoreable entries
+   )
+
+Step 3 -- read the results, free of charge
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The vectors are cached on each ``Protein``, so these calls do no work -- as long as
+the options match the ones you computed with.
+
+.. code-block:: python
+
+   import numpy as np
+
+   protein = proteins["IDR1"]
+
+   vector = protein.nardini.vector(seed=42, num_scrambles=10000)
+   vector["Frac K+R"]                 # one feature by name
+   vector.values                      # the underlying (90,) array
+
+   # nearest published human GIN grammar, plus whether to believe it
+   record = protein.nardini.gin_cluster(seed=42, num_scrambles=10000)
+   print(record["description"], record["is_typical"])
+
+   # stack the whole set into one matrix for clustering or a model
+   matrix = np.vstack([
+       p.nardini.vector(seed=42, num_scrambles=10000).values
+       for p in proteins.values()
+   ])
+
+.. important::
+   On Windows -- or any time you pass ``start_method='spawn'`` -- call this from
+   inside an ``if __name__ == "__main__":`` block. sparrow defaults to ``fork``
+   where it exists, which needs no guard and works in notebooks; see
+   :ref:`nardini-proteome`.
+
+Variations
+^^^^^^^^^^
+
+* **A non-human proteome:** build your own compositional background rather than
+  using the bundled human one, with
+  :func:`~sparrow.nardini.background.build_background`, and pass it as
+  ``background=``.
+* **Your own grammars:** rather than assigning to the 30 published human clusters,
+  cluster your own vectors with
+  :func:`~sparrow.nardini.clustering.build_gin_reference`.
+* **Patterning only:** pass ``background=None`` for the 36 composition-independent
+  patterning features, which need no reference set at all.
 
 Predicting properties for many sequences
 ----------------------------------------
