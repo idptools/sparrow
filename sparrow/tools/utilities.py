@@ -16,20 +16,31 @@ def validate_keyword_option(keyword, allowed_vals, keyword_name, error_message=N
     keyword_name : str
         the name of the keyword as the user would select it in the function call
 
-    error_message : str
-        Allows the user to pass a custom error message
-
+    error_message : str, optional
+        Allows the caller to pass a custom message used in place of the default
+        one when the keyword is invalid. Default is None (use the default
+        message).
 
     Returns
     --------
     None
 
-        No return value, but raises ctexceptions.CTException if ``keyword `` is not
-        found in the allowed_vals list
-           
-    """
+        No return value, but raises
+        :class:`sparrow.sparrow_exceptions.SparrowException` if ``keyword`` is
+        not found in the ``allowed_vals`` list.
 
+    Raises
+    -------
+    sparrow.sparrow_exceptions.SparrowException
+        If ``keyword`` is not in ``allowed_vals``.
+
+    """
 
     if keyword not in allowed_vals:
         if error_message is None:
-            raise SparrowException(f'Keyword {keyword_name} passed value [{keyword}], but this is not valid.\nMust be one of: {str(allowed_vals)}')
+            error_message = (
+                f'Keyword {keyword_name} passed value [{keyword}], but this is not valid.'
+                f'\nMust be one of: {str(allowed_vals)}'
+            )
+
+        raise SparrowException(error_message)

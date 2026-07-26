@@ -30,6 +30,10 @@ def prepare_model(network, version, gpuid):
     version : int
         The version of the network you want to use for predictions
 
+    gpuid : int
+        Index of the CUDA device to load the network onto. Only used when CUDA is
+        available; otherwise the network is loaded onto the CPU.
+
     Returns
     -------
     tuple
@@ -98,9 +102,9 @@ def __size_filter(inseqs):
 def __list2dict(protein_objs):
     """
     Helper function that takes in variable and if it's a list
-    converts into a dictionary with keys as indices (1,2,...n)
-    while if its a dictionary just returns the same dictionary 
-    again.
+    converts into a dictionary with keys as 0-based indices
+    (0,1,...n-1) while if its a dictionary just returns the same
+    dictionary again.
 
     Parameters
     --------------
@@ -344,9 +348,10 @@ def batch_predict(protein_objs,
     sequence and prediction, although the details of this mapping
     depend on the parameter return_seq2prediction.
 
-    If return_seq2prediction is False (default), the return 
+    If return_seq2prediction is False (default), the return
     dictionary maps unique indices (either those in the input
-    dictionary, or indices 1,2,...n) to a list with two elements;
+    dictionary, or 0-based indices 0,1,...n-1 for list input)
+    to a list with two elements;
 
         * [0] = sequence
         * [1] = prediction

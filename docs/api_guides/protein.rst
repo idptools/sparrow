@@ -141,6 +141,18 @@ Domains, motifs & isoforms
    sparrow.protein.Protein.plaac_prion_like_domains
    sparrow.protein.Protein.elms
    sparrow.protein.Protein.generate_phosphoisoforms
+   sparrow.predictors.Predictor.low_complexity_domains
+
+.. code-block:: python
+
+   # LCD boundaries: [[subsequence, start, end], ...]
+   p.low_complexity_domains(residue_selector="Q", minimum_length=15)
+
+   # the same call as a per-residue 1/0 mask
+   p.predictor.low_complexity_domains(residue_selector="Q")
+
+   # prion-like domains via the bundled pure-Python PLAAC implementation
+   p.plaac_prion_like_domains(core_length=60)
 
 Predictions -- disorder & secondary structure
 ---------------------------------------------
@@ -184,12 +196,37 @@ properties and distance distributions via ``protein.polymeric``.
    sparrow.polymer.Polymeric.predicted_prefactor
    sparrow.polymer.Polymeric.get_afrc_end_to_end_distribution
    sparrow.polymer.Polymeric.get_afrc_radius_of_gyration_distribution
+   sparrow.polymer.Polymeric.get_mean_afrc_end_to_end_distance
+   sparrow.polymer.Polymeric.get_mean_afrc_radius_of_gyration
+   sparrow.polymer.Polymeric.get_afrc_internal_scaling
+   sparrow.polymer.Polymeric.get_predicted_nu_dep_end_to_end_distribution
+   sparrow.polymer.Polymeric.get_saw_end_to_end_distribution
+   sparrow.polymer.Polymeric.get_mean_saw_end_to_end_distance
+   sparrow.polymer.Polymeric.get_mean_saw_radius_of_gyration
+   sparrow.polymer.Polymeric.get_nudep_saw_end_to_end_distribution
+   sparrow.polymer.Polymeric.get_mean_nudep_saw_end_to_end_distance
+   sparrow.polymer.Polymeric.get_mean_nudep_saw_radius_of_gyration
+   sparrow.polymer.Polymeric.empirical_nu
+   sparrow.polymer.Polymeric.empirical_radius_of_gyration
 
 .. code-block:: python
 
-   p.predictor.radius_of_gyration()
+   p.predictor.radius_of_gyration()               # ALBATROSS Rg, in Angstroms
+   p.predictor.radius_of_gyration(use_scaled=False)   # the non-scaled network
    p.polymeric.predicted_nu
    re_distance, probability = p.polymeric.get_afrc_end_to_end_distribution()
+
+   # analytical reference models, with tunable nu / prefactor
+   p.polymeric.get_mean_nudep_saw_radius_of_gyration(nu=0.55, prefactor=5.5)
+
+   # empirical relationships from the literature
+   p.polymeric.empirical_nu()                     # Zheng et al. 2020
+
+The ``Rg``/``Re`` predictors take a ``use_scaled`` flag selecting between the
+networks trained on ``Rg/sqrt(N)`` / ``Re/sqrt(N)`` (the default, recommended)
+and those trained on the raw values. For sequences shorter than
+``sparrow.data.configs.MIN_LENGTH_ALBATROSS_RE_RG`` (35 residues) the scaled
+network is used regardless, unless you pass ``safe=False``.
 
 (The full polymer-model surface is documented in the ``Polymeric`` reference at
 the bottom of this page.)
@@ -240,6 +277,31 @@ Visualization
 
    p.show_sequence(bold_residues=["E", "D"])   # coloured HTML (e.g. in a notebook)
 
+   # one unbroken line, no block spacing
+   p.show_sequence(blocksize=-1, newline=-1)
+
+   # get the HTML back instead of rendering it
+   html = p.show_sequence(return_raw_string=True)
+
+Both ``blocksize`` and ``newline`` accept ``-1`` to mean "the length of the
+sequence" -- ``blocksize=-1`` suppresses the block spacing and ``newline=-1``
+puts everything on one line.
+
+Plugins
+-------
+
+.. autosummary::
+   :nosignatures:
+
+   sparrow.protein.Protein.plugin
+
+.. code-block:: python
+
+   [name for name in dir(p.plugin) if not name.startswith("_")]   # what's available
+   p.plugin.MultiplicativeFCR(factor=2.5)
+
+See :doc:`../plugins` for the full plugin guide, including how to contribute one.
+
 Good to know
 ------------
 
@@ -249,6 +311,12 @@ Good to know
   ``linear_sequence_profile(mode='hydrophobicity')``.
 * Accessor objects (``predictor``, ``polymeric``, ``plugin``) are created on
   first access and reused; predictor networks load on first use.
+* Cached results are keyed on the arguments you pass, so calling the same method
+  again with different options recomputes rather than returning the earlier
+  value. Predictors additionally accept ``recompute=True`` to force a re-run.
+* Every exception sparrow raises deliberately derives from
+  :class:`sparrow.sparrow_exceptions.SparrowException`, so a single
+  ``except SparrowException`` covers all of them.
 
 ----
 

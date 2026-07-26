@@ -33,12 +33,15 @@ Inputs and outputs
 ------------------
 
 * **Input** -- a ``dict`` (keys preserved in the output) or a ``list`` (mapped to
-  integer keys ``0..n``). Values may be sequence strings or
-  :class:`sparrow.protein.Protein` objects.
+  0-based integer keys ``0..n-1``). Values may be sequence strings or
+  :class:`sparrow.protein.Protein` objects, but they must be all one or all the
+  other -- a mixture raises a ``SparrowException``.
 * **Output (default)** -- a ``dict`` mapping each input key to
   ``[sequence, prediction]``.
 * **Output (``return_seq2prediction=True``)** -- a ``dict`` mapping each unique
-  sequence directly to its prediction.
+  sequence directly to its prediction. Note that duplicate sequences collapse
+  into a single key here, so this mode loses the key/sequence mapping; use the
+  default if you need it.
 * **Order** -- the returned dictionary preserves input order.
 
 .. code-block:: python
@@ -52,18 +55,29 @@ Inputs and outputs
 Key options
 -----------
 
-* ``network`` -- which network to run (see the list above).
+* ``network`` -- which network to run (see the list above). Required.
 * ``batch_size`` -- forward-pass batch size (default 32). Larger values are
-  faster on GPU; results are independent of batch size.
-* ``version`` -- network version (default 2).
-* ``gpuid`` -- GPU index to use when CUDA is available (CPU otherwise).
+  faster on GPU; results are independent of batch size. Should be no larger than
+  the batch size used during training.
+* ``version`` -- network version (default 2, released May 21st 2023). Version 1
+  weights also ship with sparrow for reproducing older results.
+* ``gpuid`` -- CUDA device index to use when CUDA is available (default 0).
+  Ignored on machines without CUDA, where inference runs on the CPU.
 * ``batch_algorithm`` -- ``"default"`` (recommended) selects ``"pad-n-pack"`` on
-  modern PyTorch, which batches mixed-length sequences together via
-  ``pack_padded_sequence``; ``"size-collect"`` groups equal-length sequences
-  instead. Both give identical values.
-* ``safe`` -- for ``rg``/``re``, automatically routes sequences shorter than the
-  minimum reliable length to the corresponding scaled network. Leave this
-  ``True`` (the default) unless you have a specific reason not to.
+  PyTorch 1.11+, which batches mixed-length sequences together via
+  ``pack_padded_sequence``, and falls back to ``"size-collect"`` on older
+  versions. ``"size-collect"`` groups equal-length sequences instead. Both give
+  identical values. Requesting ``"pad-n-pack"`` explicitly on PyTorch older than
+  1.11 raises a ``SparrowException``.
+* ``return_seq2prediction`` -- switch the return shape (see above). Default
+  ``False``.
+* ``show_progress_bar`` -- print a ``tqdm`` progress bar as batches complete.
+  Default ``True``.
+* ``safe`` -- for ``rg``/``re``, automatically routes sequences shorter than
+  ``sparrow.data.configs.MIN_LENGTH_ALBATROSS_RE_RG`` (35 residues) to the
+  corresponding scaled network, which is substantially more accurate there. Leave
+  this ``True`` (the default) unless you have a specific reason not to. Has no
+  effect for the other networks.
 
 Performance notes
 -----------------

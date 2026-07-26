@@ -1851,7 +1851,9 @@ def score_sequence(
     alpha : float, default 1.0
         Mixing weight for S. cerevisiae vs. custom background frequencies.
         ``1.0`` uses pure S. cerevisiae background; ``0.0`` uses only the
-        frequencies supplied via *bg_freqs*.
+        frequencies supplied via *bg_freqs*. Because the default is ``1.0``,
+        passing *bg_freqs* without also lowering ``alpha`` raises a
+        ``ValueError`` rather than silently discarding the custom background.
     core_length : int, default 60
         Minimum contiguous prion-like domain length.
     window_fi : int, default 41
@@ -1872,6 +1874,7 @@ def score_sequence(
             bg_freqs={"A": 0.05, "N": 0.04, "Q": 0.04, ...}
 
         Defaults to S. cerevisiae proteome frequencies when ``None``.
+        Requires ``alpha < 1.0`` to have any effect (see ``alpha``).
     fg_freqs : dict[str, float], optional
         Foreground (prion-like) amino-acid frequency dictionary, same
         format as *bg_freqs*.  Defaults to the Alberti et al. 28-domain
@@ -1882,6 +1885,12 @@ def score_sequence(
     PLAACResult
         Dataclass with all PLAAC scores, HMM paths, disorder profiles,
         and extracted sequence motifs.
+
+    Raises
+    ------
+    ValueError
+        If the sequence is empty after stripping stop codons, or if *bg_freqs*
+        is supplied while ``alpha`` is 1.0.
 
     Examples
     --------

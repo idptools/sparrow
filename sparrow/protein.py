@@ -560,8 +560,14 @@ class Protein:
                     f"Amino acid {i} (in group 1) is not a standard amino acid"
                 )
 
-            # make sure order is always consistent
-            group1 = "".join(sorted(group1))
+        if len(group1) == 0:
+            raise sparrow_exceptions.ProteinException(
+                "group1 must contain one or more amino acids"
+            )
+
+        # make sure order is always consistent (done AFTER the loop above so an
+        # empty group1 cannot leave this as a list and break the cache key below)
+        group1 = "".join(sorted(group1))
 
         # now deal with group 2
         if group2 is None:
@@ -1053,6 +1059,13 @@ class Protein:
             "mode",
         )
 
+        # validated here (rather than only inside build_track) so the error names
+        # the offending keyword, matching linear_composition_profile /
+        # linear_property_profile
+        utilities.validate_keyword_option(
+            end_mode, ["extend-ends", "zero-ends", ""], "end_mode"
+        )
+
         if smooth is not None:
             name = "%s-%i-%s-%i" % (mode, window_size, end_mode, smooth)
         else:
@@ -1304,9 +1317,12 @@ class Protein:
             Common options:
 
             alpha : float, default 1.0
-                Mixing weight for S. cerevisiae vs. custom background frequencies.                
+                Mixing weight for S. cerevisiae vs. custom background frequencies.
                 ``1.0`` uses pure S. cerevisiae background; ``0.0`` uses only the
-                frequencies supplied via *bg_freqs*.
+                frequencies supplied via *bg_freqs*. NOTE: because the default is
+                ``1.0``, supplying *bg_freqs* without also lowering ``alpha``
+                raises a ``ValueError`` - the custom background would otherwise be
+                silently ignored.
 
             core_length : int, default 60
                 Minimum contiguous prion-like domain length.
@@ -1346,10 +1362,19 @@ class Protein:
             equals the PLD substring). If ``simple`` is False, the full PLAAC result
             object (scores and per-region metadata).
 
+        Raises
+        ------
+        ValueError
+            If the sequence is empty, or if ``bg_freqs`` is supplied while
+            ``alpha`` is left at its default of 1.0 (see ``alpha`` above).
+
         Examples
         --------
         >>> p.plaac_prion_like_domains(core_length=60)  # doctest: +SKIP
         [['QQQQQQQQQQ', 5, 15]]
+
+        >>> # a custom background requires alpha < 1.0
+        >>> p.plaac_prion_like_domains(alpha=0.0, bg_freqs=my_freqs)  # doctest: +SKIP
         """
         if simple:
             tmp = plaac_score_sequence(self.sequence, **kwargs).prd_regions
@@ -1364,11 +1389,11 @@ class Protein:
         newline=50,
         fontsize=14,
         font_family="Courier",
-        colors={},
+        colors=None,
         header=None,
-        bold_positions=[],
-        bold_residues=[],
-        opaque_positions=[],
+        bold_positions=None,
+        bold_residues=None,
+        opaque_positions=None,
         return_raw_string=False,
         warnings=True,
     ):
@@ -1381,11 +1406,12 @@ class Protein:
 
         blocksize : int
             Defines how big blocks of residues are. Blocks are equal to blocksize or the newline parameter, whicever is smaller.
-            Default=10. If set to -1 uses length of the sequence.
+            Default=10. If set to -1 uses length of the sequence (i.e. no spaces
+            are inserted).
 
         newline : int
             Defines how many residues are shown before a newline is printed. Default is 50. If set to -1 uses the length of
-            the sequence.
+            the sequence (i.e. everything is rendered on one line).
 
         fontsize : int
             Fontsize used. Default is 14
@@ -1394,27 +1420,28 @@ class Protein:
             Which font family (from HTML fonts) is used. Using a non-monospace font makes no sense as columns will be
             unaligned. Default is Courier.
 
-        colors : dict
+        colors : dict, optional
             Dictionary that allows overiding of default color scheme. Should be of format key-value as 'residue'-'color' where
             residue is a residue in the string and color is a valid HTML color (which can be a Hexcode, standard HTML color name).
-            Note that this also lets you define colors for non-standard amino acids should these be useful. Default is an empty
-            dictionary. Note also that the standard amino acid colorings are defined at sparrow.data.amino_acids.AA_COLOR
+            Note that this also lets you define colors for non-standard amino acids should these be useful. Default is None
+            (no overrides). Note also that the standard amino acid colorings are defined at sparrow.data.amino_acids.AA_COLOR
 
         header : str
             If provided, a string giving a FASTA-style header (include the leading caret yourself). Default None.
 
-        bold_positions : list
+        bold_positions : list, optional
             List of positions (indexing from 1 onwards) which will be bolded. Useful for highlighting specific regions. Note that this
             defines individual residues so (for example) to bold residues 10 to 15 would require bold_positions=[10,11,12,13,14,15].
-            Default is an empty list.
+            Default is None (nothing bolded by position).
 
-        bold_residues : list
-            List of residue types that can be bolded. Useful for highlighting specific residue groups.  Default is an empty list.
+        bold_residues : list, optional
+            List of residue types that can be bolded. Useful for highlighting specific residue groups. Default is None
+            (nothing bolded by residue type).
 
-        opaque_positions : list
+        opaque_positions : list, optional
             List of positions (indexing from 1 onwards) which will be greyed out and slightly opaque. Useful for de-emphasizing specific regions.
             Note that this defines individual residues so (for example) to grey out residues 10 to 15 would require
-            opaque_positions=[10,11,12,13,14,15]. Default is an empty list.
+            opaque_positions=[10,11,12,13,14,15]. Default is None (nothing greyed out).
 
         return_raw_string : bool
             If set to true, the function returns the actual raw HTML string, as opposed to an in-notebook rendering.
@@ -1528,13 +1555,22 @@ class Protein:
 
     @property
     def elms(self):
-        """Returns a list of NamedTuples containing each of the
-        elm annotations for the given sequence.
+        """Eukaryotic Linear Motif (ELM) annotations found in the sequence.
+
+        Each hit records the regex that matched, the ELM identifier and
+        functional-site name, the description and probability from the ELM
+        database, the start/end positions (0-indexed, end exclusive), and the
+        matched subsequence. Calculated on first access and cached.
+
+        Note this returns a **set**, so the annotations are unordered. Set
+        operations on the results of two proteins are how
+        :func:`sparrow.sequence_analysis.elm.compute_lost_elms` and friends
+        determine which motifs a mutation destroys or creates.
 
         Returns
         -------
-        List[NamedTuple]
-            A list of NamedTuples containing all possible elms in a given sequence.
+        set of sparrow.sequence_analysis.elm.ELM
+            All ELM annotations detected in the sequence.
 
         """
         if self.__elms is None:

@@ -25,13 +25,17 @@ def show_sequence(seq,
     Parameters
     -------------
 
+    seq : str
+        The amino acid sequence to render.
+
     blocksize : int
-        Defines how big blocks of residues are. Blocks are equal to blocksize or the newline parameter, whicever is smaller. 
-        Default=10. If set to -1 uses length of the sequence.
+        Defines how big blocks of residues are. Blocks are equal to blocksize or the newline parameter, whicever is smaller.
+        Default=10. If set to -1 uses length of the sequence (i.e. no spaces are
+        inserted).
 
     newline : int
         Defines how many residues are shown before a newline is printed. Default is 50. If set to -1 uses the length of
-        the sequence.
+        the sequence (i.e. everything is rendered on one line).
 
     fontsize : int
         Fontsize used. Default is 14
@@ -93,16 +97,22 @@ def show_sequence(seq,
     if opaque_positions is None:
         opaque_positions = []
 
+    # resolve the -1 sentinels FIRST, so that an explicit newline=-1 means "the
+    # whole sequence on one line" rather than being silently clamped to blocksize
+    if blocksize == -1:
+        blocksize = len(seq)
+    if newline == -1:
+        newline = len(seq)
+
+    # a block can never be wider than a line
     if blocksize > newline:
         newline = blocksize
 
-    if blocksize == -1:
-        blocksize = len(seq)
-        newline = len(seq)
-
-
     if blocksize < 1:
         raise SparrowException("blocksize must be >= 1")
+
+    if newline < 1:
+        raise SparrowException("newline must be >= 1 (or -1 for the sequence length)")
 
 
     colorString = '<p style="font-family:%s;font-size: %ipx">'%(font_family, fontsize)

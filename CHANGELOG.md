@@ -2,6 +2,57 @@
 
 All notable changes to SPARROW are documented here.
 
+## Unreleased
+
+### Fixed / Documentation
+
+The rest of this entry is a correctness and documentation pass. The headline items are a class of memoization bugs in which cached results were keyed on too little information and were therefore returned for calls made with *different* parameters, and a validation helper that silently did nothing when given a custom error message.
+
+### Fixed — incorrect results
+
+* **`Protein.polymeric`: cached polymer values ignored their parameters.** `get_mean_nudep_saw_end_to_end_distance()`, `get_mean_nudep_saw_radius_of_gyration()` and `get_nudep_saw_end_to_end_distribution()` cached on a fixed key that omitted `nu` and `prefactor`; `get_saw_end_to_end_distribution()`, `get_mean_saw_end_to_end_distance()` and `get_mean_saw_radius_of_gyration()` omitted `prefactor`; and `get_mean_afrc_end_to_end_distance()`, `get_mean_afrc_radius_of_gyration()` and `get_afrc_internal_scaling()` omitted `mode`. The second and all subsequent calls on the same `Protein` returned the *first* call's value regardless of the parameters passed. All of these now key their cache on every argument that affects the result.
+* **`sparrow.tools.utilities.validate_keyword_option()` did nothing when passed a custom `error_message`.** The invalid-keyword branch only raised when `error_message` was `None`, so supplying one disabled the validation entirely. It now always raises, using the custom message when given.
+* **`Predictor.binary_disorder()` ignored its own arguments after the first call.** It shared the plain `metapredict-disorder` cache key with `disorder()` and `disorder_domains()`, so a result computed with metapredict's defaults was reused even when non-default `disorder_threshold`, `minimum_IDR_size`, `minimum_folded_domain` or `gap_closure` values were requested. The cache key now includes those parameters, and the previous "we recommend `recompute=True`" caveat no longer applies.
+* **`calculate_molecular_weight("")` returned 18.0 instead of 0.0.** The peptide-bond correction subtracted `18 * (len(seq) - 1)`, which *added* a water for an empty sequence. Also affected `Protein("").molecular_weight`.
+* **`Polymeric.empirical_nu()` and `Polymeric.empirical_radius_of_gyration()` silently ignored `mode`.** Any value was accepted and the `zheng2020` parameterization used regardless. Unrecognized modes now raise.
+* **`show_sequence(newline=-1)` did not do what it documented.** `-1` is documented to mean "use the sequence length", but the `-1` sentinel was only resolved for `blocksize`, so `newline=-1` was silently clamped up to `blocksize` and lines still broke every 10 residues. Both sentinels are now resolved before the block/line consistency check.
+* `grammar.PATCH_FEATURES` now documents *why* `"W Patch"` is absent (it matches NARDINI+, which drops tryptophan because W patches essentially do not occur in the proteome) and derives the list from the amino-acid alphabet so the intent is explicit rather than looking like an off-by-one. The feature schema is unchanged.
+
+### Fixed — errors and robustness
+
+* **All sparrow exceptions now derive from `SparrowException`.** `ProteinException`, `PatterningException` and `CalculationException` previously inherited straight from `Exception`, so `except SparrowException` did not catch them despite the docstrings implying it would.
+* `Protein.show_sequence()` used mutable default arguments (`colors={}`, `bold_positions=[]`, `bold_residues=[]`, `opaque_positions=[]`), which are shared across every call for the lifetime of the process. They now default to `None`.
+* `Protein.compute_kappa_x()` performed its group-ordering normalization *inside* the residue-validation loop, so an empty `group1` skipped it entirely and produced a `TypeError` from the cache-key construction. Empty groups now raise a clear `ProteinException`.
+* `Predictor.binary_disorder()`'s `override_folded_domain_minsize` argument has no effect — current versions of metapredict's `predict_disorder_domains()` do not accept it. Setting it now raises a `DeprecationWarning` instead of being silently dropped; the argument will be removed in a future release.
+* `phospho_isoforms`: `phospho_rate` was unvalidated, so a value above 1 quietly returned the full isoform set and a negative value quietly returned an empty list. Out-of-range rates and out-of-range phosphosite indices now raise, and the bare `Exception`s raised for a bad `mode` are now `SparrowException`s.
+* `elm.generate_elm_df()` raised `UnboundLocalError` on a class file with no recognizable header row; it now raises a `SparrowException` explaining what was expected.
+* `elm.ELM.probability` is annotated `float` but held the raw string parsed from the TSV; it is now coerced to `float`.
+* `elm.ELM.__eq__` raised `AttributeError` when compared against a non-`ELM` object instead of returning `NotImplemented`.
+* The ELM class table is now parsed once and cached rather than re-read from disk on every `Protein.elms` access — the lost/gained/retained helpers build a second `Protein`, so they were paying for it twice per call.
+
+### Fixed — tests
+
+* **The test suite could not be collected from the repository root.** Four test modules resolved their reference data through `os.getcwd()`, so `pytest` only worked from inside `sparrow/tests`. Paths are now resolved from `__file__` via a new `sparrow.tests.reference_data_path()` helper, and `pytest sparrow/tests` works from anywhere.
+* **`test_albatross.py` was intermittently failing.** Its ~30 batch-vs-single prediction assertions use `atol=1e-05` on sequences generated by `build_seq()`, which draws from numpy's *global* unseeded RNG — so each run tested different sequences. Padding and batching legitimately change the order of float32 accumulation in the LSTM, and roughly 2 in 360 comparisons land just over that tolerance (worst observed delta 1.34e-05), so the module failed a meaningful fraction of runs. An autouse fixture now seeds the RNG per test, keeping the coverage while making any failure reproducible instead of a coin flip.
+* Added `sparrow/tests/test_regressions.py` pinning the behaviour of every fix above.
+
+### Documentation
+
+* `Predictor.radius_of_gyration()` and `Predictor.end_to_end_distance()`: the primary `use_scaled` option was entirely absent from the `Parameters` sections, and the automatic short-sequence fallback was documented as 25 residues when the actual threshold (`MIN_LENGTH_ALBATROSS_RE_RG`) is 35. Return units (Angstroms) are now stated.
+* `Predictor.low_complexity_domains()` documented a `return domains : bool` parameter that does not exist and gave no return description; `Predictor.disorder_domains()` described `return_boundaries` only in passing.
+* Corrected return types: `pLDDT()` and `pscore()` return arrays, not lists; `track_tools`' `predefined_linear_track()`, `linear_track_composition()` and `build_track()` return `np.ndarray`, not `list`; `Protein.elms` returns a `set` of `ELM` dataclasses, not a list of NamedTuples.
+* `Predictor.transactivation_domains()` described its return value as a nuclear-export-signal score (copy-paste error).
+* `sequence_complexity`: the `permissive` flag was documented as "max_interruption is ignored", which is not what it does — `max_interruption` applies in both modes; `permissive` controls whether bridged interruption residues count toward the domain's residue fraction.
+* `Polymeric.get_mean_afrc_radius_of_gyration()` documented its default `mode` as `'scaling law'`; it is `'distribution'`. `recompute` is now documented on every method that accepts it, the AFRC/SAW distribution getters' return type is described as the tuple it actually is, and `Polymeric.__init__`'s truncated docstring is completed.
+* `plaac_prion_like_domains()` / `plaac.score_sequence()`: supplying `bg_freqs` while leaving `alpha` at its default of `1.0` raises a `ValueError`. This constraint is now documented on both.
+* `batch_predict`: list inputs map to 0-based keys (`0..n-1`), not `1..n`; `prepare_model`'s `gpuid` is now documented; the batch guide now covers `version`, `gpuid`, `return_seq2prediction`, `show_progress_bar`, the `pad-n-pack` PyTorch requirement, and the all-strings-or-all-`Protein` input constraint.
+* `docs/predictors.rst` referred to a `dssp()` method that does not exist (it is `dssp_helicity()`) and gave the weights directory as a literal `sparrow/data/networks/predictor`. Added guidance on documenting options and on keying memoization correctly.
+* `docs/api_guides/protein.rst`: added the previously-undocumented `Protein.plugin` accessor, `Predictor.low_complexity_domains`, and the full `Polymeric` surface (SAW / nu-dependent SAW / empirical methods) to the capability index.
+* **Python requirement corrected to 3.9+.** `pyproject.toml`, the README and the install guide all claimed 3.7+, but `sparrow.data.properties.aaindex_loader` subscripts builtin generics (`dict[str, object]`) at runtime, which requires 3.9.
+* The install guide advertised `pip install idptools-sparrow`, which does not match the `sparrow` distribution name in `pyproject.toml`; it now documents the GitHub install the README describes, plus a development-install section.
+* The README's batch-prediction section claimed MPS acceleration; `batch_predict` selects between CUDA and CPU only.
+* `docs/index.rst`'s feature list omitted prefactor prediction, SHD, molecular weight, the domain/motif tools and the plugin system.
+
 ## 1.0.0 — first major release
 
 The first major (1.0) release. This release centers on a large correctness,

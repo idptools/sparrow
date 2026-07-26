@@ -115,6 +115,10 @@ def test_kappa():
 
 def test_kappa_range():
 
+    # these sequences are randomly generated, so seed for reproducibility -
+    # otherwise a failure cannot be re-run
+    random.seed(20240517)
+
     for i in range(100):
 
         Es = 'E'*random.randint(1,60)
@@ -133,5 +137,9 @@ def test_kappa_range():
         k = p.kappa
 
         assert k > 0
-        assert k < 1
+        # kappa is flattened at 1, so 1.0 is a legitimate value - a shuffle can
+        # land on a maximally-segregated arrangement (e.g. a single E and a
+        # single K at opposite ends of a G tract). This was `< 1`, which made
+        # the test fail on roughly 4% of runs.
+        assert k <= 1
             

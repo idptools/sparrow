@@ -25,6 +25,8 @@ BASIC workflow is as followed:
 """
 import itertools
 
+from sparrow.sparrow_exceptions import SparrowException
+
 ## -----------------------------------------
 ##
 def _predict_all_phosphosites(protein):
@@ -99,32 +101,50 @@ def _build_phosphoSeqome(sequence, phosphosites, phospho_rate=1):
     phosphosites : list
         List of valid phosphosite positions
 
-    phospho_rate : float 
-        Value between 0 and 1 which defines the maximum percent of phosphosites 
-        can be 'phosphorylated' a each sequence. Defult is 1 (IE all sites can be 
+    phospho_rate : float
+        Value between 0 and 1 which defines the maximum percent of phosphosites
+        can be 'phosphorylated' a each sequence. Defult is 1 (IE all sites can be
         phosphorylated)
 
     Returns
     ----------
     list
-        list of sequences for all posible phospho-isoforms 
+        list of sequences for all posible phospho-isoforms
         based off of the provided inputed list of phosphosites
 
-        When phospho_rate = 1 (100%) 
+        When phospho_rate = 1 (100%)
             the length of output list = 2^n where n=len(phosphosites)
+
+    Raises
+    ----------
+    sparrow.sparrow_exceptions.SparrowException
+        If phospho_rate is not between 0 and 1, or if a phosphosite index falls
+        outside the sequence.
     """
 
+    # without this check an out-of-range rate silently yields an empty list (for a
+    # negative rate) or the full 2^n set (for a rate above 1)
+    if phospho_rate < 0 or phospho_rate > 1:
+        raise SparrowException(
+            f"phospho_rate must be between 0 and 1 (got {phospho_rate})"
+        )
+
+    for site in phosphosites:
+        if site < 0 or site >= len(sequence):
+            raise SparrowException(
+                f"Phosphosite index {site} is outside the sequence "
+                f"(length {len(sequence)}). Indices are expected to be 0-based."
+            )
+
     _max_phospho_number = int(len(phosphosites)*phospho_rate)
-    ## GET ALL phospho-sequence combinations 
+    ## GET ALL phospho-sequence combinations
     phosphoSeqome = []
-    phosphoSeqome_info = []
     for phosphostatus in itertools.product("01", repeat=len(phosphosites)):
-        
+
         if phosphostatus.count('1') > _max_phospho_number:
             continue
         newseq = list(sequence)
 
-        count = 0
         indx = 0
         # look over each element in our phosphosite on/off list
         for i in phosphostatus:
@@ -133,9 +153,8 @@ def _build_phosphoSeqome(sequence, phosphosites, phospho_rate=1):
                 # set the AA at that position to a negative residue (we use E but
                 # could be D)
                 newseq[phosphosites[indx]] = "E"
-                count+=1 
             indx = indx + 1
-            
+
         # now we've replaced some number of T/Y/S with E representing a different
         # phosphostate
         newseq = "".join(newseq)
@@ -164,19 +183,27 @@ def get_phosphoisoforms(protein, mode="all", phospho_rate=1, phosphosites=None):
     
         'custom'    : uses the 'phosphosites' parameter as indices for phosphosites.
         
-    phospho_rate : int, optional
-        Value between 0 and 1 which defines the maximum percent of phosphosites 
-        can be 'phosphorylated' a each sequence, by default 1 (IE all sites can be 
+    phospho_rate : float, optional
+        Value between 0 and 1 which defines the maximum percent of phosphosites
+        can be 'phosphorylated' a each sequence, by default 1 (IE all sites can be
         phosphorylated)
 
     phosphosites : list, optional
-        Custom list of indices for valid phosphosite positions, by default None
+        Custom list of 0-based indices for valid phosphosite positions. Only used
+        when ``mode='custom'``, in which case it is required. Default is None.
 
     Returns
     -------
     list
         list of sequences for the possible phosphoisoforms based off the selected method.
-        Phosphorylatable amino acids are replaced with 'E'.    
+        Phosphorylatable amino acids are replaced with 'E'.
+
+    Raises
+    -------
+    sparrow.sparrow_exceptions.SparrowException
+        If ``mode`` is not one of 'all', 'predict' or 'custom'; if
+        ``mode='custom'`` but no ``phosphosites`` were given; if ``phospho_rate``
+        is outside 0-1; or if a phosphosite index falls outside the sequence.
     """
 
     # get phosphosite positions
@@ -188,9 +215,13 @@ def get_phosphoisoforms(protein, mode="all", phospho_rate=1, phosphosites=None):
         if phosphosites is not None:
             _phosphosites = phosphosites
         else:
-            raise Exception('To use custom phosphosites must be defined')
+            raise SparrowException(
+                "To use mode='custom' the phosphosites keyword must be defined"
+            )
     else:
-        raise Exception('Please specify mode to compute phosphosites')
+        raise SparrowException(
+            f"Invalid mode passed [{mode}]. Must be one of: 'all', 'predict', 'custom'"
+        )
 
     # generate all phospho-Isoforms
     return _build_phosphoSeqome(protein.sequence, _phosphosites, phospho_rate=phospho_rate)

@@ -6,30 +6,38 @@ def low_complexity_domains_holt_permissive(sequence, residue_selector, minimum_l
     """
     Function to identify low complexity domains enriched in a specific residues.
 
+    This is the "permissive" variant of :func:`low_complexity_domains_holt`: the
+    bridged interruption residues also count towards the domain's residue count,
+    so a domain interrupted by non-selector residues clears the
+    ``fractional_threshold`` more easily and more/longer domains are reported.
+
     Parameters
     ----------
     sequence : str
         Amino acid sequence
 
     residue_selector : list or str
-        List of residues to search through
+        One or more one-letter amino acid codes defining the residues to search
+        for (e.g. ``'Q'`` or ``'ED'``)
 
     minimum_length : int
-        Minimum length of a low complexity domain
+        Minimum length of a low complexity domain. Default is 15.
 
     max_interruption : int
-        Maximum number of residues that can be between two residues in the
-        residue_selector list
+        Maximum number of consecutive residues NOT in residue_selector that are
+        permitted between two selector residues inside a domain. Default is 5.
 
     fractional_threshold : float
-        Minimum fraction of residues in a low complexity domain that must be
-        in the residue_selector list
+        Minimum fraction (0-1) of residues in a low complexity domain that must
+        be in the residue_selector list. Note this is a strict threshold: the
+        fraction must exceed it. Default is 0.25.
 
     Returns
     -------
     list
         List of lists. Each list contains the low complexity domain sequence,
-        the start index, and the end index
+        the start index (0-indexed) and the end index (exclusive), such that
+        ``sequence[start:end]`` is the domain.
 
     """
     return __low_complexity_domains_holt_internal(sequence=sequence,
@@ -43,7 +51,11 @@ def low_complexity_domains_holt_permissive(sequence, residue_selector, minimum_l
 def low_complexity_domains_holt(sequence, residue_selector, minimum_length=15, max_interruption=5, fractional_threshold=0.25):
 
     """
-    Function to identify low complexity domains enriched in a specific residues
+    Function to identify low complexity domains enriched in a specific residues.
+
+    Only residues drawn from ``residue_selector`` count towards a domain's
+    residue count. See :func:`low_complexity_domains_holt_permissive` for the
+    variant in which bridged interruption residues count too.
 
     Parameters
     ----------
@@ -51,25 +63,31 @@ def low_complexity_domains_holt(sequence, residue_selector, minimum_length=15, m
         Amino acid sequence
 
     residue_selector : list or str
-        List of residues to search through
+        One or more one-letter amino acid codes defining the residues to search
+        for (e.g. ``'Q'`` or ``'ED'``)
 
     minimum_length : int
-        Minimum length of a low complexity domain
+        Minimum length of a low complexity domain. Default is 15.
 
     max_interruption : int
-        Maximum number of residues that can be between two residues in the
+        Maximum number of consecutive residues NOT in residue_selector that are
+        permitted between two selector residues inside a domain. Default is 5
+        (Gutierrez et al. used 17).
 
     fractional_threshold : float
-        Minimum fraction of residues in a low complexity domain that must be
+        Minimum fraction (0-1) of residues in a low complexity domain that must
+        be in the residue_selector list. Note this is a strict threshold: the
+        fraction must exceed it. Default is 0.25.
 
     Returns
     -------
     list
         List of lists. Each list contains the low complexity domain sequence,
-        the start index, and the end index
+        the start index (0-indexed) and the end index (exclusive), such that
+        ``sequence[start:end]`` is the domain.
 
     """
-    return __low_complexity_domains_holt_internal(sequence=sequence, 
+    return __low_complexity_domains_holt_internal(sequence=sequence,
                                                   residue_selector=residue_selector, 
                                                   minimum_length=minimum_length, 
                                                   max_interruption=max_interruption, 
@@ -100,15 +118,19 @@ def __low_complexity_domains_holt_internal(sequence, residue_selector, minimum_l
         in the residue_selector list
 
     permissive : bool
-        If True, then the max_interruption is ignored and the domain is
-        extended as far as possible
+        Controls what counts towards a domain's residue count. If False
+        (default), only residues in residue_selector are counted. If True, the
+        bridged interruption residues are counted as well, which makes the
+        fractional_threshold easier to clear. Note that max_interruption is
+        honoured in BOTH modes - it always determines where a domain ends.
 
     Returns
     -------
     list
         List of lists. Each list contains the low complexity domain sequence,
-        the start index, and the end index
-    
+        the start index (0-indexed) and the end index (exclusive), such that
+        ``sequence[start:end]`` is the domain.
+
     """
 
     # build binary sequence

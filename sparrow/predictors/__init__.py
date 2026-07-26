@@ -120,7 +120,7 @@ class Predictor:
         Returns
         -----------
         list
-            An list of len(seq) with per-residue predictions
+            A list of len(seq) with per-residue predictions
 
         """
 
@@ -447,9 +447,8 @@ class Predictor:
         Returns
         -------------
         list
-            Returns a list with  per-residue probability scores for whether
-            or not a residue is predicted to be in a nuclear export
-            signal
+            Returns a list with per-residue probability scores for whether
+            or not a residue is predicted to be in a transactivation domain
 
         """
 
@@ -559,7 +558,7 @@ class Predictor:
         residue_selector : str
             A string of one or more one-letter amino acid codes used to define
             the type of residues to find in LCD. (str). For example 'Q' or 'ED' for
-            aspartic acid and glutamic acid.
+            glutamic acid and aspartic acid.
 
         minimum_length : int
             An integer that defines the shortes possible LCD (int). Must be a
@@ -572,15 +571,21 @@ class Predictor:
 
         fractional_threshold : float
             A fraction between 0 and 1 that defines the minimum fraction of amino
-            acids  found in the residue selector that can be tolerated in the LCD.
+            acids found in the residue selector that must be present in the LCD.
+            Note this is a strict threshold (the LCD fraction must exceed it).
             Default = 0.25.
 
-        return domains  : bool
-
-
-        Return
+        Returns
         -------------
         list
+            A list of length equal to the sequence, where each element is 1 if
+            that residue falls inside a low-complexity domain and 0 if not.
+
+        See Also
+        -------------
+        sparrow.protein.Protein.low_complexity_domains : Returns the LCD
+            boundaries and subsequences instead of a per-residue mask, and also
+            offers the 'holt-permissive' mode.
 
         """
 
@@ -632,15 +637,24 @@ class Predictor:
             the prediction has run already
 
         return_boundaries : bool
-            Flag which, if provdied, means this function returns a nested list, where
-            each sub-element contains the start and end indices of IDRs in the
-            sequence, e.g. [[0,10], [40,80]].
+            Flag which, if set to True, means this function returns the IDR
+            boundaries instead of a per-residue mask. Default is False.
 
         Returns
         -------------
         list
-            Returns a list with 1s or 0s as to if a region is in an IDR or not. NOTE
-            if you want the actual boundaries these can be obtained in a hacky way
+            By default, a list of len(seq) with 1s or 0s indicating whether each
+            residue is in an IDR or not.
+
+            If ``return_boundaries`` is True, a nested list is returned instead,
+            where each sub-element gives the start and end indices of one IDR in
+            the sequence, e.g. ``[[0, 10], [40, 80]]`` (start 0-indexed, end
+            exclusive).
+
+        See Also
+        -------------
+        binary_disorder : Same per-residue classification, but exposes
+            metapredict's IDR-definition parameters.
 
         """
 
@@ -696,8 +710,9 @@ class Predictor:
 
         Returns
         -------------
-        list
-            Returns a list with per-residue pLDDT scores
+        np.ndarray
+            Returns an array of len(seq) with per-residue pLDDT scores. Note
+            these are normalized to fall between 0 and 1 rather than 0 and 100.
 
         """
 
@@ -730,7 +745,9 @@ class Predictor:
         that are fed into metapredicts' predict_disorder_domains() function
         can be provided here.
 
-        If non-default values are used we recommend selecting recompute=True.
+        Results are memoized per unique combination of the parameters below, so
+        calling this function again with different values recomputes correctly
+        without needing recompute=True.
 
         Parameters
         --------------
@@ -771,6 +788,13 @@ class Predictor:
             fit is "noisy", but when smoothed gaps are increasingly rare.
             Default = 10.
 
+        override_folded_domain_minsize : bool
+            DEPRECATED and ignored. Current versions of metapredict's
+            ``predict_disorder_domains()`` no longer expose this option, so
+            passing it has no effect on the returned classification. Setting it
+            to anything other than False raises a ``DeprecationWarning``. It will
+            be removed in a future release. Default = False.
+
 
         Returns
         -------------
@@ -781,7 +805,27 @@ class Predictor:
 
         """
 
-        selector = "metapredict-disorder"
+        # this option is no longer supported by metapredict's IDR-definition
+        # algorithm; warn rather than silently ignoring a value the user set
+        if override_folded_domain_minsize:
+            import warnings
+
+            warnings.warn(
+                "override_folded_domain_minsize is deprecated and has no effect: "
+                "metapredict's predict_disorder_domains() no longer supports it. "
+                "The argument will be removed in a future release of sparrow.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+
+        # NB: the IDR-definition parameters are part of the cache key. The plain
+        # "metapredict-disorder" key used by disorder()/disorder_domains() holds a
+        # result computed with metapredict's defaults, so reusing it here would
+        # silently ignore any non-default values passed to this function.
+        selector = (
+            f"metapredict-disorder-{disorder_threshold}-{minimum_IDR_size}"
+            f"-{minimum_folded_domain}-{gap_closure}-{override_folded_domain_minsize}"
+        )
         # local import
         from metapredict import meta
 
@@ -856,12 +900,14 @@ class Predictor:
             the prediction has run already
 
         normalized : bool
-            Flag which, if set to true, means returned pscore falls between 0 and 1
+            Flag which, if set to true (default), means the returned pscore is
+            rescaled from its native 0-6 range onto 0-1 and clipped to those
+            bounds. Set to False for the raw network output.
 
         Returns
         -----------
-        list
-            An list of len(seq) with per-residue predictions
+        np.ndarray
+            An array of len(seq) with per-residue predictions
 
         """
 
@@ -1158,14 +1204,22 @@ class Predictor:
         in general we have found the scaled networks are slightly more accurate.
 
         Note that for short sequences use_scaled performs much more accurately. As
-        such, if the sequence is less than 25 residues in length, the predictor
-        automatically invokes the scaled network even if the non-scaled version
-        was requested. This is the recommended and save behavior; however, if you
-        want to override this, you can do so by setting safe=False. We do NOT
-        recommend this, but, it can be done.
+        such, if the sequence is shorter than
+        ``sparrow.data.configs.MIN_LENGTH_ALBATROSS_RE_RG`` residues (35 at the
+        time of writing), the predictor automatically invokes the scaled network
+        even if the non-scaled version was requested. This is the recommended and
+        safe behavior; however, if you want to override this, you can do so by
+        setting safe=False. We do NOT recommend this, but, it can be done.
 
         Parameters
         --------------
+        use_scaled : bool
+            Flag which selects the network used. If True (default) the
+            ``scaled_rg`` network - trained on Rg/sqrt(N) - is used and the
+            prediction is multiplied back up by sqrt(N). If False the ``rg``
+            network, trained directly on Rg, is used. We recommend leaving this
+            as True. Default = True.
+
         recompute : bool
             Flag which, of set to true, means the predictor re-runs regardless of if
             the prediction has run already
@@ -1178,7 +1232,7 @@ class Predictor:
         Returns
         -------------
         float
-            Returns the predicted radius of gyration of the sequence
+            Returns the predicted radius of gyration of the sequence, in Angstroms
 
         """
 
@@ -1231,14 +1285,22 @@ class Predictor:
         in general we have found the scaled networks are slightly more accurate.
 
         Note that for short sequences scaled networks performs much more accurately. As
-        such, if the sequence is less than 25 residues in length, the predictor
-        automatically invokes the scaled network even if the non-scaled version
-        was requested. This is the recommended and save behavior; however, if you
-        want to override this, you can do so by setting safe=False. We do NOT
-        recommend this, but, it can be done.
+        such, if the sequence is shorter than
+        ``sparrow.data.configs.MIN_LENGTH_ALBATROSS_RE_RG`` residues (35 at the
+        time of writing), the predictor automatically invokes the scaled network
+        even if the non-scaled version was requested. This is the recommended and
+        safe behavior; however, if you want to override this, you can do so by
+        setting safe=False. We do NOT recommend this, but, it can be done.
 
         Parameters
         --------------
+        use_scaled : bool
+            Flag which selects the network used. If True (default) the
+            ``scaled_re`` network - trained on Re/sqrt(N) - is used and the
+            prediction is multiplied back up by sqrt(N). If False the ``re``
+            network, trained directly on Re, is used. We recommend leaving this
+            as True. Default = True.
+
         recompute : bool
             Flag which, of set to true, means the predictor re-runs regardless of if
             the prediction has run already
@@ -1251,7 +1313,7 @@ class Predictor:
         Returns
         -------------
         float
-            Returns the predicted end-to-end distance of the sequence
+            Returns the predicted end-to-end distance of the sequence, in Angstroms
 
         """
 

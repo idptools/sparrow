@@ -3,7 +3,6 @@ import urllib3
 import numpy as np
 
 from sparrow.protein import Protein
-from sparrow.sparrow_exceptions import SparrowException
 
 
 def uniprot_fetch(uniprot_accession):
@@ -97,9 +96,11 @@ def read_fasta(filename, **kwargs):
 
     Raises
     ------
-    SparrowException
-        Propagated if underlying protfasta raises and is not handled by mode
-        selections.
+    protfasta.protfasta_exceptions.ProtfastaException
+        Propagated from the underlying ``protfasta.read_fasta`` call - for
+        example if the file is missing, a header is duplicated while
+        ``expect_unique_header=True``, or a sequence is invalid and
+        ``invalid_sequence_action='fail'``.
 
     Examples
     --------
@@ -146,6 +147,18 @@ def build_grammar_background_from_fasta(
     -------
     sparrow.sequence_analysis.grammar.GrammarCompositionStats
         Computed background statistics object.
+
+    .. deprecated::
+       Use :func:`sparrow.nardini.build_background` instead::
+
+           from sparrow.nardini import build_background
+
+           background = build_background("idrs.fasta")
+           background.save("idrs_background.npz")
+
+       That covers four more compositional features and produces a background
+       that works with GIN cluster assignment. This function will be removed in
+       a future release.
     """
     # Local import avoids module-level circular dependency.
     from sparrow.sequence_analysis import grammar

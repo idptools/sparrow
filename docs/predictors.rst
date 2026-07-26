@@ -30,18 +30,20 @@ Note that the PARROT predictor should be predicted in ``residues`` mode - i.e. w
 
 **Step 2: Copy the parameter file into SPARROW**
 
-Next we take ``new_predictor.pt`` and we're going to copy it into sparrow. Specifically, this trained network should be placed under::
+Next we take ``new_predictor.pt`` and we're going to copy it into sparrow. Specifically, this trained network should be placed in its own directory under ``sparrow/data/networks/``::
 
-  sparrow/data/networks/predictor
+  sparrow/data/networks/<predictor_name>/
 
-and MUST follow the naming convention ``<predictor_name>_network_v<X>.pt``. Note there that:
+and MUST follow the naming convention ``<file_stem>_network_v<X>.pt``. Note there that:
 
 * ``<predictor_name>`` should be a single word or word connected by underscores, all lower case, that we will use as the function name to call the predictor. For example, *disorder*, *dssp* or *transmembrane* are good examples. Keep this simple but it should be clear and unambigious.
+* ``<file_stem>`` is usually just ``<predictor_name>``, though several of the existing networks append ``_predictor`` (see the examples below). Whatever you choose must match the ``NETWORK_PATH`` template you set in step 3.
 * ``<X>`` here is the specific version of this network. It is possible that your network may be retrained later, and as such we want to enable future sparrow users to select specific network versions, althogh of the course the predictors should default to the most recent version. This ability to select specific network versions is built into the standard predictor template code.
 
-As an example, our transmembrane predictor has the format::
+As examples, the transmembrane and radius-of-gyration networks are stored as::
 
-  transmembrane_predictor_network_v4.pt
+  sparrow/data/networks/transmembrane/transmembrane_predictor_network_v4.pt
+  sparrow/data/networks/rg/rg_network_v2.pt
 
 
 **Step 3: Build a predictor class which performs the prediction**
@@ -107,4 +109,10 @@ As such, to finally make a new predictor accessible, ``sparrow.predictor.Predict
 2. It should then perform the prediction on the underlying protein sequence
 3. It should (ideally) memoize the outcome into a local dictionary that means if the same prediction is called again it is simply referenced rather than recomputed.
 
-Rather than going into the details here, the underlying code and example should make this clear. Noteably, see ``dssp()`` and ``transmembrane_regions()`` for good examples of PARROT-based predictors. One important thing is to document these predictors clearly
+Rather than going into the details here, the underlying code and example should make this clear. Notably, see ``dssp_helicity()`` and ``transmembrane_regions()`` for good examples of PARROT-based predictors.
+
+One important thing is to document these predictors clearly. In particular:
+
+* Give every option a numpydoc ``Parameters`` entry, including its default. Options that exist in the signature but are absent from the docstring are effectively invisible to users.
+* If a predictor memoizes its result, make the memoization key include **every** argument that can change the returned value. A selector that ignores an argument will silently hand back a result computed with different settings - see ``binary_disorder()`` for the pattern to follow.
+* State the return type and units explicitly (for example, Rg and Re are returned in Angstroms).

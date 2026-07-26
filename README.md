@@ -111,7 +111,7 @@ Rg and Re can be predicted with the `use_scaled` flag, which uses networks train
 
 ### Batch predictions
 
-Batch mode predicts thousands of sequences in seconds; this parallelizes particularly well on GPUs and MPS but also on x86 CPUs.
+Batch mode predicts thousands of sequences in seconds; this parallelizes particularly well on CUDA GPUs but is also a large speed-up on CPUs.
 
 ```python
 from sparrow.predictors import batch_predict
@@ -124,7 +124,12 @@ results = batch_predict.batch_predict(sequences, network="re")
 
 Networks available  for batch predict are: `rg`, `scaled_rg`, `re`, `scaled_re`, `prefactor`,
 `scaling_exponent`, `asphericity`. As with single-sequence predictions, we
-**strongly recommend the `scaled_rg` and `scaled_re` networks**.
+**strongly recommend the `scaled_rg` and `scaled_re` networks**. Note that with the
+default `safe=True`, the `rg` and `re` networks automatically hand sequences shorter
+than 35 residues to their scaled counterparts.
+
+See [the batch prediction guide](https://idptools-sparrow.readthedocs.io/en/latest/api_guides/batch.html)
+for all options.
 
 ## Amino-acid property profiles
 

@@ -1,14 +1,14 @@
 from sparrow import Protein
 import pytest
 import protfasta
-import os
 import numpy as np
 from sparrow.predictors.batch_predict import batch_predict
 from sparrow import read_fasta as read_fasta_sparrow
 
+from . import reference_data_path
 
-current_filepath = os.getcwd()
-onehundred_seqs = "{}/test_data/test_seqs_100.fasta".format(current_filepath)
+
+onehundred_seqs = reference_data_path("test_seqs_100.fasta")
 
 seqs = protfasta.read_fasta(onehundred_seqs)
 seqs_sparrow = read_fasta_sparrow(onehundred_seqs)
@@ -27,6 +27,21 @@ seqs_sparrow = read_fasta_sparrow(onehundred_seqs)
 from . import build_seq
 
 
+@pytest.fixture(autouse=True)
+def _seed_random_sequences():
+    """Make the randomly-generated test sequences reproducible.
+
+    Many tests in this module build sequences with build_seq(), which draws from
+    numpy's *global* RNG, and then compare predictions with atol=1e-05. Padding
+    and batching change the order of float32 accumulation inside the LSTM, so
+    genuine differences of ~1e-5 do occur; on unseeded random sequences that made
+    these tests fail intermittently (measured: ~2 in 360 comparisons land just
+    over the tolerance, worst observed delta 1.34e-05).
+
+    Seeding per test keeps the coverage but makes any failure reproducible rather
+    than a coin flip.
+    """
+    np.random.seed(20240517)
 
 
 def test_rg_prediction_v1():
@@ -36,7 +51,7 @@ def test_rg_prediction_v1():
     ## is literally the same
 
     
-    uid_2_rg_v1 = np.load('test_data/test_100_rg.npy', allow_pickle=True).item()
+    uid_2_rg_v1 = np.load(reference_data_path("test_100_rg.npy"), allow_pickle=True).item()
     
 
     ## return_seq2prediction is True
@@ -105,7 +120,7 @@ def test_rg_prediction_v1():
 def test_rg_prediction_v2():
 
     
-    uid_2_rg_v2 = np.load('test_data/test_100_rg_v2.npy', allow_pickle=True).item()
+    uid_2_rg_v2 = np.load(reference_data_path("test_100_rg_v2.npy"), allow_pickle=True).item()
 
     ## return_seq2prediction is True
     # input dict of sparrow.protein.Protein objects
@@ -170,7 +185,7 @@ def test_rg_prediction_v2():
         
 
 def test_rg_scaled_prediction_v1():
-    uid_2_rg_scaled_v1 = np.load('test_data/test_100_rg_scaled.npy', allow_pickle=True).item()
+    uid_2_rg_scaled_v1 = np.load(reference_data_path("test_100_rg_scaled.npy"), allow_pickle=True).item()
 
     ## return_seq2prediction is True
     # input dict of sparrow.protein.Protein objects
@@ -181,7 +196,7 @@ def test_rg_scaled_prediction_v1():
 
 
 def test_rg_scaled_prediction_v2():
-    uid_2_rg_scaled_v2 = np.load('test_data/test_100_rg_scaled_v2.npy', allow_pickle=True).item()
+    uid_2_rg_scaled_v2 = np.load(reference_data_path("test_100_rg_scaled_v2.npy"), allow_pickle=True).item()
 
     ## return_seq2prediction is True
     # input dict of sparrow.protein.Protein objects
@@ -192,7 +207,7 @@ def test_rg_scaled_prediction_v2():
 
 
 def test_re_prediction_v1():
-    uid_2_rg_scaled_v1 = np.load('test_data/test_100_re.npy', allow_pickle=True).item()
+    uid_2_rg_scaled_v1 = np.load(reference_data_path("test_100_re.npy"), allow_pickle=True).item()
 
     ## return_seq2prediction is True
     # input dict of sparrow.protein.Protein objects
@@ -203,7 +218,7 @@ def test_re_prediction_v1():
 
 
 def test_re_prediction_v2():
-    uid_2_rg_scaled_v2 = np.load('test_data/test_100_re_v2.npy', allow_pickle=True).item()
+    uid_2_rg_scaled_v2 = np.load(reference_data_path("test_100_re_v2.npy"), allow_pickle=True).item()
 
     ## return_seq2prediction is True
     # input dict of sparrow.protein.Protein objects
@@ -215,7 +230,7 @@ def test_re_prediction_v2():
 
 
 def test_re_scaled_prediction_v1():
-    uid_2_rg_scaled_v1 = np.load('test_data/test_100_re_scaled.npy', allow_pickle=True).item()
+    uid_2_rg_scaled_v1 = np.load(reference_data_path("test_100_re_scaled.npy"), allow_pickle=True).item()
 
     ## return_seq2prediction is True
     # input dict of sparrow.protein.Protein objects
@@ -226,7 +241,7 @@ def test_re_scaled_prediction_v1():
 
 
 def test_re_scaled_prediction_v2():
-    uid_2_rg_scaled_v2 = np.load('test_data/test_100_re_scaled_v2.npy', allow_pickle=True).item()
+    uid_2_rg_scaled_v2 = np.load(reference_data_path("test_100_re_scaled_v2.npy"), allow_pickle=True).item()
 
     ## return_seq2prediction is True
     # input dict of sparrow.protein.Protein objects
@@ -237,7 +252,7 @@ def test_re_scaled_prediction_v2():
         
 
 def test_asph_prediction_v1():
-    uid_2_data= np.load('test_data/test_100_asph.npy', allow_pickle=True).item()
+    uid_2_data= np.load(reference_data_path("test_100_asph.npy"), allow_pickle=True).item()
 
     ## return_seq2prediction is True
     # input dict of sparrow.protein.Protein objects
@@ -247,7 +262,7 @@ def test_asph_prediction_v1():
         assert  np.isclose(v1[s],  uid_2_data[k])
 
 def test_asph_prediction_v2():
-    uid_2_data= np.load('test_data/test_100_asph_v2.npy', allow_pickle=True).item()
+    uid_2_data= np.load(reference_data_path("test_100_asph_v2.npy"), allow_pickle=True).item()
 
     ## return_seq2prediction is True
     # input dict of sparrow.protein.Protein objects
@@ -257,7 +272,7 @@ def test_asph_prediction_v2():
         assert  np.isclose(v2[s], uid_2_data[k])
 
 def test_scaling_exponent_prediction_v1():
-    uid_2_data = np.load('test_data/test_100_exponent.npy', allow_pickle=True).item()
+    uid_2_data = np.load(reference_data_path("test_100_exponent.npy"), allow_pickle=True).item()
 
     ## return_seq2prediction is True
     # input dict of sparrow.protein.Protein objects
@@ -267,7 +282,7 @@ def test_scaling_exponent_prediction_v1():
         assert  np.isclose(v1[s],  uid_2_data[k])
 
 def test_scaling_exponent_prediction_v2():        
-    uid_2_data = np.load('test_data/test_100_exponent_v2.npy', allow_pickle=True).item()
+    uid_2_data = np.load(reference_data_path("test_100_exponent_v2.npy"), allow_pickle=True).item()
 
     ## return_seq2prediction is True
     # input dict of sparrow.protein.Protein objects
@@ -279,7 +294,7 @@ def test_scaling_exponent_prediction_v2():
 
 
 def test_scaling_prefactor_prediction_v1():
-    uid_2_data = np.load('test_data/test_100_prefactor.npy', allow_pickle=True).item()
+    uid_2_data = np.load(reference_data_path("test_100_prefactor.npy"), allow_pickle=True).item()
 
     ## return_seq2prediction is True
     # input dict of sparrow.protein.Protein objects
@@ -289,7 +304,7 @@ def test_scaling_prefactor_prediction_v1():
         assert  np.isclose(v1[s], uid_2_data[k])
 
 def test_scaling_prefactor_prediction_v2():
-    uid_2_data = np.load('test_data/test_100_prefactor_v2.npy', allow_pickle=True).item()
+    uid_2_data = np.load(reference_data_path("test_100_prefactor_v2.npy"), allow_pickle=True).item()
 
     ## return_seq2prediction is True
     # input dict of sparrow.protein.Protein objects

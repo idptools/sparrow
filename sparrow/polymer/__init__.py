@@ -1,8 +1,8 @@
-import numpy as np
-
 # from afrc.polymer_models.saw import SAW
 # from afrc.polymer_models.wlc import WormLikeChain
 # from afrc.polymer_models.wlc2 import WormLikeChain2
+
+from sparrow.tools.utilities import validate_keyword_option
 
 from . import scaling_parameters
 
@@ -15,15 +15,20 @@ class Polymeric:
     behaved as an intrinsically disordered or unfolded polypeptide. 
     """
     def __init__(self, protein_obj, p_of_r_resolution=0.05):
-        """Init method for the Polymeric class that takes in a sparrow.Protein object
-        to provide programmatic access to various machine learned predictors and 
+        """Init method for the Polymeric class.
+
+        Takes a sparrow.Protein object and provides programmatic access to the
+        machine-learned predictors, analytical polymer models, and empirical
+        scaling relationships described below. A ``Polymeric`` object is not
+        normally constructed directly - it is reached as the cached
+        ``Protein.polymeric`` accessor.
 
         Parameters
         ----------
         protein_obj : sparrow.Protein
             Composition-based interface into the functionalities from the sparrow.Protein class.
             Primarily used to give access to PARROT trained predictor objects.
-        
+
         p_of_r_resolution : float
             Bin width for building the probability distributions, defined in Angstroms, by default 0.05.
         """
@@ -146,14 +151,20 @@ class Polymeric:
 
     def get_predicted_nu_dep_end_to_end_distribution(self):
         """
-        Function that returns the predicted end-to-end distance distribution 
+        Function that returns the predicted end-to-end distance distribution
         based on the predicted scaling exponent and the nu-dependent SAW model.
+
+        Both the scaling exponent (nu) and the prefactor are taken from the
+        ALBATROSS predictors (see :attr:`predicted_nu` and
+        :attr:`predicted_prefactor`), so this function takes no arguments. Use
+        :meth:`get_nudep_saw_end_to_end_distribution` if you want to set nu
+        and/or the prefactor by hand.
 
         Returns
         -------
-        np.ndarray 
-            2D numpy array in which the first column is the distance (in angstroms) 
-            and the second column is the probablity.
+        tuple of arrays
+            A 2-pair tuple of numpy arrays where the first is the distance (in
+            Angstroms) and the second is the probability of that distance.
         """
         if self.__nudepsaw is None:
             from afrc.polymer_models.nudep_saw import NuDepSAW
@@ -179,11 +190,17 @@ class Polymeric:
         based on the Analytical Flory Random Coil (AFRC). For more information
         see https://github.com/idptools/afrc
 
+        Parameters
+        ----------
+        recompute : bool, optional
+            If True, recompute the distribution even if it has already been
+            calculated. Default is False.
+
         Returns
         -------
-        np.ndarray 
-            2D numpy array in which the first column is the distance (in angstroms) 
-            and the second column is the probablity.
+        tuple of arrays
+            A 2-pair tuple of numpy arrays where the first is the distance (in
+            Angstroms) and the second is the probability of that distance.
         """
         selector = "afrc-re-dist"
         if self.__afrc is None: 
@@ -207,11 +224,18 @@ class Polymeric:
         and an improved version of the Flory approximation" by 
         Daniel Lhuillier, J. Phys. France 49 (1988) 705-710.
 
+        Parameters
+        ----------
+        recompute : bool, optional
+            If True, recompute the distribution even if it has already been
+            calculated. Default is False.
+
         Returns
         -------
-        np.ndarray 
-            2D numpy array in which the first column is the distance (in angstroms) 
-            and the second column is the probablity.
+        tuple of arrays
+            A 2-pair tuple of numpy arrays where the first is the radius of
+            gyration (in Angstroms) and the second is the probability of that
+            value.
         """
         selector = "afrc-rg-dist"
         if self.__afrc is None: 
@@ -239,16 +263,19 @@ class Polymeric:
             by default "scaling law"
 
         recompute : bool, optional
-            recompute the mean end-to-end distance, by default False
-        
+            If True, recompute the mean end-to-end distance even if a value for
+            this ``mode`` has already been calculated. Default is False.
+
         Returns
         -------
         float
             Value equal to the average end-to-end distance (as defined by ``mode``).
         """
-    
-        selector = "afrc-mean-re"
-        if self.__afrc is None: 
+
+        # NB: mode is part of the cache key - results computed with one mode must
+        # never be returned for a request made with another
+        selector = f"afrc-mean-re-{mode}"
+        if self.__afrc is None:
             from afrc import AnalyticalFRC
             self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
 
@@ -260,27 +287,30 @@ class Polymeric:
     def get_mean_afrc_radius_of_gyration(self, mode="distribution", recompute=False):
         """
         Function that returns the predicted mean radius of gyration
-        based on the Analytical Flory Random Coil (AFRC). For more 
+        based on the Analytical Flory Random Coil (AFRC). For more
         information see https://github.com/idptools/afrc
 
         Parameters
         ----------
         mode : str, optional
-            mode defines the mode in which the average is calculated, and can be 
-            set to either 'scaling law' (default) or 'distribution'. If 'distribution' is used
-            then the complete Rg distribution is used to calculate the expected value. If the
-            'scaling law' is used then the standard Rg = R0 * N^{0.5} is used. 
+            Defines the mode in which the average is calculated, and can be set
+            to either 'distribution' (default) or 'scaling law'. If
+            'distribution' is used then the complete Rg distribution is used to
+            calculate the expected value. If 'scaling law' is used then the
+            standard Rg = R0 * N^{0.5} is used.
 
         recompute : bool, optional
-            recompute the mean end-to-end distance, by default False
-        
+            If True, recompute the mean radius of gyration even if a value for
+            this ``mode`` has already been calculated. Default is False.
+
         Returns
         -------
         float
-            Value equal to the average end-to-end distance (as defined by ``mode``).
+            Value equal to the average radius of gyration (as defined by ``mode``).
         """
-        selector = "afrc-mean-rg"
-        if self.__afrc is None: 
+        # NB: mode is part of the cache key - see get_mean_afrc_end_to_end_distance
+        selector = f"afrc-mean-rg-{mode}"
+        if self.__afrc is None:
             from afrc import AnalyticalFRC
             self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
 
@@ -302,22 +332,24 @@ class Polymeric:
         Parameters
         ----------
         mode : str, optional
-            mode to compute internal scaling profile, by default "scaling law"
+            Mode used to compute the internal scaling profile, either
+            'scaling law' (default) or 'distribution'.
         recompute : bool, optional
-            whether or not to recompute the internal scaling profile 
-            if it's already been computed, by default False.
+            If True, recompute the internal scaling profile even if a value for
+            this ``mode`` has already been calculated. Default is False.
 
         Returns
         -------
         np.ndarray
            An [2 x n] matrix (where n = length of the amino acid sequence). The first column
-           is the set of | i-j | distances, and the second defines the average inter-residue 
-           distances between every pair of residues that are | i-j | residues apart in sequnce 
-           space.                
-        
+           is the set of | i-j | distances, and the second defines the average inter-residue
+           distances between every pair of residues that are | i-j | residues apart in sequnce
+           space.
+
         """
-        selector = "afrc-internal-scaling"
-        if self.__afrc is None: 
+        # NB: mode is part of the cache key - see get_mean_afrc_end_to_end_distance
+        selector = f"afrc-internal-scaling-{mode}"
+        if self.__afrc is None:
             from afrc import AnalyticalFRC
             self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
 
@@ -347,18 +379,20 @@ class Polymeric:
             but this number should be tuned to match EV sims, by default 5.5 A.
         
         recompute : bool, optional
-            whether or not to recompute the internal scaling profile 
-            if it's already been computed, by default False.
-        
+            If True, recompute the distribution even if a value for this
+            ``prefactor`` has already been calculated. Default is False.
+
         Returns
         -------
         tuple of arrays
-           A 2-pair tuple of numpy arrays where the first is the distance (in Angstroms) and 
+           A 2-pair tuple of numpy arrays where the first is the distance (in Angstroms) and
            the second array is the probability of that distance.
         """
-        
-        selector = "saw-re-dist"
-        if self.__saw is None: 
+
+        # NB: prefactor is part of the cache key - results computed with one
+        # prefactor must never be returned for a request made with another
+        selector = f"saw-re-dist-{prefactor}"
+        if self.__saw is None:
             from afrc.polymer_models.saw import SAW
             self.__saw = SAW(self.__protein.sequence, self.__p_of_r_resolution)
 
@@ -393,8 +427,8 @@ class Polymeric:
             but this number should be tuned to match EV sims, by default 5.5 A.
         
         recompute : bool, optional
-            whether or not to recompute the internal scaling profile 
-            if it's already been computed, by default False.
+            If True, recompute the mean end-to-end distance even if a value for
+            this ``prefactor`` has already been calculated. Default is False.
 
         Returns
         -------
@@ -403,8 +437,9 @@ class Polymeric:
 
         """
 
-        selector = "saw-mean-re"
-        if self.__saw is None: 
+        # NB: prefactor is part of the cache key - see get_saw_end_to_end_distribution
+        selector = f"saw-mean-re-{prefactor}"
+        if self.__saw is None:
             from afrc.polymer_models.saw import SAW
             self.__saw = SAW(self.__protein.sequence, self.__p_of_r_resolution)
 
@@ -427,8 +462,8 @@ class Polymeric:
             but this number should be tuned to match EV sims, by default 5.5 A.
         
         recompute : bool, optional
-            whether or not to recompute the internal scaling profile 
-            if it's already been computed, by default False.
+            If True, recompute the mean radius of gyration even if a value for
+            this ``prefactor`` has already been calculated. Default is False.
 
         Returns
         -------
@@ -436,8 +471,9 @@ class Polymeric:
            Value equal to the mean radius of gyration.
 
         """
-        selector = "saw-mean-rg"
-        if self.__saw is None: 
+        # NB: prefactor is part of the cache key - see get_saw_end_to_end_distribution
+        selector = f"saw-mean-rg-{prefactor}"
+        if self.__saw is None:
             from afrc.polymer_models.saw import SAW
             self.__saw = SAW(self.__protein.sequence, self.__p_of_r_resolution)
 
@@ -461,14 +497,21 @@ class Polymeric:
         prefactor : float
             Prefactor is a number that tunes the SAW dimensions. Default is 5.5 A.
 
+        recompute : bool, optional
+            If True, recompute the distribution even if a value for this ``nu``
+            and ``prefactor`` combination has already been calculated.
+            Default is False.
+
         Returns
         -------
         tuple of arrays
-           A 2-pair tuple of numpy arrays where the first is the distance (in Angstroms) and 
+           A 2-pair tuple of numpy arrays where the first is the distance (in Angstroms) and
            the second array is the probability of that distance.
 
         """
-        selector = "nudep-saw-re-dist"
+        # NB: nu and prefactor are part of the cache key - results computed with
+        # one set of parameters must never be returned for a different set
+        selector = f"nudep-saw-re-dist-{nu}-{prefactor}"
         if self.__nudepsaw is None:
             from afrc.polymer_models.nudep_saw import NuDepSAW
             self.__nudepsaw = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
@@ -492,15 +535,18 @@ class Polymeric:
             Prefactor is a number that tunes the SAW dimensions, by default 5.5 A.
         
         recompute : bool, optional
-            whether or not to recompute the internal scaling profile 
-            if it's already been computed, by default False.
+            If True, recompute the mean end-to-end distance even if a value for
+            this ``nu`` and ``prefactor`` combination has already been
+            calculated. Default is False.
 
         Returns
         -------
         float
            Returns the value equal to the mean end-to-end distance.
         """
-        selector = "nudep-saw-mean-re"
+        # NB: nu and prefactor are part of the cache key - see
+        # get_nudep_saw_end_to_end_distribution
+        selector = f"nudep-saw-mean-re-{nu}-{prefactor}"
         if self.__nudepsaw is None:
             from afrc.polymer_models.nudep_saw import NuDepSAW
             self.__nudepsaw = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
@@ -524,15 +570,18 @@ class Polymeric:
             Prefactor is a number that tunes the SAW dimensions, by default 5.5 A.
         
         recompute : bool, optional
-            whether or not to recompute the internal scaling profile 
-            if it's already been computed, by default False.
+            If True, recompute the mean radius of gyration even if a value for
+            this ``nu`` and ``prefactor`` combination has already been
+            calculated. Default is False.
 
         Returns
         -------
         float
-           Returns the value equal to the mean end-to-end distance.
-        """        
-        selector = "nudep-saw-mean-rg"
+           Returns the value equal to the mean radius of gyration.
+        """
+        # NB: nu and prefactor are part of the cache key - see
+        # get_nudep_saw_end_to_end_distribution
+        selector = f"nudep-saw-mean-rg-{nu}-{prefactor}"
         if self.__nudepsaw is None:
             from afrc.polymer_models.nudep_saw import NuDepSAW
             self.__nudepsaw = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
@@ -547,44 +596,70 @@ class Polymeric:
         """Computes the scaling exponent (nu) for the given sequence as parameterized by the
         equation from zheng2020 via the Sequence Hydropathy Decoration (SHD)
         and Sequence Charge Decoration (SCD)
-    
+
             Nu = -0.0423*SHD + 0.0074*SCD+0.701
-    
+
         This equation for predicting nu is adopeted from Zheng et al. [1].
+
+        Parameters
+        ----------
+        mode : str, optional
+            Selector for the empirical parameterization to use. The only
+            currently-implemented option is ``'zheng2020'`` (the default);
+            passing anything else raises an exception.
 
         Returns
         -------
         float
-            Returns the predict scalinge exponent (nu), a dimensionless 
+            Returns the predict scalinge exponent (nu), a dimensionless
             parameter which should fall between 0.33 and 0.6 (in theory).
+
+        Raises
+        ------
+        sparrow.sparrow_exceptions.SparrowException
+            If ``mode`` is not a recognised parameterization.
 
         References
         ---------------
-        [1] Zheng, W., Dignon, G. L., Brown, M., Kim, Y. C. & Mittal, J. 
-        Hydropathy Patterning Complements Charge Patterning to Describe 
-        Conformational Preferences of Disordered Proteins. J. Phys. 
+        [1] Zheng, W., Dignon, G. L., Brown, M., Kim, Y. C. & Mittal, J.
+        Hydropathy Patterning Complements Charge Patterning to Describe
+        Conformational Preferences of Disordered Proteins. J. Phys.
         Chem. Lett. (2020). doi:10.1021/acs.jpclett.0c00288
 
         """
+        validate_keyword_option(mode, ['zheng2020'], 'mode')
         return scaling_parameters.compute_nu_zheng2020(self.__protein.sequence)
 
-    
+
     def empirical_radius_of_gyration(self, mode='zheng2020'):
-        """Function that takes in an amino acid sequence and computes the expected 
+        """Function that takes in an amino acid sequence and computes the expected
         radius of gyration using the nu-dependent Rg as developed by Zheng et al.
+
+        Parameters
+        ----------
+        mode : str, optional
+            Selector for the empirical parameterization to use. The only
+            currently-implemented option is ``'zheng2020'`` (the default);
+            passing anything else raises an exception.
 
         Returns
         ------------------
         float
             Returns the empirically predicted radius of gyration in Angstorms.
 
+        Raises
+        ------
+        sparrow.sparrow_exceptions.SparrowException
+            If ``mode`` is not a recognised parameterization.
+
         References
         ---------------
-        [1] Zheng, W., Dignon, G. L., Brown, M., Kim, Y. C. & Mittal, J. 
-        Hydropathy Patterning Complements Charge Patterning to Describe 
-        Conformational Preferences of Disordered Proteins. J. Phys. 
+        [1] Zheng, W., Dignon, G. L., Brown, M., Kim, Y. C. & Mittal, J.
+        Hydropathy Patterning Complements Charge Patterning to Describe
+        Conformational Preferences of Disordered Proteins. J. Phys.
         Chem. Lett. (2020). doi:10.1021/acs.jpclett.0c00288
     """
+        validate_keyword_option(mode, ['zheng2020'], 'mode')
         return scaling_parameters.compute_rg_zheng2020(self.__protein.sequence)
 
 

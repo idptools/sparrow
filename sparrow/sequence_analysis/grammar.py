@@ -50,27 +50,16 @@ COMPOSITION_FEATURES = tuple(
     ]
 )
 
-PATCH_FEATURES = (
-    "A Patch",
-    "C Patch",
-    "D Patch",
-    "E Patch",
-    "F Patch",
-    "G Patch",
-    "H Patch",
-    "I Patch",
-    "K Patch",
-    "L Patch",
-    "M Patch",
-    "N Patch",
-    "P Patch",
-    "Q Patch",
-    "R Patch",
-    "S Patch",
-    "T Patch",
-    "V Patch",
-    "Y Patch",
-    "RG Frac",
+#: Patch-coverage features: one per standard amino acid EXCEPT tryptophan, plus
+#: the RG-motif patch fraction.
+#:
+#: Tryptophan is deliberately excluded. This matches the NARDINI+ reference
+#: implementation, which drops it because W patches essentially do not occur in
+#: the proteome, so the feature carries no signal and its background statistics
+#: are degenerate. Do not "restore" it for symmetry: doing so changes the feature
+#: schema and would not match NARDINI+ or the bundled composition background.
+PATCH_FEATURES = tuple(
+    [f"{aa} Patch" for aa in AMINO_ACIDS if aa != "W"] + ["RG Frac"]
 )
 
 PATTERN_FEATURES_KAPPA = tuple(

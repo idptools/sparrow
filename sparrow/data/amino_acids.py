@@ -119,7 +119,57 @@ AA_hydro_KD = {"A": 6.3,
                "Y": 3.2,
                "V": 8.7}
 
-AA_hydro_KD_normalized = {'A': 0.7, 
+# Residues classed as 'disorder promoting'.
+# Reference
+# Campen A, Williams RM, Brown CJ, Meng J, Uversky VN, Dunker AK.
+# TOP-IDP-scale: a new amino acid scale measuring propensity for intrinsic
+# disorder. Protein Pept Lett. 2008;15(9):956-63.
+# This is the set used by localCIDER's get_fraction_disorder_promoting().
+DISORDER_PROMOTING = ['T', 'A', 'G', 'R', 'D', 'H', 'Q', 'K', 'S', 'E', 'P']
+
+# Residues classed as 'chain expanding' - the charged residues plus proline.
+# Used by localCIDER's get_fraction_expanding(); at neutral pH the fraction of
+# expanding residues is simply FCR + the proline fraction.
+EXPANDING = ['E', 'D', 'R', 'K', 'P']
+
+# Polyproline II (PPII) propensity scale.
+# Reference
+# Elam WA, Schrank TP, Campagnolo AJ, Hilser VJ. Evolutionary conservation of
+# the polyproline II conformation surrounding intrinsically disordered
+# phosphorylation sites. Protein Sci. 2013;22(4):405-17.
+AA_PPII_HILSER = {'A': 0.37,
+                  'C': 0.25,
+                  'D': 0.30,
+                  'E': 0.42,
+                  'F': 0.17,
+                  'G': 0.13,
+                  'H': 0.20,
+                  'I': 0.39,
+                  'K': 0.56,
+                  'L': 0.24,
+                  'M': 0.36,
+                  'N': 0.27,
+                  'P': 1.00,
+                  'Q': 0.53,
+                  'R': 0.38,
+                  'S': 0.24,
+                  'T': 0.32,
+                  'V': 0.39,
+                  'W': 0.25,
+                  'Y': 0.25}
+
+# Side-chain pKa values for the titratable residues, as used for pH-dependent
+# charge and isoelectric-point calculations. These are the EMBOSS values, and
+# match those used by localCIDER.
+AA_PKA = {'C': 8.5,
+          'Y': 10.1,
+          'H': 6.5,
+          'E': 4.1,
+          'D': 3.9,
+          'K': 10.0,
+          'R': 12.5}
+
+AA_hydro_KD_normalized = {'A': 0.7,
                           'R': 0.0, 
                           'N': 0.111, 
                           'D': 0.111, 

@@ -10,6 +10,8 @@ import pickle
 # test both predictor versions and ensure v2 is default
 from sparrow.predictors.dssp.dssp_predictor import DSSPPredictor
 
+from . import reference_data_path
+
 
 ## ABOUT:
 ## Updated in July 2023 based on Stephen's enhanced helicity predictor. The test data used
@@ -90,10 +92,10 @@ def test_dssp_helicity_simple():
 def test_dssp_helicity_class_test100():
 
     # read seqs
-    seqs = protfasta.read_fasta('test_data/test_seqs_100.fasta')
+    seqs = protfasta.read_fasta(reference_data_path("test_seqs_100.fasta"))
 
     # read precomputed data
-    with open('test_data/helicity_class_v2_default_test_seqs_100.pickle', 'rb') as f:
+    with open(reference_data_path("helicity_class_v2_default_test_seqs_100.pickle"), 'rb') as f:
         test_data = pickle.load(f)
 
 
@@ -107,10 +109,10 @@ def test_dssp_helicity_class_test100():
 def test_dssp_helicity_prob_test100():
 
     # read seqs
-    seqs = protfasta.read_fasta('test_data/test_seqs_100.fasta')
+    seqs = protfasta.read_fasta(reference_data_path("test_seqs_100.fasta"))
 
     # read precomputed data
-    with open('test_data/helicity_prob_v2_default_test_seqs_100.pickle', 'rb') as f:
+    with open(reference_data_path("helicity_prob_v2_default_test_seqs_100.pickle"), 'rb') as f:
         test_data = pickle.load(f)
 
 
@@ -122,10 +124,10 @@ def test_dssp_helicity_prob_test100():
 def test_dssp_extended_class_test100():
 
     # read seqs
-    seqs = protfasta.read_fasta('test_data/test_seqs_100.fasta')
+    seqs = protfasta.read_fasta(reference_data_path("test_seqs_100.fasta"))
 
     # read precomputed data
-    with open('test_data/extended_class_v2_default_test_seqs_100.pickle', 'rb') as f:
+    with open(reference_data_path("extended_class_v2_default_test_seqs_100.pickle"), 'rb') as f:
         test_data = pickle.load(f)
 
 
@@ -137,10 +139,10 @@ def test_dssp_extended_class_test100():
 def test_dssp_extended_prob_test100():
 
     # read seqs
-    seqs = protfasta.read_fasta('test_data/test_seqs_100.fasta')
+    seqs = protfasta.read_fasta(reference_data_path("test_seqs_100.fasta"))
 
     # read precomputed data
-    with open('test_data/extended_prob_v2_default_test_seqs_100.pickle', 'rb') as f:
+    with open(reference_data_path("extended_prob_v2_default_test_seqs_100.pickle"), 'rb') as f:
         test_data = pickle.load(f)
 
 
@@ -153,10 +155,10 @@ def test_dssp_extended_prob_test100():
 def test_dssp_coil_class_test100():
 
     # read seqs
-    seqs = protfasta.read_fasta('test_data/test_seqs_100.fasta')
+    seqs = protfasta.read_fasta(reference_data_path("test_seqs_100.fasta"))
 
     # read precomputed data
-    with open('test_data/coil_class_v2_default_test_seqs_100.pickle', 'rb') as f:
+    with open(reference_data_path("coil_class_v2_default_test_seqs_100.pickle"), 'rb') as f:
         test_data = pickle.load(f)
 
 
@@ -168,10 +170,10 @@ def test_dssp_coil_class_test100():
 def test_dssp_coil_prob_test100():
 
     # read seqs
-    seqs = protfasta.read_fasta('test_data/test_seqs_100.fasta')
+    seqs = protfasta.read_fasta(reference_data_path("test_seqs_100.fasta"))
 
     # read precomputed data
-    with open('test_data/coil_prob_v2_default_test_seqs_100.pickle', 'rb') as f:
+    with open(reference_data_path("coil_prob_v2_default_test_seqs_100.pickle"), 'rb') as f:
         test_data = pickle.load(f)
 
 
@@ -190,10 +192,10 @@ def test_dssp_coil_prob_test100():
 def test_dssp_helicity_class_test100_non_default():
 
     # read seqs
-    seqs = protfasta.read_fasta('test_data/test_seqs_100.fasta')
+    seqs = protfasta.read_fasta(reference_data_path("test_seqs_100.fasta"))
 
     # read precomputed data
-    with open('test_data/helicity_class_v2_non_default_test_seqs_100.pickle', 'rb') as f:
+    with open(reference_data_path("helicity_class_v2_non_default_test_seqs_100.pickle"), 'rb') as f:
         test_data = pickle.load(f)
 
 
@@ -210,10 +212,10 @@ def test_dssp_helicity_class_test100_non_default():
 def test_dssp_extended_class_test100_non_default():
 
     # read seqs
-    seqs = protfasta.read_fasta('test_data/test_seqs_100.fasta')
+    seqs = protfasta.read_fasta(reference_data_path("test_seqs_100.fasta"))
 
     # read precomputed data
-    with open('test_data/extended_class_v2_non_default_test_seqs_100.pickle', 'rb') as f:
+    with open(reference_data_path("extended_class_v2_non_default_test_seqs_100.pickle"), 'rb') as f:
         test_data = pickle.load(f)
 
 
@@ -230,10 +232,10 @@ def test_dssp_extended_class_test100_non_default():
 def test_dssp_coil_class_test100_non_default():
 
     # read seqs
-    seqs = protfasta.read_fasta('test_data/test_seqs_100.fasta')
+    seqs = protfasta.read_fasta(reference_data_path("test_seqs_100.fasta"))
 
     # read precomputed data
-    with open('test_data/coil_class_v2_non_default_test_seqs_100.pickle', 'rb') as f:
+    with open(reference_data_path("coil_class_v2_non_default_test_seqs_100.pickle"), 'rb') as f:
         test_data = pickle.load(f)
 
 

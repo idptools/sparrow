@@ -1,22 +1,21 @@
-import os
-
 import numpy as np
 import protfasta
 
 from sparrow import Protein
 from sparrow.patterning import scd
 
-current_filepath = os.getcwd()
-onehundred_seqs = "{}/test_data/test_seqs_100.fasta".format(current_filepath)
+from . import reference_data_path
+
+onehundred_seqs = reference_data_path("test_seqs_100.fasta")
 
 seqs = protfasta.read_fasta(onehundred_seqs)
 shd_paper_toy_sequences = np.load(
-    "test_data/shd_paper_toy_sequences.npy", allow_pickle=True
+    reference_data_path("shd_paper_toy_sequences.npy"), allow_pickle=True
 ).item()
 
 
 def test_scd():
-    k2val = np.load("test_data/test_100_scd.npy", allow_pickle=True).item()
+    k2val = np.load(reference_data_path("test_100_scd.npy"), allow_pickle=True).item()
     for k in seqs:
         s = seqs[k]
         cython_SCD = getattr(Protein(s), "SCD")
@@ -25,7 +24,7 @@ def test_scd():
 
 
 def test_shd():
-    k2val = np.load("test_data/test_100_shd.npy", allow_pickle=True).item()
+    k2val = np.load(reference_data_path("test_100_shd.npy"), allow_pickle=True).item()
     for k in seqs:
         s = seqs[k]
         assert np.isclose(getattr(Protein(s), "SHD"), k2val[k])

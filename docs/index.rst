@@ -26,20 +26,26 @@ is cheap to make and you only compute what you ask for.
 What can it do?
 ^^^^^^^^^^^^^^^
 
-* **Sequence parameters** -- composition, charge (FCR, NCPR, kappa, SCD),
-  hydrophobicity, complexity, residue clustering and patches.
+* **Sequence parameters** -- composition, molecular weight, charge (FCR, NCPR,
+  kappa, SCD, SHD), hydrophobicity, sequence complexity, residue clustering
+  (IWD) and patches.
 * **Linear profiles** -- per-residue windowed tracks for any of the above, plus
   500+ published amino-acid property scales (AAindex).
 * **Deep-learning predictions** (via ``Protein.predictor``) -- disorder and
   pLDDT, DSSP secondary structure, polymer dimensions (Rg, Re, scaling exponent,
-  asphericity), phosphorylation, localization signals, transactivation domains,
-  transmembrane regions, and phase-separation propensity. These use the
+  asphericity, prefactor), phosphorylation, localization signals (NLS/NES),
+  transactivation domains, transmembrane regions, mitochondrial targeting, and
+  phase-separation propensity. These use the
   `ALBATROSS <https://www.nature.com/articles/s41592-023-02159-5>`_ networks and
   related PARROT-trained models.
 * **Polymer-model properties** (via ``Protein.polymeric``) -- analytical and
-  simulation-derived dimensions and distance distributions.
+  simulation-derived dimensions and distance distributions, plus empirical
+  scaling relationships from the literature.
+* **Domains and motifs** -- low-complexity domains, prion-like domains (a
+  pure-Python PLAAC implementation), ELM annotations, and phosphoisoforms.
 * **Scale-up tools** -- batch prediction over whole sequence sets, and
   fixed-length feature vectors for machine learning.
+* **Extensible** -- a simple plugin system for adding new sequence analyses.
 
 Where to start
 --------------
