@@ -10,7 +10,12 @@ from protfasta import utilities as protfasta_utilities
 
 from sparrow import calculate_parameters, data, sparrow_exceptions
 from sparrow.data import amino_acids
-from sparrow.patterning import iwd, kappa, scd
+
+# The patterning metrics come from the vectorized NumPy implementations rather
+# than the Cython extensions. They are the same functions to within the
+# compiled code's single-precision arithmetic, and more accurate where they
+# differ - see sparrow.patterning.vectorized and its test module.
+from sparrow.patterning import vectorized as patterning_metrics
 from sparrow.sequence_analysis import (
     elm,
     patching,
@@ -261,8 +266,8 @@ class Protein:
             if len(self.sequence) < 6:
                 self.__kappa = -1
             else:
-                k5 = kappa.kappa_x(self.sequence, ["R", "K"], ["E", "D"], 5, 1)
-                k6 = kappa.kappa_x(self.sequence, ["R", "K"], ["E", "D"], 6, 1)
+                k5 = patterning_metrics.kappa_x(self.sequence, ["R", "K"], ["E", "D"], 5, 1)
+                k6 = patterning_metrics.kappa_x(self.sequence, ["R", "K"], ["E", "D"], 6, 1)
                 self.__kappa = (k5 + k6) / 2
 
         return self.__kappa
@@ -289,7 +294,7 @@ class Protein:
         Phys. 143, 085101 (2015).
         """
         if self.__scd is None:
-            self.__scd = scd.compute_scd_x(
+            self.__scd = patterning_metrics.compute_scd_x(
                 self.sequence, group1=["E", "D"], group2=["R", "K"]
             )
 
@@ -317,7 +322,7 @@ class Protein:
         Chem. Lett. 11, 3408-3415 (2020).
         """
         if self.__shd is None:
-            self.__shd = scd.compute_shd(self.sequence)
+            self.__shd = patterning_metrics.compute_shd(self.sequence)
 
         return self.__shd
 
@@ -590,11 +595,11 @@ class Protein:
         # after set up, calculate kappa_x
         if kappa_x_name not in self.__kappa_x:
             if flatten:
-                self.__kappa_x[kappa_x_name] = kappa.kappa_x(
+                self.__kappa_x[kappa_x_name] = patterning_metrics.kappa_x(
                     self.sequence, list(group1), list(group2), window_size, 1
                 )
             else:
-                self.__kappa_x[kappa_x_name] = kappa.kappa_x(
+                self.__kappa_x[kappa_x_name] = patterning_metrics.kappa_x(
                     self.sequence, list(group1), list(group2), window_size, 0
                 )
 
@@ -632,7 +637,7 @@ class Protein:
             return_type="list",
         )
 
-        return iwd.calculate_average_inverse_distance_from_sequence(
+        return patterning_metrics.calculate_average_inverse_distance_from_sequence(
             self.sequence, residues
         )
 
@@ -833,7 +838,7 @@ class Protein:
         Phys. 143, 085101 (2015).
         """
 
-        return scd.compute_scd_x(self.sequence, group1=group1, group2=group2)
+        return patterning_metrics.compute_scd_x(self.sequence, group1=group1, group2=group2)
 
     # .................................................................
     #
@@ -868,7 +873,7 @@ class Protein:
         Chem. Lett. 11, 3408-3415 (2020).
         """
 
-        return scd.compute_shd(self.sequence, hydro_dict=hydro_dict)
+        return patterning_metrics.compute_shd(self.sequence, hydro_dict=hydro_dict)
 
     # .................................................................
     #
@@ -914,7 +919,7 @@ class Protein:
 
         linear_NCPR = self.__linear_profiles["NCPR-8-extend-ends"]
 
-        return iwd.calculate_average_inverse_distance_charge(
+        return patterning_metrics.calculate_average_inverse_distance_charge(
             linear_NCPR, self.sequence, charge
         )
 
@@ -945,7 +950,7 @@ class Protein:
 
         linear_NCPR = self.__linear_profiles["NCPR-8-extend-ends"]
 
-        return iwd.calculate_average_bivariate_inverse_distance_charge(
+        return patterning_metrics.calculate_average_bivariate_inverse_distance_charge(
             linear_NCPR, self.sequence
         )
 

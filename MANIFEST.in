@@ -3,7 +3,10 @@ include MANIFEST.in
 include CODE_OF_CONDUCT.md
 
 graft sparrow
-global-exclude *.py[cod] __pycache__ *.so
+
+# NB: editor autosave patterns cannot be excluded here because '#' starts a
+# comment in MANIFEST.in - see [tool.setuptools.exclude-package-data] instead
+global-exclude *.py[cod] __pycache__ *.so *.pyd
 
 recursive-include sparrow/data *
 

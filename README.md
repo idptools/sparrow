@@ -4,7 +4,7 @@
 
 **Current version is 1.0.x (June 2026)** 
 
-[![Python](https://img.shields.io/badge/python-3.7%2B-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 
@@ -41,7 +41,7 @@ SPARROW integrates direct sequence calculations with per-residue predictions fro
 
 ## Installation
 
-SPARROW runs on **Python 3.7+** and includes compiled (Cython) extensions. Installing into an isolated environment is recommended.
+SPARROW runs on **Python 3.9+** and is **pure Python** — nothing to compile, no C compiler needed. Installing into an isolated environment is recommended.
 
 ```bash
 # create and activate an environment (venv shown; uv also works)
@@ -52,7 +52,7 @@ source sparrow-env/bin/activate          # Windows: sparrow-env\Scripts\activate
 pip install git+https://github.com/idptools/sparrow.git
 ```
 
-> Installing from GitHub compiles the Cython extensions, so a C compiler is required (Xcode command-line tools on macOS, `build-essential` on Debian/Ubuntu, MSVC build tools on Windows). NumPy is installed automatically.
+> Earlier releases shipped Cython extensions and required a C compiler. Those have been replaced by vectorized NumPy implementations, so installation is now a plain pure-Python wheel with no build step.
 
 Verify the installation:
 
@@ -179,10 +179,14 @@ git clone https://github.com/idptools/sparrow.git
 cd sparrow
 pip install -e .
 
-# build the Cython extensions in place and run the test suite
-python setup.py build_ext --inplace
-cd sparrow/tests && pytest
+# run the test suite (works from anywhere in the repo)
+pytest sparrow/tests
 ```
+
+There is no build step. If you are updating a checkout that predates the removal
+of the Cython extensions, delete any stale compiled artifacts first —
+`rm -f sparrow/patterning/*.so sparrow/patterning/*.c` — since a leftover `.so`
+would shadow the new pure-Python module of the same name.
 
 Contributions are welcome — `sparrow` is designed so that new predictors and
 plugins are easy to add (see the developer guides in the documentation).

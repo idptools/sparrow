@@ -1,29 +1,15 @@
 """
 sparrow
 Next generation package for sequence parameter calculation
+
+sparrow is pure Python. It used to ship Cython extensions for the patterning
+metrics; those were replaced by vectorized NumPy implementations in
+sparrow/patterning/vectorized.py, so no compiler is needed to install.
+
+Everything else is declared in pyproject.toml; this file only remains so that
+`python setup.py ...` invocations keep working.
 """
-from setuptools import setup, Extension, find_packages
-from Cython.Build import cythonize
-import os
-import numpy
 
-# defines the absolute path of where your cython files are
-cython_dir = os.path.join("sparrow", "patterning")
+from setuptools import setup
 
-# build a list of the files 
-cython_files = [os.path.join(cython_dir, f) for f in os.listdir(cython_dir) if f.endswith('.pyx')]
-
-
-extensions = [
-    Extension(
-        name=f"sparrow.patterning.{os.path.splitext(os.path.basename(file))[0]}",
-        sources=[file],
-        include_dirs=[numpy.get_include()],
-    ) for file in cython_files
-]
-
-setup(
-    ext_modules=cythonize(extensions, compiler_directives={'language_level': "3"}),
-    packages=find_packages(),
-    include_package_data=True,
-)
+setup()

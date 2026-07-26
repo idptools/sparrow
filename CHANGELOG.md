@@ -4,6 +4,52 @@ All notable changes to SPARROW are documented here.
 
 ## Unreleased
 
+### Added — `sparrow.patterning.vectorized`
+
+Pure-NumPy reimplementations of the compiled patterning routines, as a step towards dropping the Cython extensions. Every public Cython entry point except `patterning_percentile` now has a signature-compatible twin:
+
+| Cython | NumPy |
+|---|---|
+| `kappa.calculate_sigma` / `calculate_delta` / `kappa_x` | same names in `vectorized` |
+| `iwd.calculate_average_inverse_distance_from_sequence` | same name |
+| `iwd.calculate_average_inverse_distance_charge` | same name |
+| `iwd.calculate_average_bivariate_inverse_distance_charge` | same name |
+| `scd.compute_scd_x` / `compute_shd` | same names |
+| `patterning.patterning_percentile` | same name — but see the seed note below |
+
+Plus batch entry points with no Cython equivalent — `kappa_x_batch`, `kappa_from_ternary_batch`, `iwd_batch`, `ternarize_winged_batch` — which score a whole stack of sequences per call.
+
+**Faster, mostly through better algorithms rather than vectorization alone.** IWD's pairwise `1/|i-j|` sum is the autocorrelation of the occupancy mask (one FFT instead of an explicit pairwise loop); SCD reduces to a `sqrt(d)`-weighted autocorrelation of the charge sequence, `O(n log n)` instead of `O(n²)`; SHD has a sum rather than a product in its numerator, so it collapses to prefix sums, `O(n)` instead of `O(n²)`. Measured against the extensions: `compute_shd` at L=5000 is **1779x** faster (393 ms → 0.22 ms), `compute_scd_x` 53x, single-call `kappa_x` 3x, and batched scramble scoring 18–28x at L=1000.
+
+**Accuracy.** IWD, SCD and SHD are double precision on both sides and agree to ~1e-13. The kappa routines carry their intermediates in C `float` in the Cython code and `float64` here, so they agree to ~1e-6 — and the NumPy value is the more accurate one. `test_patterning_vectorized.py` (36 tests) pins this, including a test that replays the Cython arithmetic in single precision to demonstrate the residual gap is the compiled code's precision, not an error in the port.
+
+**`patterning_percentile` and its seed.** The compiled version draws shuffles from C's `rand()`, whose algorithm the C standard leaves implementation-defined — so its seed-to-result mapping was never portable across platforms or libc versions to begin with. The NumPy version uses NumPy's generator, so the same `seed` gives a different, statistically equivalent set of shuffles. The *statistic* is unchanged: on identical arrangements the two agree to 1.6e-6 (the compiled code's precision), and percentiles from the two agree to within Monte Carlo sampling error. Verified by a paired test on identical arrangements plus a KS comparison of the two null distributions — the latter only agrees once both are snapped to the true discrete lattice, because the compiled version accumulates in float32 and splits genuinely-tied values into slightly different floats. It is also ~5x faster.
+
+### Changed — `Protein` and `scaling_parameters` now use the NumPy patterning metrics
+
+`sparrow.protein.Protein` and `sparrow.polymer.scaling_parameters` now call `sparrow.patterning.vectorized` instead of the compiled extensions. Measured effect on user-facing values:
+
+| value | shift | speed (L=3000) |
+|---|---|---|
+| `Protein.kappa`, `compute_kappa_x` | ≤ 6e-06 | 3.33 ms → 0.23 ms (15x) |
+| `Protein.SCD` | ≤ 5e-14 | 2.82 ms → 0.08 ms (34x) |
+| `Protein.SHD` | ≤ 2e-14 | 138.85 ms → 0.14 ms (**967x**) |
+| `compute_iwd` and the charge-weighted IWD variants | ≤ 7e-16 | — |
+
+The kappa shift is single-precision arithmetic being replaced by double, so the new values are the more accurate ones; expect agreement with previously-stored kappa values to about six significant figures rather than exactly. All existing stored-reference tests (`test_kappa.py`, `test_iwd.py`, `test_scd.py`, `test_scd_shd_formula.py`, `test_protein_api.py`, `test_sparrow_vs_localcider.py`, `test_polymeric.py`) pass unchanged at their existing tolerances.
+
+### Removed — the Cython extensions; sparrow is now pure Python
+
+The four `.pyx` extension modules are gone. `sparrow.patterning.kappa`, `iwd`, `scd` and `patterning` are now thin pure-Python modules re-exporting from `sparrow.patterning.vectorized`, so **every existing import keeps working unchanged**.
+
+Consequences:
+
+* **No compiler needed.** `pyproject.toml` no longer requires `cython` (at build time or runtime) or build-time `numpy`, and `setup.py` is reduced to a stub. The build now produces a `py3-none-any` wheel instead of a platform-specific one.
+* **Upgrading an existing checkout requires deleting stale artifacts**: `rm -f sparrow/patterning/*.so sparrow/patterning/*.c`. Python resolves extension modules before source modules, so a leftover `kappa.cpython-*.so` would shadow the new `kappa.py` and silently keep running the old compiled code. Noted in the README and install guide.
+* Editor autosave files (`#file#`, `.#file`, `*~`) are now excluded from the distributions via `[tool.setuptools.exclude-package-data]` — MANIFEST.in cannot express this, since `#` starts a comment there.
+
+**Validation was preserved rather than dropped.** The cross-checks in `test_patterning_vectorized.py` compared against the extensions, which would have become self-comparisons once the shims were in place. Before deleting, the original `.pyx` sources were rebuilt in isolation and used to capture 400 randomly-generated golden cases — every metric, both kappa flatten modes, the charge-weighted IWD variants, custom SCD groups, and the deterministic half of `patterning_percentile` — into `sparrow/tests/test_data/cython_patterning_golden_v1.npz` (86 KB). The tests now assert against that fixture, so the agreement with the compiled implementation stays pinned permanently and independently of whether it exists.
+
 ### Fixed / Documentation
 
 The rest of this entry is a correctness and documentation pass. The headline items are a class of memoization bugs in which cached results were keyed on too little information and were therefore returned for calls made with *different* parameters, and a validation helper that silently did nothing when given a custom error message.

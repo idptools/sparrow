@@ -1,7 +1,7 @@
 [build-system]
 
-# delete cython/numpy if not needed
-requires = ["setuptools>=61", "versioningit~=2.0", "cython", "numpy", ]
+# sparrow is pure Python - no compiler, Cython or build-time numpy required
+requires = ["setuptools>=61", "versioningit~=2.0"]
 build-backend = "setuptools.build_meta"
 
 
@@ -14,14 +14,13 @@ authors = [
     {name = "Alex Holehouse", email = "alex.holehouse@wustl.edu"}
 ]
 license = {text = "CC-NC-ND"}
-readme = "README.md"  
-requires-python = ">=3.7"
+readme = "README.md"
+requires-python = ">=3.9"
 
 # add in as needed  
-dependencies = [      
+dependencies = [
     "numpy>=1.14.0",
     "scipy",
-    "cython",
     "protfasta",
     "metapredict>2",
     "ipython",
@@ -50,6 +49,11 @@ include = ["sparrow", "sparrow.*"]  # Discover all sub-packages inside the main 
 sparrow = [
     "py.typed"
 ]
+
+# keep editor autosave/backup files out of the distributions. MANIFEST.in cannot
+# express this: '#' starts a comment there, so a '#*#' pattern is unusable.
+[tool.setuptools.exclude-package-data]
+"*" = ["#*#", ".#*", "*~", "*.orig", "*.rej"]
 
 [tool.versioningit]
 default-version = "1+unknown"

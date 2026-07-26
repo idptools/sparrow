@@ -1,9 +1,17 @@
 Installation
 ============
 
-sparrow runs on **Python 3.7+** and includes compiled (Cython) extensions. The
-sections below cover setting up an isolated environment and installing sparrow
-with either ``pip`` or ``uv``, from PyPI or directly from GitHub.
+sparrow runs on **Python 3.9+** and is **pure Python** - there is nothing to
+compile, so no C compiler is required. The sections below cover setting up an
+isolated environment and installing sparrow directly from GitHub with either
+``pip`` or ``uv``.
+
+.. note::
+   Releases before this one shipped Cython extensions for the patterning
+   metrics and needed a working compiler to install. Those were replaced by
+   vectorized NumPy implementations - see
+   :mod:`sparrow.patterning.vectorized` - so installation is now a plain
+   pure-Python wheel.
 
 .. contents:: On this page
    :local:
@@ -47,21 +55,10 @@ With ``uv``
 2. Install sparrow
 ------------------
 
-Install from PyPI (stable)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Install from GitHub
+^^^^^^^^^^^^^^^^^^^
 
-.. code-block:: bash
-
-   # with pip
-   pip install idptools-sparrow
-
-   # with uv
-   uv pip install idptools-sparrow
-
-Install from GitHub (latest)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-To get the most recent development version straight from the repository:
+sparrow is currently installed directly from the repository:
 
 .. code-block:: bash
 
@@ -71,11 +68,37 @@ To get the most recent development version straight from the repository:
    # with uv
    uv pip install git+https://github.com/idptools/sparrow.git
 
-.. note::
-   Installing from GitHub builds the Cython extensions locally, so you need a
-   working C compiler (Xcode command-line tools on macOS, ``build-essential`` on
-   Debian/Ubuntu, or MSVC build tools on Windows). NumPy is required at build
-   time and is installed automatically.
+To install a specific tagged release, append ``@<tag>``:
+
+.. code-block:: bash
+
+   pip install git+https://github.com/idptools/sparrow.git@1.0.0
+
+Install for development
+^^^^^^^^^^^^^^^^^^^^^^^
+
+If you want to work on sparrow itself, clone it and install in editable mode:
+
+.. code-block:: bash
+
+   git clone https://github.com/idptools/sparrow.git
+   cd sparrow
+   pip install -e .
+
+   # run the test suite (works from the repository root)
+   pytest sparrow/tests
+
+There is no build step - sparrow is pure Python.
+
+.. warning::
+   If you are upgrading a checkout that predates the removal of the Cython
+   extensions, delete any stale compiled artifacts first::
+
+       rm -f sparrow/patterning/*.so sparrow/patterning/*.c
+
+   Python looks for extension modules before source modules, so a leftover
+   ``kappa.cpython-*.so`` would shadow the new ``kappa.py`` and you would
+   silently keep running the old compiled code.
 
 3. Verify the installation
 --------------------------

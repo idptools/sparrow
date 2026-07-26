@@ -90,6 +90,14 @@ htmlhelp_basename = "sparrowdoc"
 
 # -- Extension configuration -------------------------------------------------
 
+# On Read the Docs only the doc requirements are installed, so sparrow's heavier
+# runtime dependencies are absent. Each candidate is import-tested and mocked
+# only if it actually fails, which keeps local builds (where everything is
+# installed) documenting the real objects.
+#
+# NB: sparrow.patterning.* used to be compiled extensions that were never built
+# on RTD. They are pure Python now, but they still pull in the sparrow package
+# and hence its dependencies, so they stay on this list - the import test decides.
 MOCK = os.getenv("READTHEDOCS") or os.getenv("SPARROW_DOC_BUILD")
 if MOCK:
     candidates = [
@@ -103,6 +111,7 @@ if MOCK:
         "sparrow.patterning.kappa",
         "sparrow.patterning.patterning",
         "sparrow.patterning.scd",
+        "sparrow.patterning.vectorized",
     ]
     autodoc_mock_imports = []
     for module_name in candidates:
