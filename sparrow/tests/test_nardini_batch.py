@@ -316,3 +316,134 @@ def test_progress_bar_runs(small):
         warnings.simplefilter("ignore")
         out = nardini_proteins(small, show_progress=True, **OPTIONS)
     assert len(out) == len(small)
+
+
+# =====================================================================
+# nardini_vectors(n_processes=...) - the same engine, matrix in / matrix out
+# =====================================================================
+
+
+@pytest.mark.parametrize("n_processes", [2, 3])
+def test_parallel_vectors_match_serial(enough_to_parallelize, n_processes):
+    """Splitting the work must not change a single number."""
+    background = load_reference_background("human")
+    kwargs = dict(background=background, **OPTIONS)
+
+    serial = nardini_vectors(enough_to_parallelize, n_processes=1, **kwargs)
+    parallel = nardini_vectors(enough_to_parallelize, n_processes=n_processes, **kwargs)
+
+    assert parallel.names == serial.names
+    assert np.array_equal(parallel.zscores, serial.zscores)
+    assert np.array_equal(parallel.raw_patterning, serial.raw_patterning)
+    assert np.array_equal(parallel.raw_composition, serial.raw_composition)
+    assert parallel.backend == serial.backend
+
+
+def test_parallel_vectors_ignore_chunksize(enough_to_parallelize):
+    background = load_reference_background("human")
+    kwargs = dict(background=background, n_processes=2, **OPTIONS)
+
+    fine = nardini_vectors(enough_to_parallelize, chunksize=1, **kwargs)
+    coarse = nardini_vectors(enough_to_parallelize, chunksize=100, **kwargs)
+
+    assert np.array_equal(fine.zscores, coarse.zscores)
+
+
+def test_parallel_vectors_preserve_input_order(enough_to_parallelize):
+    """Workers finish out of order; the result must not."""
+    result = nardini_vectors(enough_to_parallelize, n_processes=4, **OPTIONS)
+
+    assert result.names == tuple(enough_to_parallelize)
+    assert result.sequences == tuple(enough_to_parallelize.values())
+
+
+def test_parallel_vectors_from_a_list_keep_order(enough_to_parallelize):
+    sequences = list(enough_to_parallelize.values())
+    result = nardini_vectors(sequences, n_processes=4, **OPTIONS)
+
+    assert result.sequences == tuple(sequences)
+
+
+def test_parallel_vectors_reject_duplicate_names():
+    """Results are matched back up by name, so names must be unique."""
+    sequences = _sequences(20)
+    duplicated = list(sequences.values())
+    # a list gives positional names, so force the collision explicitly
+    with pytest.raises(SparrowException, match="unique"):
+        from sparrow.nardini.vectors import _parallel_vectors
+
+        _parallel_vectors(
+            ["same"] * len(duplicated),
+            duplicated,
+            None,
+            dict(OPTIONS),
+            n_processes=2,
+            chunksize=None,
+            start_method=None,
+            show_progress=False,
+        )
+
+
+def test_parallel_vectors_report_a_bad_sequence(enough_to_parallelize):
+    broken = dict(enough_to_parallelize)
+    broken["bad"] = "MEEEKKKXXXSSSTTT"
+
+    with pytest.raises(SparrowException, match="Could not compute") as info:
+        nardini_vectors(broken, n_processes=2, **OPTIONS)
+
+    # and points at the entry point that can skip them
+    assert "on_error='skip'" in str(info.value)
+
+
+def test_vectors_are_serial_by_default(monkeypatch, enough_to_parallelize):
+    """The default must not spawn - Protein.nardini scores one sequence at a time."""
+    import sparrow.nardini.batch as batch_module
+
+    def no_pools(*args, **kwargs):
+        raise AssertionError("nardini_vectors spawned a pool without being asked")
+
+    monkeypatch.setattr(batch_module, "score_in_parallel", no_pools)
+
+    result = nardini_vectors(enough_to_parallelize, **OPTIONS)
+    assert len(result) == len(enough_to_parallelize)
+
+    # and the Protein accessor likewise (90 = it defaults to the human background)
+    first = list(enough_to_parallelize.values())[0]
+    assert len(Protein(first).nardini.vector(**OPTIONS)) == 90
+
+
+def test_unknown_keywords_are_rejected_not_swallowed():
+    """A mistyped keyword must fail, not vanish into **read_fasta_kwargs.
+
+    nardini_vectors forwards extra keywords to protfasta.read_fasta, but only when
+    `sequences` is a filename. Anything else used to be accepted and discarded, so
+    `num_workers=16` (the argument is `n_processes`) ran at exactly the speed of
+    `num_workers=1` with nothing to explain why.
+    """
+    sequences = _sequences(4)
+
+    with pytest.raises(SparrowException, match="n_processes") as info:
+        nardini_vectors(sequences, num_workers=8, **OPTIONS)
+    assert "num_workers" in str(info.value)
+
+    # a near-miss gets a suggestion rather than a bare rejection
+    with pytest.raises(SparrowException, match="Did you mean 'n_processes'"):
+        nardini_vectors(sequences, n_procs=8, **OPTIONS)
+
+    # a real protfasta option is still wrong when the input is not a file
+    with pytest.raises(SparrowException, match="only forwarded to protfasta"):
+        nardini_vectors(sequences, verbose=True, **OPTIONS)
+
+
+def test_fasta_keywords_still_work_for_a_filename(tmp_path):
+    """The catch-all must keep doing its actual job."""
+    fasta = tmp_path / "seqs.fasta"
+    fasta.write_text(">a\nMEEEKKKSSSTTTQQQNNNGGGMEEEKKKSSSTTT\n")
+
+    result = nardini_vectors(
+        fasta, num_scrambles=100, seed=1, invalid_sequence_action="convert"
+    )
+    assert len(result) == 1
+
+    with pytest.raises(SparrowException, match="n_processes"):
+        nardini_vectors(fasta, num_scrambles=100, seed=1, num_workers=4)

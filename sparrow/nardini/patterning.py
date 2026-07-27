@@ -10,6 +10,12 @@ Because scrambling preserves composition exactly, the z-score isolates
 that type are more segregated (blockier) than composition alone would predict,
 and a large negative z-score means they are more evenly interspersed.
 
+What is z-scored is **delta**: the mean squared deviation of the per-window
+asymmetry from the whole-sequence asymmetry, unnormalized. The ``'kappa'`` backend
+z-scores delta divided by ``delta_max`` instead, which is the same quantity once
+z-scored - the divisor depends only on composition, and every scramble shares the
+sequence's composition, so a constant cancels. See :ref:`nardini-delta-vs-kappa`.
+
 The two underlying statistics, both evaluated over sliding windows ("blobs") of
 ``blob_size`` residues:
 
@@ -84,8 +90,13 @@ DEFAULT_BACKEND = "nardini"
 #: * ``'nardini'`` - the published NARDINI omega/kappa window asymmetry. This is
 #:   the only backend whose z-scores live in the space the GIN centroids were
 #:   defined in, so it is required for GIN cluster assignment.
-#: * ``'kappa'`` - sparrow's own generalized kappa (``kappa_x``), normalized
-#:   against the maximally-segregated sequence and bounded 0-1.
+#: * ``'kappa'`` - sparrow's own generalized kappa (``kappa_x``): the same
+#:   asymmetry as above, divided by the delta of the most segregated arrangement
+#:   of the same composition, and bounded 0-1. Because that divisor depends only
+#:   on composition - which scrambling preserves - it cancels out of the z-score,
+#:   so this measures the same thing as ``'nardini'`` and is offered for
+#:   completeness and for continuity with the deprecated
+#:   :mod:`sparrow.sequence_analysis.grammar`. See the NARDINI guide.
 #: * ``'iwd'`` - sparrow's inverse-weighted distance, a clustering metric that
 #:   ignores ``blob_size`` entirely.
 PATTERNING_BACKENDS = {
@@ -211,7 +222,7 @@ def type_fractions(labels, num_types):
     return counts / labels.size
 
 
-def _window_counts(labels_2d, num_types, blob_size):
+def _window_counts(labels_2d, num_types, blob_size, types=None):
     """Sliding-window counts of every type, for a batch of label arrays.
 
     Parameters
@@ -222,29 +233,43 @@ def _window_counts(labels_2d, num_types, blob_size):
         Number of residue types.
     blob_size : int
         Window size.
+    types : sequence of int, optional
+        Only count these residue types, in this order. Default None (all of
+        them). Restricting to the types some evaluated feature actually refers
+        to is worth real time on the scramble path, where this runs thousands of
+        times.
 
     Returns
     -------
     numpy.ndarray
-        Array of shape ``(n_sequences, num_types, n_windows)`` of counts, where
-        ``n_windows = length - blob_size + 1``.
+        Array of shape ``(n_sequences, n_types, n_windows)`` of counts, where
+        ``n_types`` is ``num_types`` (or ``len(types)``) and ``n_windows`` is
+        ``length - blob_size + 1``.
     """
     n_seqs, length = labels_2d.shape
+    wanted = range(num_types) if types is None else list(types)
 
-    # one-hot the labels then take a running total, so a window count is the
-    # difference of two prefix sums. int32 is ample: counts are bounded by length.
-    onehot = np.zeros((n_seqs, num_types, length), dtype=np.int32)
-    seq_idx = np.repeat(np.arange(n_seqs), length)
-    pos_idx = np.tile(np.arange(length), n_seqs)
-    onehot[seq_idx, labels_2d.reshape(-1), pos_idx] = 1
+    # A window count is the difference of two prefix sums over an indicator of
+    # "is this position type t". Done one type at a time rather than one-hotting
+    # every type at once: it reuses a single (n_seqs, length + 1) buffer instead
+    # of allocating an (n_seqs, num_types, length) cube, and it lets the caller
+    # skip types no evaluated feature refers to. int16 is ample - a count cannot
+    # exceed the sequence length - and halves the memory traffic of int32.
+    out = np.empty((n_seqs, len(wanted), length - blob_size + 1), dtype=np.int16)
+    prefix = np.zeros((n_seqs, length + 1), dtype=np.int16)
 
-    prefix = np.zeros((n_seqs, num_types, length + 1), dtype=np.int32)
-    np.cumsum(onehot, axis=2, out=prefix[:, :, 1:])
+    for slot, residue_type in enumerate(wanted):
+        np.cumsum(labels_2d == residue_type, axis=1, out=prefix[:, 1:])
+        np.subtract(
+            prefix[:, blob_size:], prefix[:, :-blob_size], out=out[:, slot, :]
+        )
 
-    return prefix[:, :, blob_size:] - prefix[:, :, :-blob_size]
+    return out
 
 
-def _asymmetries_from_counts(counts, fractions, pair_index, blob_size):
+def _asymmetries_from_counts(
+    counts, fractions, pair_index, blob_size, mask=None, slot_of=None
+):
     """Compute all patterning features from precomputed window counts.
 
     Parameters
@@ -258,11 +283,18 @@ def _asymmetries_from_counts(counts, fractions, pair_index, blob_size):
         ``(i, j)`` type-index pairs in canonical feature order.
     blob_size : int
         Window size.
+    mask : numpy.ndarray, optional
+        Boolean mask over ``pair_index``. Features that are False are left at 0.0
+        rather than computed, which is what the caller would do with them anyway.
+    slot_of : numpy.ndarray, optional
+        Maps a residue-type index onto its row in ``counts``, for when ``counts``
+        covers only a subset of types. Default None (row == type index).
 
     Returns
     -------
     numpy.ndarray
-        Array of shape ``(n_sequences, len(pair_index))`` of raw asymmetries.
+        Array of shape ``(n_sequences, len(pair_index))`` of raw asymmetries;
+        features excluded by ``mask`` are 0.0.
     """
     n_seqs = counts.shape[0]
     out = np.zeros((n_seqs, len(pair_index)), dtype=np.float64)
@@ -270,12 +302,24 @@ def _asymmetries_from_counts(counts, fractions, pair_index, blob_size):
     # window fractions
     frac_windows = counts / float(blob_size)
 
+    # `counts` may cover only some types, in which case slot_of maps a type index
+    # onto its row. Without it, the type index is the row.
+    def row(type_index):
+        return type_index if slot_of is None else slot_of[type_index]
+
     for feature, (i, j) in enumerate(pair_index):
+        # Skipping unevaluated features is the single biggest saving on the
+        # scramble path: their values are discarded by the caller anyway, and a
+        # typical IDR evaluates only a third of the 36.
+        if mask is not None and not mask[feature]:
+            continue
+
         if i == j:
             # omega: one type against everything else
             f = fractions[i]
             sigma_all = (f - (1.0 - f)) ** 2
-            sigma_window = (frac_windows[:, i, :] - (1.0 - frac_windows[:, i, :])) ** 2
+            window = frac_windows[:, row(i), :]
+            sigma_window = (window - (1.0 - window)) ** 2
         else:
             # kappa: type i against type j
             f1, f2 = fractions[i], fractions[j]
@@ -285,8 +329,8 @@ def _asymmetries_from_counts(counts, fractions, pair_index, blob_size):
                 continue
             sigma_all = (f1 - f2) ** 2 / denominator
 
-            c1 = frac_windows[:, i, :]
-            c2 = frac_windows[:, j, :]
+            c1 = frac_windows[:, row(i), :]
+            c2 = frac_windows[:, row(j), :]
             total = c1 + c2
             sigma_window = np.zeros_like(total)
             nonzero = total > 0
@@ -666,20 +710,51 @@ def patterning_zscores(
     scramble_values = np.zeros((num_scrambles, n_features), dtype=np.float64)
 
     if backend == "nardini":
+        # Only the evaluated features are ever looked at, so only the residue
+        # types they refer to need counting. On a typical IDR that is around a
+        # third of the features and half the types, and this is the inner loop of
+        # the whole calculation - the published protocol runs it 100,000 times per
+        # sequence.
+        needed_types = sorted(
+            {t for feature, pair in enumerate(pairs) if evaluated[feature] for t in pair}
+        )
+        slot_of = np.full(num_types, -1, dtype=np.intp)
+        for slot, residue_type in enumerate(needed_types):
+            slot_of[residue_type] = slot
+
+        # Permuting into a preallocated C-ordered buffer, rather than letting
+        # rng.permuted allocate: it returns an F-contiguous array when handed a
+        # broadcast view, and downstream row-wise cumsums and FFTs are both
+        # slower and - for the FFT - not bit-reproducible across row counts on a
+        # non-C-contiguous input.
+        scramble_buffer = np.empty((_SCRAMBLE_BLOCK, labels.size), dtype=labels.dtype)
+
         done = 0
         while done < num_scrambles:
             block = min(_SCRAMBLE_BLOCK, num_scrambles - done)
 
             # Permute the type labels; equivalent to shuffling the residues, since
             # the asymmetries depend only on which type sits at each position.
-            # argsort of uniform randoms gives an independent uniform permutation
-            # per row, and generates the whole block without a Python-level loop.
-            order = rng.random((block, labels.size)).argsort(axis=1)
-            permuted = labels[order]
+            # rng.permuted shuffles each row independently by Fisher-Yates, which
+            # is O(n) per row and allocates once. The previous approach - argsort
+            # of a block of uniform randoms - was O(n log n) and allocated two
+            # large temporaries, and was the single largest cost here.
+            permuted = rng.permuted(
+                np.broadcast_to(labels, (block, labels.size)),
+                axis=1,
+                out=scramble_buffer[:block],
+            )
 
-            counts = _window_counts(permuted, num_types, blob_size)
+            counts = _window_counts(
+                permuted, num_types, blob_size, types=needed_types
+            )
             scramble_values[done : done + block] = _asymmetries_from_counts(
-                counts, fractions, pairs, blob_size
+                counts,
+                fractions,
+                pairs,
+                blob_size,
+                mask=evaluated,
+                slot_of=slot_of,
             )
             done += block
     else:
@@ -690,13 +765,18 @@ def patterning_zscores(
 
         group_lists = [sorted(residues) for residues in groups.values()]
         residues = np.frombuffer(sequence.encode("ascii"), dtype=np.uint8)
+        code_buffer = np.empty((_SCRAMBLE_BLOCK, residues.size), dtype=np.uint8)
 
         done = 0
         while done < num_scrambles:
             block = min(_SCRAMBLE_BLOCK, num_scrambles - done)
 
-            order = rng.random((block, residues.size)).argsort(axis=1)
-            codes = residues[order]
+            # same Fisher-Yates shuffle, into a C-ordered buffer, as above
+            codes = rng.permuted(
+                np.broadcast_to(residues, (block, residues.size)),
+                axis=1,
+                out=code_buffer[:block],
+            )
 
             for feature, (i, j) in enumerate(pairs):
                 if not evaluated[feature]:

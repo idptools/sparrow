@@ -357,6 +357,140 @@ def _resolve_input(sequences, **read_fasta_kwargs):
     return names, seqs
 
 
+def _reject_unknown_kwargs(kwargs, sequences, own_parameters):
+    """Fail loudly on keyword arguments that would otherwise be silently ignored.
+
+    ``nardini_vectors`` forwards ``**read_fasta_kwargs`` to ``protfasta.read_fasta``,
+    but only when ``sequences`` is a filename. Anything else lands in that dict and
+    disappears without trace - which is how ``num_workers=16`` (the parameter is
+    ``n_processes``) came to run at exactly the speed of ``num_workers=1``, with no
+    error to explain it. A silently ignored keyword is worse than a crash, so
+    anything that cannot be used is rejected here.
+
+    Parameters
+    ----------
+    kwargs : dict
+        The captured keyword arguments.
+    sequences : object
+        The ``sequences`` argument, used to decide whether FASTA options apply.
+    own_parameters : iterable of str
+        The function's own parameter names, for the "did you mean" suggestion.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If any keyword cannot be used.
+    """
+    if not kwargs:
+        return
+
+    import difflib
+    import inspect
+
+    reading_a_file = isinstance(sequences, (str, os.PathLike))
+
+    try:
+        import protfasta
+
+        fasta_parameters = set(inspect.signature(protfasta.read_fasta).parameters)
+        fasta_parameters.discard("filename")
+    except Exception:  # pragma: no cover - protfasta is a hard dependency
+        fasta_parameters = set()
+
+    accepted = fasta_parameters if reading_a_file else set()
+    unknown = [key for key in kwargs if key not in accepted]
+    if not unknown:
+        return
+
+    candidates = set(own_parameters) | fasta_parameters
+    message = (
+        f"Unexpected keyword argument(s) for nardini_vectors(): "
+        f"{sorted(unknown)}."
+    )
+    for key in sorted(unknown):
+        close = [
+            match
+            for match in difflib.get_close_matches(key, candidates, n=2, cutoff=0.6)
+            if match != key
+        ]
+        if close:
+            message += f" Did you mean '{close[0]}' instead of '{key}'?"
+        elif "worker" in key or "thread" in key or "job" in key or "cpu" in key:
+            message += (
+                f" To compute in parallel, the argument is 'n_processes', "
+                f"not '{key}'."
+            )
+    if not reading_a_file:
+        message += (
+            " Extra keywords are only forwarded to protfasta.read_fasta when "
+            "`sequences` is a filename; here it is a "
+            f"{type(sequences).__name__}."
+        )
+    raise SparrowException(message)
+
+
+def _parallel_vectors(
+    names,
+    seqs,
+    background,
+    options,
+    n_processes,
+    chunksize,
+    start_method,
+    show_progress,
+):
+    """Compute vectors across processes and reassemble one NardiniResult.
+
+    Shares :func:`sparrow.nardini.batch.score_in_parallel` with
+    :func:`sparrow.nardini.batch.nardini_proteins`, so the chunking and pool
+    handling exist once. The result is identical to the serial path - see the
+    module docstring on seeding - and is reassembled in the caller's original
+    order rather than the order the workers happened to finish in.
+    """
+    from sparrow.nardini.batch import score_in_parallel
+
+    if len(set(names)) != len(names):
+        raise SparrowException(
+            "Sequence names must be unique to compute in parallel, because "
+            "results are matched back up by name. Deduplicate them, or call with "
+            "n_processes=1."
+        )
+
+    computed, failures = score_in_parallel(
+        list(zip(names, seqs)),
+        background,
+        options,
+        n_processes=n_processes,
+        chunksize=chunksize,
+        start_method=start_method,
+        show_progress=show_progress,
+    )
+
+    if failures:
+        name, message = failures[0]
+        raise SparrowException(
+            f"Could not compute a NARDINI+ vector for {name!r}: {message}. "
+            f"{len(failures)} of {len(names)} sequences failed. Use "
+            "sparrow.nardini.nardini_proteins(..., on_error='skip') to drop "
+            "unscoreable sequences instead."
+        )
+
+    ordered = [computed[name] for name in names]
+    first = ordered[0]
+
+    return NardiniResult(
+        names=tuple(names),
+        sequences=tuple(seqs),
+        patterning_names=first.patterning_feature_names,
+        composition_names=first.composition_feature_names,
+        patterning_zscores=np.vstack([r.patterning_zscores for r in ordered]),
+        composition_zscores=np.vstack([r.composition_zscores for r in ordered]),
+        raw_patterning=np.vstack([r.raw_patterning for r in ordered]),
+        raw_composition=np.vstack([r.raw_composition for r in ordered]),
+        backend=first.backend,
+    )
+
+
 def nardini_vectors(
     sequences,
     background=None,
@@ -366,6 +500,9 @@ def nardini_vectors(
     blob_size=DEFAULT_BLOB_SIZE,
     min_fraction=DEFAULT_MIN_FRACTION,
     backend=DEFAULT_BACKEND,
+    n_processes=1,
+    chunksize=None,
+    start_method=None,
     show_progress=False,
     **read_fasta_kwargs,
 ):
@@ -423,6 +560,20 @@ def nardini_vectors(
         :mod:`sparrow.sequence_analysis.grammar` are accepted as aliases.
         Only the patterning block changes; the compositional block is identical
         across backends.
+    n_processes : int, optional
+        Compute across this many worker processes. Default 1 (in-process). The
+        result is bit-identical to the serial one however the work is divided,
+        because each sequence's seed derives from its own text rather than its
+        position in the batch. Worth using from a few dozen sequences upwards;
+        below that, worker start-up costs more than it saves.
+    chunksize : int or None, optional
+        Sequences per task when running in parallel. Default aims for a few chunks
+        per worker, so uneven sequence lengths do not leave workers idle.
+    start_method : str or None, optional
+        Multiprocessing start method. Default ``'fork'`` where available. On a
+        ``spawn`` platform, call this from inside an
+        ``if __name__ == "__main__":`` block - see
+        :func:`sparrow.nardini.batch.nardini_proteins` for why.
     show_progress : bool, optional
         Show a progress bar across sequences. Default False.
     **read_fasta_kwargs
@@ -443,6 +594,9 @@ def nardini_vectors(
 
     See Also
     --------
+    sparrow.nardini.nardini_proteins : The same work, returning ``Protein`` objects
+        with the results attached, and with an ``on_error`` option for proteomes
+        that contain unscoreable entries.
     sparrow.nardini.build_background : Build the compositional background.
     sparrow.nardini.patterning.patterning_zscores : Patterning half only.
 
@@ -491,6 +645,16 @@ def nardini_vectors(
                 "sparrow.nardini.build_background()."
             )
 
+    _reject_unknown_kwargs(
+        read_fasta_kwargs,
+        sequences,
+        (
+            "background", "num_scrambles", "seed", "typeset", "blob_size",
+            "min_fraction", "backend", "n_processes", "chunksize",
+            "start_method", "show_progress",
+        ),
+    )
+
     names, seqs = _resolve_input(sequences, **read_fasta_kwargs)
 
     if len(seqs) == 0:
@@ -499,6 +663,29 @@ def nardini_vectors(
     patterning_names = patterning_feature_names(typeset)
 
     n_seqs = len(seqs)
+
+    if n_processes != 1:
+        # Farm the sequences out and stitch the per-sequence results back
+        # together. Safe because a sequence's seed comes from its own text rather
+        # than its position, so splitting the work cannot change any number.
+        return _parallel_vectors(
+            names,
+            seqs,
+            background,
+            {
+                "num_scrambles": num_scrambles,
+                "seed": seed,
+                "typeset": typeset,
+                "blob_size": blob_size,
+                "min_fraction": min_fraction,
+                "backend": backend,
+            },
+            n_processes=n_processes,
+            chunksize=chunksize,
+            start_method=start_method,
+            show_progress=show_progress,
+        )
+
     patt_z = np.zeros((n_seqs, len(patterning_names)), dtype=np.float64)
     patt_raw = np.zeros((n_seqs, len(patterning_names)), dtype=np.float64)
 

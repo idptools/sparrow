@@ -145,7 +145,7 @@ def ternarize_winged(sequence, group1, group2, window_size):
     return ternary
 
 
-def _window_sums(indicator, window_size):
+def _window_sums(indicator, window_size, dtype=None):
     """Sliding-window sums along the last axis.
 
     Parameters
@@ -154,15 +154,39 @@ def _window_sums(indicator, window_size):
         Array of shape ``(..., n)``.
     window_size : int
         Window width.
+    dtype : numpy.dtype, optional
+        Accumulator type for the prefix sum. Default ``int32``, which cannot
+        overflow for any realistic sequence and moves half the memory of int64.
 
     Returns
     -------
     numpy.ndarray
         Array of shape ``(..., n - window_size + 1)``.
     """
-    prefix = np.zeros(indicator.shape[:-1] + (indicator.shape[-1] + 1,), dtype=np.int64)
+    if dtype is None:
+        # a running total cannot exceed the length, so int32 is ample and halves
+        # the memory traffic of int64 - which is what this costs, not arithmetic
+        dtype = np.int32
+    prefix = np.zeros(indicator.shape[:-1] + (indicator.shape[-1] + 1,), dtype=dtype)
     np.cumsum(indicator, axis=-1, out=prefix[..., 1:])
     return prefix[..., window_size:] - prefix[..., :-window_size]
+
+
+def _asymmetry_from_parts(difference, pair_total, total):
+    """``(Fa - Fb)^2 / (Fa + Fb)`` given ``a - b`` and ``a + b`` directly.
+
+    The ternary encoding gives both of those from one cumulative sum each - the
+    running total of the ternary array is ``a - b``, and of its non-zero
+    indicator is ``a + b``. Going through the difference and the sum therefore
+    avoids materializing two separate boolean masks and two wide count arrays,
+    which is the bulk of the cost on the batch path.
+    """
+    numerator = np.asarray(difference, dtype=np.float64) ** 2
+    denominator = np.asarray(pair_total, dtype=np.float64) * total
+
+    out = np.zeros(np.broadcast(numerator, denominator).shape, dtype=np.float64)
+    np.divide(numerator, denominator, out=out, where=denominator > 0)
+    return out
 
 
 def _asymmetry(count_a, count_b, total):
@@ -202,10 +226,14 @@ def _delta_from_ternary(ternary, window_size, sigma):
     numpy.ndarray or float
         Delta, with the leading shape of ``ternary``.
     """
-    count_a = _window_sums((ternary == 1).astype(np.int64), window_size)
-    count_b = _window_sums((ternary == -1).astype(np.int64), window_size)
+    # a - b and a + b straight from the ternary array, rather than counting the
+    # +1s and -1s separately
+    difference = _window_sums(ternary, window_size)
+    pair_total = _window_sums(ternary != 0, window_size)
 
-    window_asymmetry = _asymmetry(count_a, count_b, float(window_size))
+    window_asymmetry = _asymmetry_from_parts(
+        difference, pair_total, float(window_size)
+    )
 
     sigma = np.asarray(sigma, dtype=np.float64)
     if sigma.ndim:
@@ -858,7 +886,13 @@ def iwd_batch(masks):
     >>> bool(vals[0] > vals[1])
     True
     """
-    masks = np.atleast_2d(np.asarray(masks)).astype(np.float64)
+    # ascontiguousarray, not just astype: pocketfft takes a different path for a
+    # non-C-contiguous input, and the results then differ in the last bit between
+    # rows of the same call. That is invisible almost everywhere, but it turns a
+    # null distribution that should be an exact point mass into one with ~1e-16
+    # of spread, which the degenerate-null guard in sparrow.nardini.patterning
+    # then has to cope with.
+    masks = np.ascontiguousarray(np.atleast_2d(np.asarray(masks)), dtype=np.float64)
     n_masks, length = masks.shape
 
     counts = masks.sum(axis=1)

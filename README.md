@@ -211,10 +211,10 @@ Three patterning statistics are selectable via `backend`:
 | `backend` | statistic | notes |
 |---|---|---|
 | `'nardini'` (default) | published NARDINI omega/kappa window asymmetry | **required for GIN** |
-| `'kappa'` | sparrow's generalized `kappa_x`, normalized | bounded 0–1 |
+| `'kappa'` | the same asymmetry, normalized by `delta_max` | bounded 0–1; equivalent once z-scored |
 | `'iwd'` | sparrow's inverse-weighted distance | ignores `blob_size` |
 
-The last two supersede the `kappa_cython` / `iwd_combined` backends of the now-deprecated `sparrow.sequence_analysis.grammar`, and reproduce its values to ~1e-6 (sparrow computes them in double precision where `grammar` used single). All three are vectorized over scrambles and cost about the same — at L=1000 and 2,000 scrambles, 0.49 s / 0.43 s / 0.37 s — so pick a backend on scientific grounds rather than budget. Values are **not** comparable across backends, though; `result.backend` records which one produced them.
+`'nardini'` z-scores the raw asymmetry (**delta**); `'kappa'` z-scores delta divided by `delta_max`. Since `delta_max` depends only on composition and every scramble preserves it, that divisor cancels out of the z-score — the two measure the same thing (correlation 0.97–1.00 in practice, differing only because `kappa_x` pads the ends and caps at 1). **`'kappa'` is provided for completeness**, and for continuity with the deprecated `sparrow.sequence_analysis.grammar`, whose values it reproduces to ~1e-6 (sparrow computes them in double precision where `grammar` used single). All three are vectorized over scrambles and all are fast enough to choose between on scientific grounds — at L=1000 and 10,000 scrambles, 0.81 s / 1.50 s / 1.45 s for `nardini` / `kappa` / `iwd`. Values are **not** comparable across backends, though; `result.backend` records which one produced them.
 
 GIN cluster assignment maps sequences onto the published human grammars
 (`'D/E-tracts'`, `'S patches'`, ...). Nearest-centroid assignment never abstains,
@@ -229,9 +229,10 @@ a human IDR is an extrapolation** — sparrow flags this rather than hiding it. 
 patterning half of the vector is unaffected and stays meaningful for any sequence,
 since it is scored against the sequence's own scrambles.
 
-The patterning calculation is vectorized over scrambles, so it is 20-40x faster
-than the reference implementation; a 1000-residue IDR at the published 100,000
-scrambles takes ~15 s rather than ~9 min.
+The patterning calculation is vectorized over scrambles and skips the features
+the abundance gate has already excluded, making it ~100x faster than the
+reference implementation; a 1000-residue IDR at the published 100,000 scrambles
+takes ~7 s rather than ~13 min.
 
 Two worked example notebooks are in [`examples/`](examples): `nardini_from_protein_objects.ipynb` for the single-sequence interface and `nardini_module.ipynb` for the batch one. Both are executed, so you can read the outputs without running anything.
 

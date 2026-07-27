@@ -252,6 +252,12 @@ Key options:
   deterministically from this value, so a given sequence's vector does not depend
   on how many other sequences were in the batch or in what order.
 * ``typeset`` -- ``'8'`` (default) or ``'9'``; see below.
+* ``n_processes`` -- compute across this many processes. Default 1. The result is
+  bit-identical to the serial one however the work is divided, since each
+  sequence's seed comes from its own text rather than its position. Measured on 64
+  IDRs at 10,000 scrambles: 22.1 s serial, 5.9 s on four processes, 3.3 s on eight
+  (6.8x). Use :func:`~sparrow.nardini.batch.nardini_proteins` instead if you want
+  ``Protein`` objects back, or need to skip unscoreable sequences.
 * ``min_fraction`` -- abundance threshold, default 0.10; see below.
 * ``backend`` -- which patterning statistic to use; see the next section.
 * ``show_progress`` -- progress bar across sequences.
@@ -309,6 +315,42 @@ are accepted as aliases: ``'kappa_cython'`` → ``'kappa'`` and ``'iwd_combined'
 → ``'iwd'``. Those two backends reproduce that module's values *exactly*, so
 migrating changes no numbers.
 
+.. _nardini-delta-vs-kappa:
+
+``'nardini'`` and ``'kappa'`` measure the same thing
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Worth being explicit about, because the naming invites confusion. Both are built
+on the same Das & Pappu window asymmetry, but they stop at different points:
+
+* ``'nardini'`` z-scores **delta** -- the mean squared deviation of the per-window
+  asymmetry from the whole-sequence asymmetry. This is the published NARDINI
+  statistic, and it is *unnormalized*.
+* ``'kappa'`` z-scores **kappa**, which is that same delta divided by
+  ``delta_max``: the delta of the most segregated arrangement of the same
+  composition. This is sparrow's :func:`~sparrow.patterning.kappa.kappa_x`,
+  bounded 0-1.
+
+**The two z-scores are the same quantity.** ``delta_max`` depends only on
+composition, and scrambling preserves composition exactly, so ``delta_max`` is the
+*same constant* for a sequence and for every member of its null distribution. A
+constant factor cancels out of a z-score, so normalizing changes nothing once the
+value has been referenced against its own scrambles.
+
+In practice they are very close but not bit-identical, for two reasons that have
+nothing to do with the normalization: ``kappa_x`` scores a *winged* (end-padded)
+array, which changes slightly which windows exist, and it caps values at 1, which
+is a nonlinear step. Measured over a range of sequences at 4,000 scrambles, the
+per-feature z-scores correlate at 0.97-1.00, differ by at most ~0.2, and agree in
+sign for 31 of 32 evaluated features.
+
+So **``'kappa'`` is offered for completeness, not because it tells you something
+different**: it exists so that results from the deprecated
+``sequence_analysis.grammar`` module can be reproduced, and so the normalized form
+is available if you want it. Use ``'nardini'`` -- the default -- unless you have a
+specific reason not to. It is also the fastest of the three, and the only one GIN
+cluster assignment accepts.
+
 What the choice looks like in practice, on a blocky vs. a well-mixed E/K
 sequence (``pos-neg`` z-score, 500 scrambles):
 
@@ -331,19 +373,22 @@ behaves normally.
 Backend performance
 ^^^^^^^^^^^^^^^^^^^
 
-All three backends are vectorized over scrambles and cost about the same.
-Wall-clock for 2,000 scrambles of a single sequence:
+All three backends are vectorized over scrambles, and all are fast enough that
+the choice is a scientific one. ``'nardini'``, the default, is now also the
+quickest: its inner loop skips the features and residue types that the abundance
+gate has already excluded, which the other two cannot do as cleanly. Wall-clock
+for 10,000 scrambles of a single sequence:
 
 .. code-block:: text
 
    length     nardini     kappa       iwd
-      80        0.10 s    0.10 s    0.07 s
-     300        0.18 s    0.17 s    0.16 s
-    1000        0.49 s    0.43 s    0.37 s
+     200        0.28 s    0.43 s    0.36 s
+     500        0.51 s    0.90 s    0.67 s
+    1000        0.81 s    1.50 s    1.45 s
 
 Scaled to the published 100,000 scrambles, a 1000-residue IDR takes roughly
-25 s, 21 s and 19 s respectively -- so the choice of backend can be made on
-scientific grounds rather than budget.
+8 s, 15 s and 15 s respectively. For a whole proteome, divide by however many
+cores you give :func:`~sparrow.nardini.batch.nardini_proteins`.
 
 This is a recent change. ``'kappa'`` and ``'iwd'`` originally delegated to
 sparrow's Cython extensions, which score one sequence per call and made those
@@ -683,6 +728,140 @@ override any of them. Note that cluster *numbers* mean nothing across runs: k-me
 numbering is arbitrary, and sparrow's largest-first ordering only makes it stable
 within a run.
 
+.. _nardini-cluster-contents:
+
+How big is each cluster, and what is in it?
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Cluster sizes** are recorded on the reference as
+:attr:`~sparrow.nardini.gin.GINReference.num_idrs`, a ``{cluster: count}`` dict.
+Clusters are numbered largest-first, so cluster 0 is always the most populated:
+
+.. code-block:: python
+
+   for cluster in reference.clusters:
+       print(cluster, reference.num_idrs[cluster], reference.describe(cluster))
+
+.. code-block:: text
+
+   0 812 blocky neg-neg, high Frac D, high Frac E
+   1 693 well-mixed pol-gly, high Frac G
+   2 455 high Frac Q, Q patches
+
+:meth:`~sparrow.nardini.gin.GINReference.definitions` gives the same information as
+a list of dicts, which is handier for sorting or writing out::
+
+   reference.definitions()
+   # [{'cluster': 0, 'description': 'blocky neg-neg, ...', 'num_idrs': 812}, ...]
+
+**Which IDRs are in each cluster** is a property of an *assignment*, not of the
+reference -- the reference stores only the centroids and how many sequences formed
+each one. Assign your sequences, then group the records by cluster:
+
+.. code-block:: python
+
+   import collections
+
+   assignment = assign_gin_clusters(vectors, reference=reference)
+
+   members = collections.defaultdict(list)
+   for record in assignment.records():
+       members[record["cluster"]].append(record["name"])
+
+Now iterate the clusters, and the IDRs within each:
+
+.. code-block:: python
+
+   for cluster in reference.clusters:
+       names = members[cluster]
+       print(f"cluster {cluster}: {reference.describe(cluster)}  ({len(names)} IDRs)")
+       for name in names:
+           print("   ", name)
+
+.. code-block:: text
+
+   cluster 0: low Frac Aliphatic, high Frac E, high Frac D  (8 IDRs)
+       DE_0
+       DE_1
+       DE_2
+
+Each record carries the diagnostics alongside the label, so you can filter while
+iterating -- for instance to list only the IDRs whose assignment is trustworthy:
+
+.. code-block:: python
+
+   for record in assignment.records():
+       if record["is_typical"] and record["separation"] > 5:
+           print(record["cluster"], record["name"], round(record["distance"], 1))
+
+Printing the sequences in one cluster
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The records carry names, not sequences -- but the result you scored already holds
+both, in the same order, so one ``zip`` gives you a lookup:
+
+.. code-block:: python
+
+   sequence_of = dict(zip(vectors.names, vectors.sequences))
+
+   cluster = 1
+   print(f"cluster {cluster}: {reference.describe(cluster)}")
+
+   for record in assignment.records():
+       if record["cluster"] == cluster:
+           print(f">{record['name']}")
+           print(sequence_of[record["name"]])
+
+.. code-block:: text
+
+   cluster 1: high Frac S, S patches, high Disorder Promoting
+   >Srich_0
+   SGPSSPTSSPPSSSSSSSSSTSTPSSSPSGSSSPSTSTSSGSSGSTSGSSTTSSPPSGSS...
+   >Srich_1
+   SGSSSSGGSPSSGSPTSSSSGSTGSGSSTTPGSTSSSSSSSPSSSPTGSSTSSSSSSSSP...
+
+That output is already FASTA, so writing a cluster out for use elsewhere -- an
+alignment, a motif search, a figure -- is the same loop pointed at a file:
+
+.. code-block:: python
+
+   with open(f"cluster_{cluster}.fasta", "w") as handle:
+       for record in assignment.records():
+           if record["cluster"] == cluster:
+               handle.write(f">{record['name']}\n{sequence_of[record['name']]}\n")
+
+To do this for every cluster at once, reuse the ``members`` grouping from above:
+
+.. code-block:: python
+
+   for cluster in reference.clusters:
+       with open(f"cluster_{cluster}.fasta", "w") as handle:
+           for name in members[cluster]:
+               handle.write(f">{name}\n{sequence_of[name]}\n")
+
+If you started from a plain ``{name: sequence}`` dict you can of course index that
+directly instead of building ``sequence_of`` -- the names are unchanged all the way
+through.
+
+If you used :func:`~sparrow.nardini.batch.nardini_proteins` you have ``Protein``
+objects under the same names, which is more useful again, since you can go
+straight from a cluster to any other sparrow property:
+
+.. code-block:: python
+
+   proteins = nardini_proteins(idr_sequences, background=background, seed=42)
+
+   for name in members[cluster]:
+       protein = proteins[name]
+       print(name, len(protein), round(protein.FCR, 3), round(protein.kappa, 3))
+
+.. important::
+   ``reference.num_idrs`` and the sizes you get from an assignment answer different
+   questions, and coincide only when you assign back exactly the set you clustered.
+   ``num_idrs`` is a fixed property of the reference: how many sequences formed each
+   centroid. Assigning a *different* set gives that set's distribution across the
+   same centroids -- which is the point of saving a reference and reusing it.
+
 Any backend works
 ^^^^^^^^^^^^^^^^^
 
@@ -973,10 +1152,12 @@ in sparrow. Differences worth knowing about:
      the two definitions are kept side by side rather than reconciled -- see
      :ref:`protein-shared-with-nardini`. They share an implementation and differ
      only in the residue set.
-* **Much faster.** The patterning calculation is vectorized over scrambles, which
-  is 20-40x faster than the reference loop implementation and gets better with
-  sequence length. A 1000-residue IDR at the published 100,000 scrambles takes
-  ~15 s rather than ~9 min, so the notebook's limits of 20 sequences and 1000
+* **Much faster.** The patterning calculation is vectorized over scrambles, and
+  skips the features and residue types the abundance gate has already excluded.
+  Measured against a direct transcription of the reference loop, it is about
+  **100x** faster at L=1000 and the margin grows with length. A 1000-residue IDR
+  at the published 100,000 scrambles takes ~7 s rather than ~13 min, so the
+  notebook's limits of 20 sequences and 1000
   residues do not apply.
 * **Robust gamma fitting.** The scramble distribution for each feature is
   summarized by a maximum-likelihood 3-parameter gamma fit, as in the reference.

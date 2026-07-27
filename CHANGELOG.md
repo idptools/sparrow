@@ -180,6 +180,57 @@ The NARDINI guide, the examples page, the README and the notebooks now cover eve
 * The warning hierarchy (`SparrowWarning`, `BackgroundQualityWarning`, `ClusteringQualityWarning`) is documented as a reference section with the filtering recipe; `ClusteringQualityWarning` had not been named in the docs at all.
 * The feature summaries in `README.md` and `docs/index.rst` described only the original NARDINI surface, with no mention of GIN clustering or parallel computation.
 
+### Documentation — working with the contents of your own clusters
+
+The "building your own clusters" section now covers what you actually do once you have a reference: read cluster sizes off `reference.num_idrs` (or `definitions()`), group an assignment's records by cluster to get the members, iterate clusters and then the IDRs within each, filter on the diagnostics while iterating, and get back to the sequences or `Protein` objects behind the names.
+
+It also flags a distinction that is easy to trip over: `reference.num_idrs` records how many sequences *formed* each centroid, whereas assigning a set gives that set's distribution across the same centroids. They coincide only when you assign back exactly what you clustered — verified with an example where clustering 8 per cluster and then assigning a different 3 per cluster gives, correctly, different numbers.
+
+### Fixed — `nardini_vectors()` silently swallowed unknown keyword arguments
+
+It forwards `**read_fasta_kwargs` to `protfasta.read_fasta`, but only when `sequences` is a filename; with any other input those keywords vanished without a word. That is how `nardini_vectors(..., num_workers=16)` — the argument is `n_processes` — came to run at exactly the speed of `num_workers=1`, with nothing to indicate the request had been ignored. Measured: `num_workers` 1 vs 16 gave 7.01 s vs 7.02 s, where `n_processes` 1 vs 8 gives 7.11 s vs 1.11 s.
+
+Unknown keywords now raise, with a suggestion where there is an obvious one (`n_procs` → "Did you mean 'n_processes'?"), an explicit pointer to `n_processes` for anything worker- or thread-shaped, and a note that FASTA options only apply when reading from a file. Genuine `protfasta` options still work when `sequences` is a filename. `nardini_proteins()` was never affected — it has no catch-all.
+
+### Added — `nardini_vectors(n_processes=...)`
+
+`nardini_vectors()` can now compute across processes, not just `nardini_proteins()`. Default is 1, so nothing spawns unless asked — which matters because `Protein.nardini` calls this for a single sequence. On 64 IDRs at 10,000 scrambles: 22.1 s serial, 11.5 s on two processes, 5.9 s on four, 3.3 s on eight (6.8x), and **bit-identical to serial at every process count and chunk size**, because a sequence's seed comes from its own text rather than its position in the batch.
+
+The pool handling, chunking and per-sequence error isolation were extracted from `nardini_proteins()` into a shared `score_in_parallel()`, so there is one implementation rather than two that can drift. Results are reassembled in the caller's order, not the order workers finished in; parallel mode requires unique sequence names, since results are matched back up by name, and says so if they collide.
+
+Use `nardini_proteins()` when you want `Protein` objects back or need `on_error='skip'`; use `nardini_vectors(n_processes=...)` when you just want the matrix.
+
+### Documentation — `'nardini'` and `'kappa'` measure the same thing
+
+Clarified in the guide, the `patterning` module docstring and the README, because the naming invites exactly the wrong conclusion. `'nardini'` z-scores **delta**, the unnormalized mean squared deviation of the per-window asymmetry from the whole-sequence asymmetry. `'kappa'` z-scores delta divided by `delta_max`, the delta of the most segregated arrangement of the same composition.
+
+**Those are the same quantity once z-scored.** `delta_max` depends only on composition, scrambling preserves composition exactly, and so `delta_max` is the same constant for a sequence and for every member of its null distribution — verified: it takes exactly one distinct value across a sequence and 200 scrambles of it. A constant cancels out of a z-score.
+
+They are close but not bit-identical, for reasons unrelated to the normalization: `kappa_x` scores a *winged* (end-padded) array, changing which windows exist, and caps values at 1. Measured across five sequence types at 4,000 scrambles, per-feature z-scores correlate at 0.97–1.00, differ by at most ~0.2, and agree in sign for 31 of 32 evaluated features.
+
+So `'kappa'` is documented as being **for completeness** — reproducing results from the deprecated `sequence_analysis.grammar`, and offering the bounded form — not because it reports anything `'nardini'` does not.
+
+### Changed — patterning is 2-3x faster
+
+Profiling the scramble path found real waste rather than a need for cleverness. Measured at 10,000 scrambles, best of three interleaved runs:
+
+| backend | L=200 | L=500 | L=1000 |
+|---|---|---|---|
+| `nardini` (default) | 2.13x | 2.44x | 2.75x |
+| `kappa` | 1.22x | 1.20x | 1.21x |
+| `iwd` | 1.12x | 1.18x | 1.13x |
+
+The gain grows with sequence length, because the wasted work scaled with the number of windows.
+
+* **Unevaluated features were being computed and then discarded.** A feature is only scored when its residue types clear `min_fraction`, and a typical IDR clears about 15 of 36 — but all 36 were computed and the rest zeroed afterwards. `_asymmetries_from_counts` now takes the mask. This was the single biggest saving, in the stage that was two thirds of the runtime.
+* **Window counts covered all 8 residue types** when only the ~5 appearing in an evaluated feature are ever read. They are now restricted, computed one type at a time into a single reused buffer rather than allocating an `(n, 8, L)` cube, and accumulated in `int16` rather than `int32`.
+* **Permutation by `argsort` of uniform randoms** — `O(n log n)` plus two large temporaries — replaced with `rng.permuted`, an `O(n)` Fisher-Yates shuffle into a preallocated buffer. This was the largest single stage once the above landed.
+* In `sparrow.patterning.vectorized`, `_delta_from_ternary` counted the `+1`s and `-1`s separately, materializing two boolean masks and two `int64` count arrays. The ternary encoding gives both quantities the asymmetry actually needs — `a - b` is the window sum of the ternary array, `a + b` the window sum of its non-zero indicator — so it now takes two cumulative sums over narrow types instead. Worth about 1.15x on `kappa_from_ternary_batch`.
+
+**The first two produce bit-identical output**, verified against a worktree of the previous commit with `array_equal`. The permutation change does not: it consumes randomness differently, so a given `seed` now yields a different — statistically equivalent — set of scrambles. Checked rather than asserted: across 40 seeds, mean `|z|` moves from 1.2257 to 1.2262, the largest per-feature mean shift is 0.30 seed-to-seed standard deviations, and no feature's two-sample KS test falls below p = 0.165. As with `patterning_percentile`, do not compare a stored z-score against a freshly computed one; recompute instead.
+
+**Fixed along the way:** `rng.permuted` returns an F-contiguous array when handed a broadcast view, and pocketfft takes a different path on non-C-contiguous input — enough that identical rows in one call came out differing in the last bit. That turned an IWD null which should be an exact point mass into one with ~1e-16 of spread. Both scramble loops now permute into C-ordered buffers, and `iwd_batch` calls `ascontiguousarray` so its results no longer depend on the caller's memory layout at all.
+
 ### Added — `nardini_proteins()`, a whole proteome in parallel
 
 `nardini_proteins()` takes sequences or `Protein` objects, computes every NARDINI+ vector across multiple processes, and returns Protein objects with the results already attached — so `p.nardini.vector(...)` afterwards is free rather than recomputed. Input and output shapes match: a dict returns a dict with the same keys, anything else a list in input order. Sequences become new Protein objects; Protein objects passed in are populated **in place** and handed back. Mixed input works.

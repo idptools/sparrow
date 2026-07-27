@@ -54,7 +54,7 @@ from sparrow.nardini.patterning import (
 from sparrow.nardini.protein_interface import DEFAULT_REFERENCE
 from sparrow.sparrow_exceptions import SparrowException, SparrowWarning
 
-__all__ = ["nardini_proteins"]
+__all__ = ["nardini_proteins", "score_in_parallel"]
 
 #: Target number of chunks per worker. More than one keeps workers busy when
 #: sequences differ in length (cost scales with length), at the price of a little
@@ -237,6 +237,101 @@ def _chunk(pairs, chunksize):
         yield pairs[start : start + chunksize]
 
 
+def score_in_parallel(
+    pairs,
+    background,
+    options,
+    n_processes=None,
+    chunksize=None,
+    start_method=None,
+    show_progress=False,
+):
+    """Score ``(name, sequence)`` pairs across processes, one result per sequence.
+
+    The shared engine behind both :func:`nardini_proteins` and the
+    ``n_processes`` argument of :func:`sparrow.nardini.vectors.nardini_vectors`,
+    so there is one implementation of the chunking, the pool handling and the
+    per-sequence error isolation.
+
+    Parameters
+    ----------
+    pairs : list of tuple
+        ``(name, sequence)`` pairs. Names must be unique - results are collected
+        into a dict keyed by them.
+    background : NardiniBackground or None
+        Already resolved, so workers receive a small pickled object.
+    options : dict
+        Keyword arguments forwarded to
+        :func:`~sparrow.nardini.vectors.nardini_vectors` in each worker. Must not
+        contain ``n_processes``, or the workers would try to nest pools.
+    n_processes : int or None, optional
+        Worker processes. Default ``os.cpu_count()``. ``1`` runs in this process.
+    chunksize : int or None, optional
+        Sequences per task. Default aims for a few chunks per worker.
+    start_method : str or None, optional
+        Multiprocessing start method; see :func:`_default_start_method`.
+    show_progress : bool, optional
+        Progress bar over chunks. Default False.
+
+    Returns
+    -------
+    tuple
+        ``(computed, failures)`` where ``computed`` maps name to a
+        single-sequence :class:`~sparrow.nardini.vectors.NardiniResult`, and
+        ``failures`` is a list of ``(name, message)``.
+    """
+    if n_processes is None:
+        n_processes = os.cpu_count() or 1
+    n_processes = max(1, int(n_processes))
+
+    if chunksize is None:
+        chunksize = max(1, len(pairs) // (n_processes * _CHUNKS_PER_WORKER))
+    chunksize = max(1, int(chunksize))
+
+    chunks = list(_chunk(pairs, chunksize))
+
+    # Run in-process when a pool would not pay for itself, and - importantly - when
+    # we are already inside a worker. The latter is what stops a spawn-platform
+    # script with no __main__ guard from recursively spawning: the re-imported
+    # module still computes the right answer, just serially.
+    serial = (
+        n_processes == 1 or len(pairs) < _MIN_FOR_PARALLEL or _in_worker_process()
+    )
+
+    if serial:
+        _init_worker(background, options)
+        outcomes = map(_run_chunk, chunks)
+        pool = None
+    else:
+        import multiprocessing as mp
+
+        method = start_method or _default_start_method()
+        pool = mp.get_context(method).Pool(
+            processes=n_processes,
+            initializer=_init_worker,
+            initargs=(background, options),
+        )
+        outcomes = pool.imap_unordered(_run_chunk, chunks)
+
+    if show_progress:
+        from tqdm import tqdm
+
+        outcomes = tqdm(outcomes, total=len(chunks), desc="NARDINI")
+
+    computed, failures = {}, []
+    try:
+        for chunk_results, chunk_failures in outcomes:
+            for name, result in chunk_results:
+                computed[name] = result
+            failures.extend(chunk_failures)
+    finally:
+        if pool is not None:
+            pool.terminate()
+            pool.join()
+
+    return computed, failures
+
+
 def nardini_proteins(
     sequences,
     background=DEFAULT_REFERENCE,
@@ -368,52 +463,15 @@ def nardini_proteins(
 
     pairs = [(name, protein.sequence) for name, protein in zip(names, proteins)]
 
-    if n_processes is None:
-        n_processes = os.cpu_count() or 1
-    n_processes = max(1, int(n_processes))
-
-    if chunksize is None:
-        chunksize = max(1, len(pairs) // (n_processes * _CHUNKS_PER_WORKER))
-    chunksize = max(1, int(chunksize))
-
-    chunks = list(_chunk(pairs, chunksize))
-
-    # Run in-process when a pool would not pay for itself, and - importantly - when
-    # we are already inside a worker. The latter is what stops a spawn-platform
-    # script with no __main__ guard from recursively spawning: the re-imported
-    # module still computes the right answer, just serially.
-    serial = n_processes == 1 or len(pairs) < _MIN_FOR_PARALLEL or _in_worker_process()
-
-    if serial:
-        _init_worker(resolved_background, options)
-        outcomes = map(_run_chunk, chunks)
-        pool = None
-    else:
-        import multiprocessing as mp
-
-        method = start_method or _default_start_method()
-        pool = mp.get_context(method).Pool(
-            processes=n_processes,
-            initializer=_init_worker,
-            initargs=(resolved_background, options),
-        )
-        outcomes = pool.imap_unordered(_run_chunk, chunks)
-
-    if show_progress:
-        from tqdm import tqdm
-
-        outcomes = tqdm(outcomes, total=len(chunks), desc="NARDINI")
-
-    computed, failures = {}, []
-    try:
-        for chunk_results, chunk_failures in outcomes:
-            for name, result in chunk_results:
-                computed[name] = result
-            failures.extend(chunk_failures)
-    finally:
-        if pool is not None:
-            pool.terminate()
-            pool.join()
+    computed, failures = score_in_parallel(
+        pairs,
+        resolved_background,
+        options,
+        n_processes=n_processes,
+        chunksize=chunksize,
+        start_method=start_method,
+        show_progress=show_progress,
+    )
 
     if failures and on_error == "raise":
         name, message = failures[0]
