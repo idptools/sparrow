@@ -31,8 +31,9 @@ background that ships with sparrow, or build one from your own set of IDRs:
         seed=42,
     )
 
-    result.to_dataframe()               # 90 columns, one row per IDR
+    result.to_table()                   # 90 columns, one row per IDR
     result.top_features("IDR1", n=5)    # most non-random features
+    result.to_dataframe()               # ... or pandas, if you prefer
 
 The 90 features are 36 patterning z-scores (against each sequence's own
 scrambles) plus 54 compositional z-scores (against the background). The
@@ -43,15 +44,57 @@ those 36 features.
 
 .. code-block:: python
 
-    result.gin_clusters().to_dataframe()
-    #                 cluster            description   distance  separation
-    # Name
-    # IDR1                  7             D/E-tracts      41.2        6.31
+    result.gin_clusters().records()
+    # [{'name': 'IDR1', 'cluster': 7, 'description': 'D/E-tracts',
+    #   'distance': 41.2, 'separation': 6.31, 'is_typical': True, ...}, ...]
 
 This maps each sequence onto one of the 30 published human GIN grammars. It needs
 the full 90-feature vector, so a background is required - and because the
 centroids live in human NARDINI+ z-score space, ``load_reference_background(
 'human')`` is the background to use for results comparable to the published ones.
+
+**4. For a whole proteome, compute in parallel**
+
+.. code-block:: python
+
+    from sparrow.nardini import nardini_proteins
+
+    proteins = nardini_proteins(idr_sequences, num_scrambles=10000, seed=42,
+                                show_progress=True)
+
+    proteins["IDR1"].nardini.vector(seed=42, num_scrambles=10000)   # cached
+
+:func:`~sparrow.nardini.batch.nardini_proteins` takes sequences or
+:class:`~sparrow.protein.Protein` objects and returns Protein objects with the
+results attached, so the expensive part happens once. Parallelism does not change
+the numbers: per-sequence seeds derive from the sequence rather than its position
+in a batch, so a vector is unaffected by how the input was chunked.
+
+**5. Or derive your own grammars instead of using the published ones**
+
+.. code-block:: python
+
+    from sparrow.nardini import build_gin_reference, compare_gin_references
+
+    reference = build_gin_reference(result, k=30, seed=0)
+    reference.save("my_grammars.npz")
+    compare_gin_references(reference)      # how close is this to published GIN?
+
+:func:`~sparrow.nardini.clustering.build_gin_reference` runs the same clustering
+procedure over your own vectors, which is what you want for a non-human proteome
+or a designed library. Reproducing the *published* centroids exactly is a
+different matter - see that module for why.
+
+Where things live
+-----------------
+``vectors`` is the entry point and stitches the two halves together;
+``patterning`` and ``composition`` compute those halves; ``background`` provides
+the reference statistics the compositional half is scored against; ``gin``
+assigns to cluster centroids and ``clustering`` builds new ones; ``batch``
+parallelizes over many sequences; ``protein_interface`` is what
+``Protein.nardini`` resolves to; ``table`` holds the small labelled containers
+everything returns; ``groups`` defines the residue typesets. ``architecture.md``
+in this directory describes how they fit together in more detail.
 
 Choosing a patterning statistic
 -------------------------------

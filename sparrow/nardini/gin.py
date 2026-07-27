@@ -5,9 +5,21 @@ grammar, obtained by k-means on NARDINI+ z-score vectors. Each cluster has a
 human-readable description - ``'D/E-tracts'``, ``'S patches'``,
 ``'Well-mixed P and G'``, and so on.
 
-This module assigns *new* sequences to those published clusters. It does not
-re-cluster anything: it computes each sequence's NARDINI+ vector and finds the
-nearest published centroid.
+This module assigns *new* sequences to clusters: it computes each sequence's
+NARDINI+ vector and finds the nearest centroid. It does not derive clusters -
+:mod:`sparrow.nardini.clustering` does that, and produces a :class:`GINReference`
+that :func:`assign_gin_clusters` accepts in place of the published one.
+
+So there are two ways to use this module: against the 30 published human grammars
+(the default, and what you want for human IDRs), or against centroids you built
+yourself with :func:`~sparrow.nardini.clustering.build_gin_reference` (which is
+what you want for anything else). :meth:`GINReference.save` and
+:meth:`GINReference.load` persist the latter.
+
+Whichever reference is used, the vectors and the centroids must live in the same
+space. A reference records the patterning backend it was built from, and
+:func:`assign_gin_clusters` refuses a vector computed with a different one, since
+those are different statistics on different scales.
 
     from sparrow.nardini import (
         load_reference_background,

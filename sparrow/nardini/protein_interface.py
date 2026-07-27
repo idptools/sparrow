@@ -11,9 +11,27 @@ directly::
     p.nardini.patterning()         # just the 36 patterning z-scores
     p.nardini.composition()        # just the 54 compositional z-scores
     p.nardini.gin_cluster()        # nearest published human GIN grammar
+    print(p.nardini.gin_report())  # the same, in prose, with the caveats
 
 Everything returns a :class:`~sparrow.nardini.table.FeatureVector` - a labelled
 NumPy array you can index by feature name - or, for the GIN call, a plain dict.
+
+This module is a thin adapter: it resolves the ``background`` argument, calls
+:func:`sparrow.nardini.vectors.nardini_vectors` on the one sequence, and slices
+the answer. The work happens in the modules behind it.
+
+Caching
+-------
+Results are memoized per unique set of options, keyed on the *contents* of the
+background rather than its identity, so asking for the vector, the patterning half
+and the GIN label with the same arguments computes the underlying analysis once.
+``patterning()`` will also reuse a cached full result, because the patterning half
+does not depend on the background.
+
+For many proteins, :func:`sparrow.nardini.batch.nardini_proteins` computes the
+vectors in parallel and stores them here directly, so the calls above become free.
+That is sound because a sequence's vector does not depend on how it was batched -
+see :mod:`sparrow.nardini.vectors`.
 
 The background
 --------------

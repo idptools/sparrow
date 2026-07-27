@@ -23,6 +23,34 @@ proteome.
 Unlike the patterning features, these are *raw* values. Turning them into
 z-scores requires a background distribution estimated over a reference set of
 IDRs - see :mod:`sparrow.nardini.background`.
+
+Where the numbers come from
+---------------------------
+This module *assembles* the feature vector; it does not implement the individual
+quantities. Each one is computed by the same code behind the corresponding
+:class:`~sparrow.protein.Protein` property:
+
+* the 20 amino acid fractions - :func:`sparrow.calculate_parameters.calculate_aa_fractions`;
+* the grouped fractions, ratios and whole-sequence properties -
+  :mod:`sparrow.sequence_analysis.physical_properties`;
+* the patch features - :mod:`sparrow.sequence_analysis.patching`.
+
+So ``composition_values(seq)['FCR']`` and ``Protein(seq).FCR`` are the same number
+by construction rather than by coincidence, and a test asserts that for every
+feature that has a counterpart.
+
+.. warning::
+   One definition deliberately differs. ``'Frac Polar'`` counts cysteine
+   (QNSTGCH); :attr:`sparrow.protein.Protein.fraction_polar` does not (GHNQST), so
+   the two differ by the cysteine content. Both conventions are used, and the
+   bundled backgrounds and GIN centroids are defined against this one, so they are
+   kept distinct. Only the residue set differs - the implementation is shared.
+
+.. note::
+   These values feed the bundled per-species backgrounds and the GIN centroids, so
+   they must stay bit-identical. Changing how a feature is summed - even in a way
+   that looks equivalent - shifts every compositional z-score and every centroid
+   distance downstream.
 """
 
 from collections import OrderedDict

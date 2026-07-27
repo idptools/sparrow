@@ -31,6 +31,11 @@ This module supersedes sparrow's older ``sequence_analysis.grammar`` -- see
    :local:
    :depth: 2
 
+.. note::
+   Working on the module rather than with it? ``sparrow/nardini/architecture.md``
+   describes how the files fit together, how they connect to ``Protein``, and the
+   invariants that are not obvious from any single file.
+
 From a ``Protein``
 ------------------
 

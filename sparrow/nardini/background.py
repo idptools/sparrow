@@ -29,6 +29,15 @@ Typical use::
 The means and standard deviations are accumulated with Welford's online
 algorithm, so building a background over a full IDRome uses memory proportional
 to the number of features rather than the number of sequences.
+
+A background fails quietly rather than loudly: if a feature never varies across
+the reference set there is no scale to divide by, so its z-score comes back as
+exactly 0.0 for every sequence ever scored against it - which reads as "average"
+but means "unmeasurable". :func:`build_background` therefore warns
+(:class:`~sparrow.sparrow_exceptions.BackgroundQualityWarning`) when the set is
+too small or too many features are constant; see
+:data:`MIN_RECOMMENDED_SEQUENCES` and :data:`MAX_DEGENERATE_FRACTION`. The
+background is still returned and still usable - this is advice, not an error.
 """
 
 import json

@@ -21,6 +21,25 @@ Both halves are z-scores, but they answer different questions:
 
 So a patterning z-score is composition-independent by construction, while a
 compositional z-score is only as meaningful as the background behind it.
+
+Seeding
+-------
+Patterning z-scores come from random scrambles, so pass ``seed`` if you want them
+reproducible. Each sequence's seed is derived from the master seed **and the
+sequence itself**, never from its position in the batch. A given sequence
+therefore gets the same scramble stream whether it is scored alone, as part of a
+set, or as part of a differently-ordered set - which is what lets
+:func:`sparrow.nardini.batch.nardini_proteins` split the work across processes
+without changing any number, and what makes ``Protein.nardini`` agree exactly with
+a batch result.
+
+Backends
+--------
+The patterning statistic is selectable, and the choice is recorded on the result
+as ``result.backend``. Values from different backends are **not comparable** -
+they are different quantities on different scales - so the recorded backend is
+what stops them being mixed: GIN assignment refuses a vector whose backend does
+not match the centroids it is being assigned against.
 """
 
 import hashlib

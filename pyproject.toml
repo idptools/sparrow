@@ -48,7 +48,10 @@ include = ["sparrow", "sparrow.*"]  # Discover all sub-packages inside the main 
 
 [tool.setuptools.package-data]
 sparrow = [
-    "py.typed"
+    "py.typed",
+    # shipped so the pointer in sparrow.nardini's docstring resolves for an
+    # installed copy, not just a checkout
+    "nardini/architecture.md",
 ]
 
 # keep editor autosave/backup files out of the distributions. MANIFEST.in cannot
