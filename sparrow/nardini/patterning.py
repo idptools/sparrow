@@ -139,8 +139,7 @@ def resolve_backend(backend):
 
     if key not in PATTERNING_BACKENDS:
         raise SparrowException(
-            f"Unknown patterning backend '{backend}'. Must be one of "
-            f"{sorted(PATTERNING_BACKENDS)}."
+            f"Unknown patterning backend '{backend}'. Must be one of {sorted(PATTERNING_BACKENDS)}."
         )
     return key
 
@@ -244,7 +243,8 @@ def _window_counts(labels_2d, num_types, blob_size, types=None):
     numpy.ndarray
         Array of shape ``(n_sequences, n_types, n_windows)`` of counts, where
         ``n_types`` is ``num_types`` (or ``len(types)``) and ``n_windows`` is
-        ``length - blob_size + 1``.
+        ``length - blob_size + 2``. The final window contains the trailing
+        ``blob_size - 1`` residues, matching the published NARDINI protocol.
     """
     n_seqs, length = labels_2d.shape
     wanted = range(num_types) if types is None else list(types)
@@ -255,21 +255,20 @@ def _window_counts(labels_2d, num_types, blob_size, types=None):
     # of allocating an (n_seqs, num_types, length) cube, and it lets the caller
     # skip types no evaluated feature refers to. int16 is ample - a count cannot
     # exceed the sequence length - and halves the memory traffic of int32.
-    out = np.empty((n_seqs, len(wanted), length - blob_size + 1), dtype=np.int16)
+    out = np.empty((n_seqs, len(wanted), length - blob_size + 2), dtype=np.int16)
     prefix = np.zeros((n_seqs, length + 1), dtype=np.int16)
 
     for slot, residue_type in enumerate(wanted):
         np.cumsum(labels_2d == residue_type, axis=1, out=prefix[:, 1:])
-        np.subtract(
-            prefix[:, blob_size:], prefix[:, :-blob_size], out=out[:, slot, :]
-        )
+        np.subtract(prefix[:, blob_size:], prefix[:, :-blob_size], out=out[:, slot, :-1])
+        # NARDINI also scores the final partial window, but still normalizes
+        # its counts by blob_size in _asymmetries_from_counts.
+        np.subtract(prefix[:, -1], prefix[:, -blob_size], out=out[:, slot, -1])
 
     return out
 
 
-def _asymmetries_from_counts(
-    counts, fractions, pair_index, blob_size, mask=None, slot_of=None
-):
+def _asymmetries_from_counts(counts, fractions, pair_index, blob_size, mask=None, slot_of=None):
     """Compute all patterning features from precomputed window counts.
 
     Parameters
@@ -435,9 +434,7 @@ def _alt_backend_values(sequence, argsets, n_features, backend, blob_size):
             values[feature] = 0.0 if value < 0 else value
     else:
         for feature, (residues,) in argsets:
-            values[feature] = vec.calculate_average_inverse_distance_from_sequence(
-                sequence, residues
-            )
+            values[feature] = vec.calculate_average_inverse_distance_from_sequence(sequence, residues)
 
     return values
 
@@ -505,8 +502,7 @@ def patterning_values(
         raise SparrowException(f"blob_size must be >= 2 (got {blob_size})")
     if len(sequence) < blob_size:
         raise SparrowException(
-            f"Sequence of length {len(sequence)} is shorter than blob_size "
-            f"{blob_size}; patterning cannot be computed."
+            f"Sequence of length {len(sequence)} is shorter than blob_size {blob_size}; patterning cannot be computed."
         )
 
     labels = encode_types(sequence, typeset)
@@ -715,9 +711,7 @@ def patterning_zscores(
         # third of the features and half the types, and this is the inner loop of
         # the whole calculation - the published protocol runs it 100,000 times per
         # sequence.
-        needed_types = sorted(
-            {t for feature, pair in enumerate(pairs) if evaluated[feature] for t in pair}
-        )
+        needed_types = sorted({t for feature, pair in enumerate(pairs) if evaluated[feature] for t in pair})
         slot_of = np.full(num_types, -1, dtype=np.intp)
         for slot, residue_type in enumerate(needed_types):
             slot_of[residue_type] = slot
@@ -745,9 +739,7 @@ def patterning_zscores(
                 out=scramble_buffer[:block],
             )
 
-            counts = _window_counts(
-                permuted, num_types, blob_size, types=needed_types
-            )
+            counts = _window_counts(permuted, num_types, blob_size, types=needed_types)
             scramble_values[done : done + block] = _asymmetries_from_counts(
                 counts,
                 fractions,
@@ -786,18 +778,12 @@ def patterning_zscores(
                 group2 = [] if i == j else group_lists[j]
 
                 if backend == "kappa":
-                    ternary = vec.ternarize_winged_batch(
-                        codes, group1, group2, blob_size
-                    )
-                    values = vec.kappa_from_ternary_batch(
-                        ternary, blob_size, 1, group2_present=len(group2) > 0
-                    )
+                    ternary = vec.ternarize_winged_batch(codes, group1, group2, blob_size)
+                    values = vec.kappa_from_ternary_batch(ternary, blob_size, 1, group2_present=len(group2) > 0)
                     # kappa_x reports -1 when undefined; that means "not scored"
                     values = np.where(values < 0, 0.0, values)
                 else:
-                    targets = (
-                        group1 if i == j else sorted(set(group1) | set(group_lists[j]))
-                    )
+                    targets = group1 if i == j else sorted(set(group1) | set(group_lists[j]))
                     mask = vec._membership_lookup(targets)[codes]
                     values = vec.iwd_batch(mask)
 
@@ -812,9 +798,7 @@ def patterning_zscores(
     null_var = np.full(n_features, np.nan)
     for feature in range(n_features):
         if evaluated[feature]:
-            null_mean[feature], null_var[feature] = _fit_gamma_moments(
-                scramble_values[:, feature]
-            )
+            null_mean[feature], null_var[feature] = _fit_gamma_moments(scramble_values[:, feature])
 
     zscores = np.zeros(n_features, dtype=np.float64)
     for feature in range(n_features):

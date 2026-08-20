@@ -31,9 +31,7 @@ from sparrow.sparrow_exceptions import (
     SparrowException,
 )
 
-SMARCC2_LIKE = (
-    "MENDPRVRKFASDGAQWAIKWQKKGWSTLTSRQKQTARAAMGIKLSPVAQPVQKVTRLSAPVALAYREVSTQPRVSTARD"
-)
+SMARCC2_LIKE = "MENDPRVRKFASDGAQWAIKWQKKGWSTLTSRQKQTARAAMGIKLSPVAQPVQKVTRLSAPVALAYREVSTQPRVSTARD"
 RG_RICH = "GRGRGGYGGRGGYGGSRGGYGGSRGGRGGYGGSRGGRGGRGGYGGRGRGRG"
 BLOCKY_EK = "EEEEEEEEEEEEEEEKKKKKKKKKKKKKKK"
 MIXED_EK = "EKEKEKEKEKEKEKEKEKEKEKEKEKEKEK"
@@ -41,9 +39,7 @@ MIXED_EK = "EKEKEKEKEKEKEKEKEKEKEKEKEKEKEK"
 # The synthetic fixtures here are deliberately small, so build_background warns
 # that they are weak. That warning is asserted directly in the dedicated tests
 # below (pytest.warns overrides this filter); everywhere else it is just noise.
-pytestmark = pytest.mark.filterwarnings(
-    "ignore::sparrow.sparrow_exceptions.BackgroundQualityWarning"
-)
+pytestmark = pytest.mark.filterwarnings("ignore::sparrow.sparrow_exceptions.BackgroundQualityWarning")
 
 
 # =====================================================================
@@ -67,7 +63,7 @@ def _reference_omega(seq, type1, b=5):
     sigAll = ((count / len(seq)) - (1 - (count / len(seq)))) ** 2
 
     sigX = []
-    for x in range(0, len(seq) - b + 1):
+    for x in range(0, len(seq) - b + 2):
         subseq = seq[x : x + b]
         count = sum(subseq.count(res) for res in type1)
         sigX.append(((count / b) - (1 - (count / b))) ** 2)
@@ -78,12 +74,10 @@ def _reference_omega(seq, type1, b=5):
 def _reference_kappa(seq, type1, type2, b=5):
     count1 = sum(seq.count(res) for res in type1)
     count2 = sum(seq.count(res) for res in type2)
-    sigAll = ((count1 / len(seq)) - (count2 / len(seq))) ** 2 / (
-        (count1 / len(seq)) + (count2 / len(seq))
-    )
+    sigAll = ((count1 / len(seq)) - (count2 / len(seq))) ** 2 / ((count1 / len(seq)) + (count2 / len(seq)))
 
     sigX = []
-    for x in range(0, len(seq) - b + 1):
+    for x in range(0, len(seq) - b + 2):
         subseq = seq[x : x + b]
         c1 = sum(subseq.count(res) for res in type1)
         c2 = sum(subseq.count(res) for res in type2)
@@ -109,9 +103,7 @@ def _reference_patterning_values(seq, min_fraction=0.10, b=5):
                     values.append(0.0)
             else:
                 if fracs[i] > min_fraction and fracs[j] > min_fraction:
-                    values.append(
-                        _reference_kappa(seq, _REF_TYPES[i], _REF_TYPES[j], b)
-                    )
+                    values.append(_reference_kappa(seq, _REF_TYPES[i], _REF_TYPES[j], b))
                 else:
                     values.append(0.0)
     return np.array(values)
@@ -204,9 +196,7 @@ def test_scramble_scoring_matches_reference():
     from sparrow.nardini import patterning as P
 
     rng = random.Random(3)
-    scrambles = [
-        "".join(rng.sample(SMARCC2_LIKE, len(SMARCC2_LIKE))) for _ in range(25)
-    ]
+    scrambles = ["".join(rng.sample(SMARCC2_LIKE, len(SMARCC2_LIKE))) for _ in range(25)]
 
     labels = np.stack([P.encode_types(s) for s in scrambles])
     fractions = P.type_fractions(P.encode_types(SMARCC2_LIKE), 8)
@@ -216,9 +206,7 @@ def test_scramble_scoring_matches_reference():
     got[:, ~P._evaluated_mask(fractions, pairs, 0.10)] = 0.0
 
     for row, scramble in enumerate(scrambles):
-        assert np.allclose(
-            got[row], _reference_patterning_values(scramble), rtol=1e-12, atol=1e-15
-        )
+        assert np.allclose(got[row], _reference_patterning_values(scramble), rtol=1e-12, atol=1e-15)
 
 
 # =====================================================================
@@ -316,9 +304,7 @@ def test_patterning_is_reproducible_with_a_seed():
 
 
 def test_patterning_details():
-    z, details = patterning_zscores(
-        SMARCC2_LIKE, num_scrambles=300, seed=1, return_details=True
-    )
+    z, details = patterning_zscores(SMARCC2_LIKE, num_scrambles=300, seed=1, return_details=True)
 
     assert details["scramble_values"].shape == (300, 36)
     assert details["raw"].shape == (36,)
@@ -399,12 +385,8 @@ def test_resolve_backend_rejects_unknown():
     "grammar_backend,nardini_backend,prefix",
     [("kappa_cython", "kappa", "kappa::"), ("iwd_combined", "iwd", "iwd::")],
 )
-@pytest.mark.parametrize(
-    "sequence", [SMARCC2_LIKE, RG_RICH, BLOCKY_EK, "QQQQNNNNSSSSTTTTGGGGPPPPAAAA"]
-)
-def test_ported_backends_match_grammar(
-    grammar_backend, nardini_backend, prefix, sequence
-):
+@pytest.mark.parametrize("sequence", [SMARCC2_LIKE, RG_RICH, BLOCKY_EK, "QQQQNNNNSSSSTTTTGGGGPPPPAAAA"])
+def test_ported_backends_match_grammar(grammar_backend, nardini_backend, prefix, sequence):
     """The ported backends must reproduce sparrow.sequence_analysis.grammar.
 
     Agreement is to single-precision tolerance rather than bit-for-bit: grammar
@@ -527,12 +509,7 @@ def test_backend_recorded_on_result():
         assert result.backend == backend
 
     # legacy alias is normalized on the way in
-    assert (
-        nv(
-            {"a": SMARCC2_LIKE}, num_scrambles=100, seed=1, backend="iwd_combined"
-        ).backend
-        == "iwd"
-    )
+    assert nv({"a": SMARCC2_LIKE}, num_scrambles=100, seed=1, backend="iwd_combined").backend == "iwd"
 
 
 def test_backend_does_not_affect_composition_block(idr_set):
@@ -641,10 +618,7 @@ def idr_set():
     """A small synthetic set of IDR-like sequences."""
     rng = random.Random(5)
     alphabet = "SSSTTTGGGQQQNNNPPPEEEDDDKKKRRRAAALLLVVVMIYFWHC"
-    return {
-        f"idr_{i}": "".join(rng.choice(alphabet) for _ in range(rng.randint(40, 150)))
-        for i in range(60)
-    }
+    return {f"idr_{i}": "".join(rng.choice(alphabet) for _ in range(rng.randint(40, 150))) for i in range(60)}
 
 
 @pytest.fixture
@@ -699,13 +673,8 @@ def test_paths_may_be_pathlib_objects(tmp_path, idr_fasta, idr_set):
     assert isinstance(NardiniBackground.load(saved), NardiniBackground)
 
     # and as the `background` argument, on both the module and Protein entry points
-    assert nardini_vectors(
-        idr_set, background=saved, num_scrambles=100, seed=1
-    ).has_composition
-    assert (
-        len(Protein(next(iter(idr_set.values()))).nardini.composition(background=saved))
-        == 54
-    )
+    assert nardini_vectors(idr_set, background=saved, num_scrambles=100, seed=1).has_composition
+    assert len(Protein(next(iter(idr_set.values()))).nardini.composition(background=saved)) == 54
 
 
 def test_build_background_from_list(idr_set):
@@ -793,9 +762,7 @@ def test_background_zscores_from_mapping_and_array(idr_set):
     values = composition_values(SMARCC2_LIKE)
 
     from_mapping = background.zscores(values)
-    from_array = background.zscores(
-        np.array([values[n] for n in composition_feature_names()])
-    )
+    from_array = background.zscores(np.array([values[n] for n in composition_feature_names()]))
 
     assert np.allclose(from_mapping, from_array)
     assert from_mapping.shape == (54,)
@@ -862,9 +829,7 @@ def test_nardini_vectors_from_fasta(idr_fasta, idr_set):
 
 def test_nardini_vectors_accepts_background_path(tmp_path, idr_set):
     path = build_background(idr_set).save(tmp_path / "bg")
-    result = nardini_vectors(
-        {"a": SMARCC2_LIKE}, background=path, num_scrambles=100, seed=1
-    )
+    result = nardini_vectors({"a": SMARCC2_LIKE}, background=path, num_scrambles=100, seed=1)
     assert result.zscores.shape == (1, 90)
 
 
@@ -954,9 +919,7 @@ def test_protein_nardini_agrees_with_batch(idr_set):
         num_scrambles=300,
         seed=11,
     )
-    solo = Protein(SMARCC2_LIKE).nardini.vector(
-        background=background, num_scrambles=300, seed=11
-    )
+    solo = Protein(SMARCC2_LIKE).nardini.vector(background=background, num_scrambles=300, seed=11)
 
     assert np.allclose(solo.to_numpy(), batch.zscores[batch.names.index("b")])
 
@@ -973,12 +936,8 @@ def test_nardini_vectors_reproducible(idr_set):
 
 def test_nardini_vectors_composition_block_is_seed_independent(idr_set):
     background = build_background(idr_set)
-    a = nardini_vectors(
-        {"a": SMARCC2_LIKE}, background=background, num_scrambles=200, seed=1
-    )
-    b = nardini_vectors(
-        {"a": SMARCC2_LIKE}, background=background, num_scrambles=200, seed=2
-    )
+    a = nardini_vectors({"a": SMARCC2_LIKE}, background=background, num_scrambles=200, seed=1)
+    b = nardini_vectors({"a": SMARCC2_LIKE}, background=background, num_scrambles=200, seed=2)
 
     assert np.allclose(a.composition_zscores, b.composition_zscores)
     assert not np.allclose(a.patterning_zscores, b.patterning_zscores)
@@ -1009,9 +968,7 @@ def test_nardini_vectors_rejects_mismatched_background():
 
 def test_top_features(idr_set):
     background = build_background(idr_set)
-    result = nardini_vectors(
-        {"rg": RG_RICH}, background=background, num_scrambles=200, seed=1
-    )
+    result = nardini_vectors({"rg": RG_RICH}, background=background, num_scrambles=200, seed=1)
 
     top = result.top_features("rg", n=5)
     assert len(top) == 5
@@ -1025,9 +982,7 @@ def test_top_features(idr_set):
 
 def test_top_features_by_index_and_unknown_name(idr_set):
     background = build_background(idr_set)
-    result = nardini_vectors(
-        {"rg": RG_RICH}, background=background, num_scrambles=100, seed=1
-    )
+    result = nardini_vectors({"rg": RG_RICH}, background=background, num_scrambles=100, seed=1)
 
     assert result.top_features(0, n=3) == result.top_features("rg", n=3)
 
@@ -1037,9 +992,7 @@ def test_top_features_by_index_and_unknown_name(idr_set):
 
 def test_result_repr(idr_set):
     background = build_background(idr_set)
-    result = nardini_vectors(
-        {"a": SMARCC2_LIKE}, background=background, num_scrambles=100, seed=1
-    )
+    result = nardini_vectors({"a": SMARCC2_LIKE}, background=background, num_scrambles=100, seed=1)
     assert "90 features" in repr(result)
 
 
@@ -1074,10 +1027,7 @@ def _diverse_idrs(count, seed=17):
     """`count` IDR-like sequences drawn from all 20 residues."""
     rng = random.Random(seed)
     alphabet = "SSSTTTGGGQQQNNNPPPEEEDDDKKKRRRAAALLLVVVMIYFWHC"
-    return {
-        f"idr_{i}": "".join(rng.choice(alphabet) for _ in range(rng.randint(60, 200)))
-        for i in range(count)
-    }
+    return {f"idr_{i}": "".join(rng.choice(alphabet) for _ in range(rng.randint(60, 200))) for i in range(count)}
 
 
 def test_build_background_warns_about_too_few_sequences():
