@@ -9,3 +9,4 @@
 # with a comment naming it. `git log --format=%H -1` gives you the SHA.
 
 # <sha>  Reformat the tree with ruff format
+50f2a898b5cb28f05591b264bd9b508662a979d4
