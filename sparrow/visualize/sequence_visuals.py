@@ -1,25 +1,27 @@
-#from IPython import display
+# from IPython import display
 from IPython.display import display
 from IPython.display import HTML
 
 from sparrow.data.amino_acids import AA_COLOR
 from sparrow.sparrow_exceptions import SparrowException
 
-def show_sequence(seq, 
-                  blocksize=10, 
-                  newline=50, 
-                  fontsize=14, 
-                  font_family='Courier', 
-                  colors=None,
-                  header=None,
-                  bold_positions=None,
-                  bold_residues=None,
-                  opaque_positions=None,
-                  return_raw_string=False,
-                  warnings = True):
-                  
+
+def show_sequence(
+    seq,
+    blocksize=10,
+    newline=50,
+    fontsize=14,
+    font_family="Courier",
+    colors=None,
+    header=None,
+    bold_positions=None,
+    bold_residues=None,
+    opaque_positions=None,
+    return_raw_string=False,
+    warnings=True,
+):
     """
-    Function that generates an HTML colored string that either renders in the browser or returns the 
+    Function that generates an HTML colored string that either renders in the browser or returns the
     html string. Contains various customizable components.
 
     Parameters
@@ -41,52 +43,52 @@ def show_sequence(seq,
         Fontsize used. Default is 14
 
     font_family : str
-        Which font family (from HTML fonts) is used. Using a non-monospace font makes no sense as columns will be 
-        unaligned. Default is Courier. 
+        Which font family (from HTML fonts) is used. Using a non-monospace font makes no sense as columns will be
+        unaligned. Default is Courier.
 
     colors : dict
-        Dictionary that allows overiding of default color scheme. Should be of format key-value as 'residue'-'color' where 
-        residue is a residue in the string and color is a valid HTML color (which can be a Hexcode, standard HTML color name). 
-        Note that this also lets you define colors for non-standard amino acids should these be useful. Default is an empty 
+        Dictionary that allows overiding of default color scheme. Should be of format key-value as 'residue'-'color' where
+        residue is a residue in the string and color is a valid HTML color (which can be a Hexcode, standard HTML color name).
+        Note that this also lets you define colors for non-standard amino acids should these be useful. Default is an empty
         dictionary. Note also that the standard amino acid colorings are defined at sparrow.data.amino_acids.AA_COLOR
-      
+
     header : str
         If provided, this is a string that provides a FASTA-style header (with a leading carrett included). Default None.
 
     bold_positions : list
         List of positions (indexing from 1 onwards) which will be bolded. Useful for highlighting specific regions. Note that this
-        defines individual residues so (for example) to bold residues 10 to 15 would require bold_positions=[10,11,12,13,14,15]. 
+        defines individual residues so (for example) to bold residues 10 to 15 would require bold_positions=[10,11,12,13,14,15].
         Default is an empty list.
 
     bold_residues : list
         List of residue types that can be bolded. Useful for highlighting specific residue groups.  Default is an empty list.
-    
+
     opaque_positions : list
-        List of positions (indexing from 1 onwards) which will be grey and slighlty opaque. Useful for highlighting specific regions. 
-        Note that this defines individual residues so (for example) to bold residues 10 to 15 would require 
+        List of positions (indexing from 1 onwards) which will be grey and slighlty opaque. Useful for highlighting specific regions.
+        Note that this defines individual residues so (for example) to bold residues 10 to 15 would require
         bold_positions=[10,11,12,13,14,15]. Default is an empty list.
 
     return_raw_string : bool
-        If set to true, the function returns the actual raw HTML string, as opposed to an in-notebook rendering. 
+        If set to true, the function returns the actual raw HTML string, as opposed to an in-notebook rendering.
         Default is False
 
     warnings : bool
         If set to true, the function will print warnings if invalid amino acids are found. Default is True.
-                  
+
 
     Returns
     ----------
     None or str
         If return_raw_string is set to true then an HTML-compatible string is returned.
 
-    
+
     Raises
     -------
     sparrow.sparrow_exceptions.SparrowException
         Raises a sparrow exception if invalid input is provided (within reason).
 
     """
-    
+
     # normalize mutable defaults
     if colors is None:
         colors = {}
@@ -114,57 +116,50 @@ def show_sequence(seq,
     if newline < 1:
         raise SparrowException("newline must be >= 1 (or -1 for the sequence length)")
 
-
-    colorString = '<p style="font-family:%s;font-size: %ipx">'%(font_family, fontsize)
+    colorString = '<p style="font-family:%s;font-size: %ipx">' % (font_family, fontsize)
 
     if header:
-        colorString = colorString + "<b>%s</b><br>"%(str(header))
-        
+        colorString = colorString + "<b>%s</b><br>" % (str(header))
 
     count = -1
     for residue in seq:
-
         count = count + 1
 
         if count > 0:
             if count % newline == 0:
                 colorString = colorString + "<br>"
-            
+
             elif count % blocksize == 0:
                 colorString = colorString + " "
 
-
         if residue not in AA_COLOR and residue not in colors:
             if warnings:
-                print('Warning: found invalid amino acid (%s) at position %i'%(residue, count+1))
-            colorString = colorString + '<span style="color:%s"><b>%s</b></span>' % ('black', residue)
+                print("Warning: found invalid amino acid (%s) at position %i" % (residue, count + 1))
+            colorString = colorString + '<span style="color:%s"><b>%s</b></span>' % ("black", residue)
         else:
-
             # override with user-suppplied pallete if present
             if residue in colors:
                 c = colors[residue]
 
-            # else fall back on the standard pallete 
+            # else fall back on the standard pallete
             else:
                 c = AA_COLOR[residue]
 
-             # check if residue should be light grey and opaque
-            # This overrides other coloring 
-            if count+1 in opaque_positions:
-                 c = '#a9a9a9'
+            # check if residue should be light grey and opaque
+            # This overrides other coloring
+            if count + 1 in opaque_positions:
+                c = "#a9a9a9"
 
             # if the residue type OR residue position is to be bolded...
-            if residue in bold_residues or (count+1) in bold_positions:
+            if residue in bold_residues or (count + 1) in bold_positions:
                 colorString = colorString + '<span style="color:%s"><b>%s</b></span>' % (c, residue)
             else:
                 colorString = colorString + '<span style="color:%s">%s</span>' % (c, residue)
 
+    colorString = colorString + "</p>"
 
-
-    colorString = colorString +"</p>"
-            
     if return_raw_string:
         return colorString
     else:
         display(HTML(colorString))
-        #HTML(colorString)
+        # HTML(colorString)

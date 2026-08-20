@@ -27,9 +27,7 @@ class PhosphoPredictor(BaseNetworkPredictor):
     ARCHITECTURE = "MtM"
     TARGET_RESIDUE: str = None
 
-    def _predict_phospho(
-        self, seq, raw_values=False, return_sites_only=False, windowsize=4, threshold=0.6
-    ):
+    def _predict_phospho(self, seq, raw_values=False, return_sites_only=False, windowsize=4, threshold=0.6):
         """Predict phosphosites for :attr:`TARGET_RESIDUE` in a sequence.
 
         Parameters
@@ -52,9 +50,7 @@ class PhosphoPredictor(BaseNetworkPredictor):
             ``raw_values``; a list of site positions if ``return_sites_only``.
         """
         seq = seq.upper()
-        probability = outputs.per_residue_class1_probability(
-            self._raw_predict(seq), self.number_of_classes
-        )
+        probability = outputs.per_residue_class1_probability(self._raw_predict(seq), self.number_of_classes)
 
         if raw_values:
             return np.array(probability)

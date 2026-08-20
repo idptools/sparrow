@@ -43,7 +43,7 @@ def test_compression_ratio_is_finite(compressor):
 
 def test_repetitive_sequence_compresses_better_than_random(compressor):
     repetitive = "AC" * 40
-    diverse = ("ACDEFGHIKLMNPQRSTVWY" * 4)
+    diverse = "ACDEFGHIKLMNPQRSTVWY" * 4
     r_rep = KMerCompressor.compression_ratio(repetitive, compressor.compress(repetitive))
     r_div = KMerCompressor.compression_ratio(diverse, compressor.compress(diverse))
     assert r_rep < r_div

@@ -24,9 +24,7 @@ from sparrow.sparrow_exceptions import SparrowException, SparrowWarning
 # own suite stays readable - it is left visible for library users, for whom it is
 # genuine information about their process.
 pytestmark = [
-    pytest.mark.filterwarnings(
-        "ignore::sparrow.sparrow_exceptions.BackgroundQualityWarning"
-    ),
+    pytest.mark.filterwarnings("ignore::sparrow.sparrow_exceptions.BackgroundQualityWarning"),
     pytest.mark.filterwarnings("ignore:This process .* is multi-threaded"),
 ]
 
@@ -36,10 +34,7 @@ OPTIONS = dict(num_scrambles=200, seed=42)
 def _sequences(count, length=110, seed=0):
     rng = random.Random(seed)
     return {
-        f"idr{i:03d}": "".join(
-            rng.choice("SSTTGGQQNNPPEEDDKKRRAAILVM") for _ in range(length)
-        )
-        for i in range(count)
+        f"idr{i:03d}": "".join(rng.choice("SSTTGGQQNNPPEEDDKKRRAAILVM") for _ in range(length)) for i in range(count)
     }
 
 
@@ -118,13 +113,9 @@ def test_attached_result_equals_what_the_protein_would_compute(small):
 
 def test_attached_result_equals_nardini_vectors(small):
     out = nardini_proteins(small, **OPTIONS)
-    reference = nardini_vectors(
-        small, background=load_reference_background("human"), **OPTIONS
-    )
+    reference = nardini_vectors(small, background=load_reference_background("human"), **OPTIONS)
 
-    stacked = np.vstack(
-        [out[name].nardini.vector(**OPTIONS).to_numpy() for name in small]
-    )
+    stacked = np.vstack([out[name].nardini.vector(**OPTIONS).to_numpy() for name in small])
     assert np.allclose(stacked, reference.zscores)
 
 
@@ -177,12 +168,8 @@ def test_parallel_matches_serial(enough_to_parallelize):
 
 
 def test_chunksize_does_not_change_anything(enough_to_parallelize):
-    fine = nardini_proteins(
-        enough_to_parallelize, n_processes=2, chunksize=1, **OPTIONS
-    )
-    coarse = nardini_proteins(
-        enough_to_parallelize, n_processes=2, chunksize=100, **OPTIONS
-    )
+    fine = nardini_proteins(enough_to_parallelize, n_processes=2, chunksize=1, **OPTIONS)
+    coarse = nardini_proteins(enough_to_parallelize, n_processes=2, chunksize=100, **OPTIONS)
 
     for name in enough_to_parallelize:
         assert np.allclose(
@@ -193,12 +180,8 @@ def test_chunksize_does_not_change_anything(enough_to_parallelize):
 
 def test_start_method_does_not_change_anything(enough_to_parallelize):
     """fork and spawn must produce the same numbers."""
-    forked = nardini_proteins(
-        enough_to_parallelize, n_processes=2, start_method="fork", **OPTIONS
-    )
-    spawned = nardini_proteins(
-        enough_to_parallelize, n_processes=2, start_method="spawn", **OPTIONS
-    )
+    forked = nardini_proteins(enough_to_parallelize, n_processes=2, start_method="fork", **OPTIONS)
+    spawned = nardini_proteins(enough_to_parallelize, n_processes=2, start_method="spawn", **OPTIONS)
 
     for name in enough_to_parallelize:
         assert np.allclose(
@@ -289,9 +272,7 @@ def test_worker_processes_run_serially(monkeypatch, enough_to_parallelize):
     """
     import multiprocessing as mp
 
-    monkeypatch.setattr(
-        "sparrow.nardini.batch._in_worker_process", lambda: True, raising=True
-    )
+    monkeypatch.setattr("sparrow.nardini.batch._in_worker_process", lambda: True, raising=True)
 
     def no_pools(*args, **kwargs):
         raise AssertionError("a nested pool was created inside a worker")
@@ -440,9 +421,7 @@ def test_fasta_keywords_still_work_for_a_filename(tmp_path):
     fasta = tmp_path / "seqs.fasta"
     fasta.write_text(">a\nMEEEKKKSSSTTTQQQNNNGGGMEEEKKKSSSTTT\n")
 
-    result = nardini_vectors(
-        fasta, num_scrambles=100, seed=1, invalid_sequence_action="convert"
-    )
+    result = nardini_vectors(fasta, num_scrambles=100, seed=1, invalid_sequence_action="convert")
     assert len(result) == 1
 
     with pytest.raises(SparrowException, match="n_processes"):

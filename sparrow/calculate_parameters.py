@@ -148,10 +148,6 @@ def calculate_linear_hydrophobicity(s, mode="KD", normalize=False):
             else:
                 return [amino_acids.AA_hydro_KD[r] for r in s]
         except KeyError:
-            raise sparrow_exceptions.CalculationException(
-                "Invalid residue found in %s" % (s)
-            )
+            raise sparrow_exceptions.CalculationException("Invalid residue found in %s" % (s))
     else:
-        raise sparrow_exceptions.CalculationException(
-            "Invalid mode passed: %s" % (mode)
-        )
+        raise sparrow_exceptions.CalculationException("Invalid mode passed: %s" % (mode))

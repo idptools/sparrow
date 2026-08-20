@@ -37,9 +37,7 @@ def _index_of(name, available, what="feature"):
         return list(available).index(name)
     except ValueError:
         preview = ", ".join(list(available)[:6])
-        raise SparrowException(
-            f"Unknown {what} '{name}'. Available {what}s start: {preview} ..."
-        ) from None
+        raise SparrowException(f"Unknown {what} '{name}'. Available {what}s start: {preview} ...") from None
 
 
 class FeatureVector:
@@ -77,13 +75,9 @@ class FeatureVector:
         self.label = label
 
         if self.values.ndim != 1:
-            raise SparrowException(
-                f"FeatureVector needs a 1D array, got shape {self.values.shape}"
-            )
+            raise SparrowException(f"FeatureVector needs a 1D array, got shape {self.values.shape}")
         if self.values.size != len(self.names):
-            raise SparrowException(
-                f"Got {self.values.size} values but {len(self.names)} names"
-            )
+            raise SparrowException(f"Got {self.values.size} values but {len(self.names)} names")
 
     def __len__(self):
         return self.values.size
@@ -117,9 +111,7 @@ class FeatureVector:
         """Return a one-column pandas DataFrame indexed by feature name."""
         import pandas as pd
 
-        return pd.DataFrame(
-            {self.label or "value": self.values}, index=list(self.names)
-        )
+        return pd.DataFrame({self.label or "value": self.values}, index=list(self.names))
 
 
 class FeatureTable:
@@ -157,9 +149,7 @@ class FeatureTable:
         self.column_names = tuple(str(name) for name in column_names)
 
         if self.values.ndim != 2:
-            raise SparrowException(
-                f"FeatureTable needs a 2D array, got shape {self.values.shape}"
-            )
+            raise SparrowException(f"FeatureTable needs a 2D array, got shape {self.values.shape}")
         if self.values.shape != (len(self.row_names), len(self.column_names)):
             raise SparrowException(
                 f"Array shape {self.values.shape} does not match "
@@ -215,9 +205,7 @@ class FeatureTable:
         else:
             index = int(name_or_index)
 
-        return FeatureVector(
-            self.values[index], self.column_names, label=self.row_names[index]
-        )
+        return FeatureVector(self.values[index], self.column_names, label=self.row_names[index])
 
     def column(self, name):
         """Return one column as a NumPy array, one value per row."""
@@ -229,14 +217,10 @@ class FeatureTable:
 
     def to_dict(self):
         """Return nested ``{row_name: {column_name: value}}`` dicts."""
-        return {
-            name: self.row(index).to_dict() for index, name in enumerate(self.row_names)
-        }
+        return {name: self.row(index).to_dict() for index, name in enumerate(self.row_names)}
 
     def to_dataframe(self):
         """Return the table as a pandas DataFrame indexed by row name."""
         import pandas as pd
 
-        return pd.DataFrame(
-            self.values, index=list(self.row_names), columns=list(self.column_names)
-        )
+        return pd.DataFrame(self.values, index=list(self.row_names), columns=list(self.column_names))

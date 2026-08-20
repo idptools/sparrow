@@ -40,12 +40,52 @@ VALID_AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
 
 # generic words skipped when picking the single "meaning" word of a description
 _STOP_WORDS = {
-    "index", "indices", "normalized", "frequency", "frequencies", "of", "the",
-    "a", "an", "for", "in", "on", "to", "and", "or", "value", "values", "scale",
-    "propensity", "propensities", "parameter", "parameters", "average",
-    "relative", "number", "mean", "content", "residue", "residues", "amino",
-    "acid", "acids", "protein", "proteins", "side", "chain", "based", "using",
-    "derived", "from", "with", "at", "by", "information", "measure", "measures",
+    "index",
+    "indices",
+    "normalized",
+    "frequency",
+    "frequencies",
+    "of",
+    "the",
+    "a",
+    "an",
+    "for",
+    "in",
+    "on",
+    "to",
+    "and",
+    "or",
+    "value",
+    "values",
+    "scale",
+    "propensity",
+    "propensities",
+    "parameter",
+    "parameters",
+    "average",
+    "relative",
+    "number",
+    "mean",
+    "content",
+    "residue",
+    "residues",
+    "amino",
+    "acid",
+    "acids",
+    "protein",
+    "proteins",
+    "side",
+    "chain",
+    "based",
+    "using",
+    "derived",
+    "from",
+    "with",
+    "at",
+    "by",
+    "information",
+    "measure",
+    "measures",
     "net",
 }
 
@@ -225,6 +265,5 @@ def list_property_indices():
     _, accession_to_slug = _registry()
     raw = _load_raw()
     return [
-        (accession_to_slug[accession], accession, raw[accession].get("description", ""))
-        for accession in sorted(raw)
+        (accession_to_slug[accession], accession, raw[accession].get("description", "")) for accession in sorted(raw)
     ]

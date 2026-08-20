@@ -31,12 +31,8 @@ def test_permissive_forwards_fractional_threshold():
     # regression: the permissive variant previously dropped fractional_threshold.
     # With an impossible-to-satisfy threshold it must return no domains; with a
     # lenient one it must find the Q block -> the argument is actually honored.
-    strict = sc.low_complexity_domains_holt_permissive(
-        SEQ, "Q", minimum_length=10, fractional_threshold=1.01
-    )
-    lenient = sc.low_complexity_domains_holt_permissive(
-        SEQ, "Q", minimum_length=10, fractional_threshold=0.1
-    )
+    strict = sc.low_complexity_domains_holt_permissive(SEQ, "Q", minimum_length=10, fractional_threshold=1.01)
+    lenient = sc.low_complexity_domains_holt_permissive(SEQ, "Q", minimum_length=10, fractional_threshold=0.1)
     assert strict == []
     assert len(lenient) >= 1
 
@@ -49,9 +45,7 @@ def test_protein_low_complexity_domains_wrapper():
 
 def test_protein_low_complexity_domains_permissive_mode():
     p = Protein(SEQ)
-    lcds = p.low_complexity_domains(
-        mode="holt-permissive", residue_selector="Q", minimum_length=10
-    )
+    lcds = p.low_complexity_domains(mode="holt-permissive", residue_selector="Q", minimum_length=10)
     assert isinstance(lcds, list)
 
 

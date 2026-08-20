@@ -21,9 +21,7 @@ def _bridge_positions(positions, interruption):
         for idx in fill_idx:
             extras.extend(range(positions[idx] + 1, positions[idx + 1]))
         if extras:
-            positions = np.unique(
-                np.concatenate([positions, np.array(extras, dtype=np.int32)])
-            )
+            positions = np.unique(np.concatenate([positions, np.array(extras, dtype=np.int32)]))
     return positions
 
 
@@ -65,13 +63,9 @@ def patch_fraction(
     if interruption < 0:
         raise sparrow_exceptions.CalculationException("interruption must be >= 0")
     if min_target_count is not None and min_target_count < 1:
-        raise sparrow_exceptions.CalculationException(
-            "min_target_count must be >= 1 or None"
-        )
+        raise sparrow_exceptions.CalculationException("min_target_count must be >= 1 or None")
     if min_adjacent_pair_count < 0:
-        raise sparrow_exceptions.CalculationException(
-            "min_adjacent_pair_count must be >= 0"
-        )
+        raise sparrow_exceptions.CalculationException("min_adjacent_pair_count must be >= 0")
 
     sequence = general_tools.validate_protein_sequence(
         sequence,
@@ -132,9 +126,7 @@ def patch_fraction(
             region = seq_bytes[start:end]
             if region.size < 2:
                 continue
-            motif_count = int(
-                np.sum((region[:-1] == ord(motif[0])) & (region[1:] == ord(motif[1])))
-            )
+            motif_count = int(np.sum((region[:-1] == ord(motif[0])) & (region[1:] == ord(motif[1]))))
             if motif_count < min_adjacent_pair_count:
                 continue
 
@@ -162,9 +154,7 @@ def rg_patch_fraction(sequence, interruption=2, min_adjacent_rg_pairs=2):
     """
 
     if min_adjacent_rg_pairs < 1:
-        raise sparrow_exceptions.CalculationException(
-            "min_adjacent_rg_pairs must be >= 1"
-        )
+        raise sparrow_exceptions.CalculationException("min_adjacent_rg_pairs must be >= 1")
 
     return patch_fraction(
         sequence=sequence,

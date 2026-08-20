@@ -23,8 +23,7 @@ def test_registry_unique_and_resolves():
 
 def test_collision_increment():
     # the Aurora 1998 positional indices share meaning+author+year -> numbered
-    ids = [i[0] for i in aaindex.list_property_indices()
-           if i[0].startswith("positional-aurora-1998")]
+    ids = [i[0] for i in aaindex.list_property_indices() if i[0].startswith("positional-aurora-1998")]
     assert "positional-aurora-1998-1" in ids
     assert len(ids) == len(set(ids)) and len(ids) > 1
 
@@ -34,10 +33,7 @@ def test_profile_matches_manual_window_mean():
     values = aaindex.get_property_values("hydropathy-kyte-1982")
     window = 9
 
-    raw = [
-        np.mean([values[r] for r in SEQ[i:i + window]])
-        for i in range(len(SEQ) - window + 1)
-    ]
+    raw = [np.mean([values[r] for r in SEQ[i : i + window]]) for i in range(len(SEQ) - window + 1)]
     raw = np.array(raw)
     front = window // 2
     expected = np.concatenate([[raw[0]] * front, raw])
@@ -61,9 +57,7 @@ def test_slug_and_accession_equivalent_and_cached():
 )
 def test_end_mode_lengths(end_mode, expected_len):
     p = Protein(SEQ)
-    profile = p.linear_property_profile(
-        "hydropathy-kyte-1982", window_size=8, end_mode=end_mode
-    )
+    profile = p.linear_property_profile("hydropathy-kyte-1982", window_size=8, end_mode=end_mode)
     assert len(profile) == expected_len
 
 

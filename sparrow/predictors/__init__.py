@@ -132,10 +132,8 @@ class Predictor:
             self.__transmembrane_predictor_object = TransmembranePredictor()
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = (
-                self.__transmembrane_predictor_object.predict_transmembrane_regions(
-                    self.__protein.sequence
-                )
+            self.__precomputed[selector] = self.__transmembrane_predictor_object.predict_transmembrane_regions(
+                self.__protein.sequence
             )
 
         return self.__precomputed[selector]
@@ -200,9 +198,7 @@ class Predictor:
             )
 
         elif mode == "probability":
-            return self.__dssp_predictor_object.predict_helical_probability(
-                self.__protein.sequence
-            )
+            return self.__dssp_predictor_object.predict_helical_probability(self.__protein.sequence)
 
         elif mode == "both":
             return self.__dssp_predictor_object.predict_helicity_smart(
@@ -268,9 +264,7 @@ class Predictor:
             )
 
         elif mode == "probability":
-            return self.__dssp_predictor_object.predict_coil_probability(
-                self.__protein.sequence
-            )
+            return self.__dssp_predictor_object.predict_coil_probability(self.__protein.sequence)
 
         elif mode == "both":
             return self.__dssp_predictor_object.predict_coil_smart(
@@ -338,9 +332,7 @@ class Predictor:
             )
 
         elif mode == "probability":
-            return self.__dssp_predictor_object.predict_extended_probability(
-                self.__protein.sequence
-            )
+            return self.__dssp_predictor_object.predict_extended_probability(self.__protein.sequence)
 
         elif mode == "both":
             return self.__dssp_predictor_object.predict_extended_smart(
@@ -380,9 +372,7 @@ class Predictor:
                 MitochondrialTargetingPredictor,
             )
 
-            self.__mitochondrial_targeting_predictor_object = (
-                MitochondrialTargetingPredictor()
-            )
+            self.__mitochondrial_targeting_predictor_object = MitochondrialTargetingPredictor()
 
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = (
@@ -423,10 +413,8 @@ class Predictor:
             self.__nes_predictor_object = NESPredictor()
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = (
-                self.__nes_predictor_object.predict_nuclear_export_signal(
-                    self.__protein.sequence
-                )
+            self.__precomputed[selector] = self.__nes_predictor_object.predict_nuclear_export_signal(
+                self.__protein.sequence
             )
 
         return self.__precomputed[selector]
@@ -460,10 +448,8 @@ class Predictor:
             self.__tad_predictor_object = TADPredictor()
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = (
-                self.__tad_predictor_object.predict_transactivation_domains(
-                    self.__protein.sequence
-                )
+            self.__precomputed[selector] = self.__tad_predictor_object.predict_transactivation_domains(
+                self.__protein.sequence
             )
 
         return self.__precomputed[selector]
@@ -498,10 +484,8 @@ class Predictor:
             self.__nls_predictor_object = NLSPredictor()
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = (
-                self.__nls_predictor_object.predict_nuclear_import_signal(
-                    self.__protein.sequence
-                )
+            self.__precomputed[selector] = self.__nls_predictor_object.predict_nuclear_import_signal(
+                self.__protein.sequence
             )
 
         return self.__precomputed[selector]
@@ -531,9 +515,7 @@ class Predictor:
         from metapredict import meta
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = meta.predict_disorder_domains(
-                self.__protein.sequence, return_numpy=False
-            )
+            self.__precomputed[selector] = meta.predict_disorder_domains(self.__protein.sequence, return_numpy=False)
 
         return self.__precomputed[selector].disorder
 
@@ -664,9 +646,7 @@ class Predictor:
         from metapredict import meta
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = meta.predict_disorder_domains(
-                self.__protein.sequence, return_numpy=False
-            )
+            self.__precomputed[selector] = meta.predict_disorder_domains(self.__protein.sequence, return_numpy=False)
 
         if return_boundaries:
             return self.__precomputed[selector].disordered_domain_boundaries
@@ -926,27 +906,17 @@ class Predictor:
                 min_pscore = 0
                 max_pscore = 6.0
 
-                score = self.__pscore_predictor_object.predict_pscore(
-                    self.__protein.sequence
-                )
-                self.__precomputed[selector] = np.clip(
-                    (score - min_pscore) / (max_pscore - min_pscore), 0.0, 1.0
-                )
+                score = self.__pscore_predictor_object.predict_pscore(self.__protein.sequence)
+                self.__precomputed[selector] = np.clip((score - min_pscore) / (max_pscore - min_pscore), 0.0, 1.0)
 
             else:
-                self.__precomputed[selector] = (
-                    self.__pscore_predictor_object.predict_pscore(
-                        self.__protein.sequence
-                    )
-                )
+                self.__precomputed[selector] = self.__pscore_predictor_object.predict_pscore(self.__protein.sequence)
 
         return self.__precomputed[selector]
 
     # .................................................................
     #
-    def serine_phosphorylation(
-        self, recompute=False, raw_values=False, return_sites_only=False
-    ):
+    def serine_phosphorylation(self, recompute=False, raw_values=False, return_sites_only=False):
         """
         Function for predicting serine phosphorylation from sequence
 
@@ -1003,33 +973,25 @@ class Predictor:
 
         if selector not in self.__precomputed or recompute is True:
             if selector == "ser-phosphorylation":
-                self.__precomputed[selector] = (
-                    self.__ser_phos_predictor_object.predict_ser_phosphorylation(
-                        self.__protein.sequence
-                    )
+                self.__precomputed[selector] = self.__ser_phos_predictor_object.predict_ser_phosphorylation(
+                    self.__protein.sequence
                 )
 
             elif selector == "ser-phosphorylation-sites":
-                self.__precomputed[selector] = (
-                    self.__ser_phos_predictor_object.predict_ser_phosphorylation(
-                        self.__protein.sequence, return_sites_only=True
-                    )
+                self.__precomputed[selector] = self.__ser_phos_predictor_object.predict_ser_phosphorylation(
+                    self.__protein.sequence, return_sites_only=True
                 )
 
             elif selector == "ser-phosphorylation-raw-vals":
-                self.__precomputed[selector] = (
-                    self.__ser_phos_predictor_object.predict_ser_phosphorylation(
-                        self.__protein.sequence, raw_values=True
-                    )
+                self.__precomputed[selector] = self.__ser_phos_predictor_object.predict_ser_phosphorylation(
+                    self.__protein.sequence, raw_values=True
                 )
 
         return self.__precomputed[selector]
 
     # .................................................................
     #
-    def threonine_phosphorylation(
-        self, recompute=False, raw_values=False, return_sites_only=False
-    ):
+    def threonine_phosphorylation(self, recompute=False, raw_values=False, return_sites_only=False):
         """
         Function for predicting threonine phosphorylation from sequence
 
@@ -1086,33 +1048,25 @@ class Predictor:
 
         if selector not in self.__precomputed or recompute is True:
             if selector == "thr-phosphorylation":
-                self.__precomputed[selector] = (
-                    self.__thr_phos_predictor_object.predict_thr_phosphorylation(
-                        self.__protein.sequence
-                    )
+                self.__precomputed[selector] = self.__thr_phos_predictor_object.predict_thr_phosphorylation(
+                    self.__protein.sequence
                 )
 
             elif selector == "thr-phosphorylation-sites":
-                self.__precomputed[selector] = (
-                    self.__thr_phos_predictor_object.predict_thr_phosphorylation(
-                        self.__protein.sequence, return_sites_only=True
-                    )
+                self.__precomputed[selector] = self.__thr_phos_predictor_object.predict_thr_phosphorylation(
+                    self.__protein.sequence, return_sites_only=True
                 )
 
             elif selector == "thr-phosphorylation-raw-vals":
-                self.__precomputed[selector] = (
-                    self.__thr_phos_predictor_object.predict_thr_phosphorylation(
-                        self.__protein.sequence, raw_values=True
-                    )
+                self.__precomputed[selector] = self.__thr_phos_predictor_object.predict_thr_phosphorylation(
+                    self.__protein.sequence, raw_values=True
                 )
 
         return self.__precomputed[selector]
 
     # .................................................................
     #
-    def tyrosine_phosphorylation(
-        self, recompute=False, raw_values=False, return_sites_only=False
-    ):
+    def tyrosine_phosphorylation(self, recompute=False, raw_values=False, return_sites_only=False):
         """
         Function for predicting tyrosine phosphorylation from sequence
 
@@ -1169,24 +1123,18 @@ class Predictor:
 
         if selector not in self.__precomputed or recompute is True:
             if selector == "tyr-phosphorylation":
-                self.__precomputed[selector] = (
-                    self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(
-                        self.__protein.sequence
-                    )
+                self.__precomputed[selector] = self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(
+                    self.__protein.sequence
                 )
 
             elif selector == "tyr-phosphorylation-sites":
-                self.__precomputed[selector] = (
-                    self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(
-                        self.__protein.sequence, return_sites_only=True
-                    )
+                self.__precomputed[selector] = self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(
+                    self.__protein.sequence, return_sites_only=True
                 )
 
             elif selector == "tyr-phosphorylation-raw-vals":
-                self.__precomputed[selector] = (
-                    self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(
-                        self.__protein.sequence, raw_values=True
-                    )
+                self.__precomputed[selector] = self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(
+                    self.__protein.sequence, raw_values=True
                 )
 
         return self.__precomputed[selector]
@@ -1251,12 +1199,9 @@ class Predictor:
                 self.__scaled_rg_predictor_object = ScaledRgPredictor()
 
             if selector not in self.__precomputed or recompute is True:
-                self.__precomputed[selector] = (
-                    self.__scaled_rg_predictor_object.predict_scaled_rg(
-                        self.__protein.sequence
-                    )
-                    * np.sqrt(len(self.__protein.sequence))
-                )
+                self.__precomputed[selector] = self.__scaled_rg_predictor_object.predict_scaled_rg(
+                    self.__protein.sequence
+                ) * np.sqrt(len(self.__protein.sequence))
 
         else:
             selector = "rg"
@@ -1266,9 +1211,7 @@ class Predictor:
                 self.__rg_predictor_object = RgPredictor()
 
             if selector not in self.__precomputed or recompute is True:
-                self.__precomputed[selector] = self.__rg_predictor_object.predict_rg(
-                    self.__protein.sequence
-                )
+                self.__precomputed[selector] = self.__rg_predictor_object.predict_rg(self.__protein.sequence)
 
         return self.__precomputed[selector]
 
@@ -1331,12 +1274,9 @@ class Predictor:
                 self.__scaled_re_predictor_object = ScaledRePredictor()
 
             if selector not in self.__precomputed or recompute is True:
-                self.__precomputed[selector] = (
-                    self.__scaled_re_predictor_object.predict_scaled_re(
-                        self.__protein.sequence
-                    )
-                    * np.sqrt(len(self.__protein.sequence))
-                )
+                self.__precomputed[selector] = self.__scaled_re_predictor_object.predict_scaled_re(
+                    self.__protein.sequence
+                ) * np.sqrt(len(self.__protein.sequence))
 
         else:
             selector = "re"
@@ -1346,9 +1286,7 @@ class Predictor:
                 self.__re_predictor_object = RePredictor()
 
             if selector not in self.__precomputed or recompute is True:
-                self.__precomputed[selector] = self.__re_predictor_object.predict_re(
-                    self.__protein.sequence
-                )
+                self.__precomputed[selector] = self.__re_predictor_object.predict_re(self.__protein.sequence)
 
         return self.__precomputed[selector]
 
@@ -1377,10 +1315,8 @@ class Predictor:
             self.__asphericity_predictor_object = AsphericityPredictor()
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = (
-                self.__asphericity_predictor_object.predict_asphericity(
-                    self.__protein.sequence
-                )
+            self.__precomputed[selector] = self.__asphericity_predictor_object.predict_asphericity(
+                self.__protein.sequence
             )
 
         return self.__precomputed[selector]
@@ -1410,11 +1346,7 @@ class Predictor:
             self.__prefactor_predictor_object = PrefactorPredictor()
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = (
-                self.__prefactor_predictor_object.predict_prefactor(
-                    self.__protein.sequence
-                )
-            )
+            self.__precomputed[selector] = self.__prefactor_predictor_object.predict_prefactor(self.__protein.sequence)
 
         return self.__precomputed[selector]
 
@@ -1445,10 +1377,8 @@ class Predictor:
             self.__scaling_exponent_predictor_object = ScalingExponentPredictor()
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = (
-                self.__scaling_exponent_predictor_object.predict_scaling_exponent(
-                    self.__protein.sequence
-                )
+            self.__precomputed[selector] = self.__scaling_exponent_predictor_object.predict_scaling_exponent(
+                self.__protein.sequence
             )
 
         return self.__precomputed[selector]

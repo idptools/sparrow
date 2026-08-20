@@ -91,9 +91,7 @@ def normalize_residue_selector(
         try:
             selector = [str(x) for x in residue_selector]
         except TypeError:
-            raise exception_cls(
-                f"{selector_name} must be a string or iterable of residues"
-            )
+            raise exception_cls(f"{selector_name} must be a string or iterable of residues")
 
     if uppercase:
         selector = [x.upper() for x in selector]
@@ -109,9 +107,7 @@ def normalize_residue_selector(
         raise exception_cls(f"{selector_name} must contain one or more residues")
 
     if expected_length is not None and len(selector) != expected_length:
-        raise exception_cls(
-            f"{selector_name} must contain exactly {expected_length} residues"
-        )
+        raise exception_cls(f"{selector_name} must contain exactly {expected_length} residues")
 
     for residue in selector:
         if residue not in amino_acids.VALID_AMINO_ACIDS:

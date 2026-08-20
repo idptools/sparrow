@@ -31,9 +31,7 @@ def uniprot_fetch(uniprot_accession):
     API clients or bulk download services.
     """
     http = urllib3.PoolManager()
-    r = http.request(
-        "GET", f"https://www.uniprot.org/uniprot/{uniprot_accession}.fasta"
-    )
+    r = http.request("GET", f"https://www.uniprot.org/uniprot/{uniprot_accession}.fasta")
 
     # non-200 responses (e.g. unknown accession) carry no usable FASTA
     if getattr(r, "status", 200) != 200:
@@ -45,9 +43,7 @@ def uniprot_fetch(uniprot_accession):
     if "Sorry" in raw:
         return None
 
-    sequence = "".join(
-        line.strip() for line in raw.splitlines() if line and not line.startswith(">")
-    )
+    sequence = "".join(line.strip() for line in raw.splitlines() if line and not line.startswith(">"))
     if sequence == "":
         return None
 
@@ -164,9 +160,7 @@ def build_grammar_background_from_fasta(
     from sparrow.sequence_analysis import grammar
 
     proteins = read_fasta(fasta_filename, **read_fasta_kwargs)
-    stats = grammar.compute_composition_background_stats(
-        proteins, dtype=dtype
-    )
+    stats = grammar.compute_composition_background_stats(proteins, dtype=dtype)
     grammar.save_composition_stats_npz(
         output_filename=output_filename,
         composition_stats=stats,

@@ -1,11 +1,12 @@
 from __future__ import annotations
 from math import ceil, log2
 from dataclasses import dataclass
-from typing import List, Tuple, Iterable, Dict
+from typing import List, Iterable, Dict
 
 AMINO_ALPHABET = tuple("ACDEFGHIKLMNPQRSTVWY")  # 20 canonical amino acids
-SYMBOL_BITS = ceil(log2(len(AMINO_ALPHABET)))     # = 5 bits
+SYMBOL_BITS = ceil(log2(len(AMINO_ALPHABET)))  # = 5 bits
 ALPHABET_SET = set(AMINO_ALPHABET)
+
 
 @dataclass(frozen=True)
 class Token:
@@ -14,6 +15,7 @@ class Token:
     parent_index: int  -> index into the dictionary (1-based); 0 = empty prefix
     next_symbol:  str  -> a single amino-acid letter
     """
+
     parent_index: int
     next_symbol: str
 
@@ -64,7 +66,7 @@ class KMerCompressor:
             j = i
             phrase_index = 0
             while j < n:
-                candidate = s[i:j+1]
+                candidate = s[i : j + 1]
                 if candidate in dictionary:
                     phrase_index = dictionary[candidate]
                     j += 1
@@ -77,7 +79,7 @@ class KMerCompressor:
                 next_symbol = s[j]
                 tokens.append(Token(phrase_index, next_symbol))
                 # Add new phrase = (known phrase) + next_symbol
-                new_phrase = s[i:j+1]
+                new_phrase = s[i : j + 1]
                 dictionary[new_phrase] = len(dictionary) + 1
                 # Advance input pointer past the consumed (known phrase + 1 symbol)
                 i = j + 1
@@ -153,5 +155,3 @@ class KMerCompressor:
         raw = cls.theoretical_raw_bits(len(s))
         comp = cls.bit_cost(tokens)
         return comp / raw if raw else 1.0
-
-

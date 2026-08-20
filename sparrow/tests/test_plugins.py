@@ -1,7 +1,6 @@
 import pytest
 
 from sparrow.protein import Protein
-from sparrow.sequence_analysis.community_plugins.contributed import MultiplicativeFCR
 from sparrow.sequence_analysis.plugins import BasePlugin
 
 

@@ -69,7 +69,7 @@ def _strip_module_prefix(state_dict):
         return state_dict
 
     return {
-        (key[len(_MODULE_PREFIX):] if key.startswith(_MODULE_PREFIX) else key): value
+        (key[len(_MODULE_PREFIX) :] if key.startswith(_MODULE_PREFIX) else key): value
         for key, value in state_dict.items()
     }
 
@@ -115,9 +115,7 @@ def load_parrot_network(relative_path, architecture="MtO", device=None):
 
     saved_weights = sparrow.get_data(relative_path)
     if not os.path.isfile(saved_weights):
-        raise SparrowException(
-            f"Error: could not find saved weights file {saved_weights}"
-        )
+        raise SparrowException(f"Error: could not find saved weights file {saved_weights}")
 
     state_dict = torch.load(saved_weights, map_location=device)
     state_dict = _strip_module_prefix(state_dict)
@@ -136,9 +134,7 @@ def load_parrot_network(relative_path, architecture="MtO", device=None):
             input_size, hidden_vector_size, number_of_layers, number_of_classes, device
         )
     else:
-        raise SparrowException(
-            f"Unknown network architecture '{architecture}' (expected 'MtO' or 'MtM')"
-        )
+        raise SparrowException(f"Unknown network architecture '{architecture}' (expected 'MtO' or 'MtM')")
 
     network.load_state_dict(state_dict)
 

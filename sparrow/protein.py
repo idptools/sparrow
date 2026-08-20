@@ -76,9 +76,7 @@ class Protein:
                 fixed = protfasta_utilities.convert_to_valid(s)
 
                 if general_tools.is_valid_protein_sequence(fixed) is False:
-                    raise sparrow_exceptions.SparrowException(
-                        f"Invalid amino acid in {fixed}"
-                    )
+                    raise sparrow_exceptions.SparrowException(f"Invalid amino acid in {fixed}")
 
                 self.__seq = fixed
             else:
@@ -134,9 +132,7 @@ class Protein:
         """
 
         if self.__molecular_weight is None:
-            self.__molecular_weight = physical_properties.calculate_molecular_weight(
-                self.sequence
-            )
+            self.__molecular_weight = physical_properties.calculate_molecular_weight(self.sequence)
 
         return self.__molecular_weight
 
@@ -295,9 +291,7 @@ class Protein:
         Phys. 143, 085101 (2015).
         """
         if self.__scd is None:
-            self.__scd = patterning_metrics.compute_scd_x(
-                self.sequence, group1=["E", "D"], group2=["R", "K"]
-            )
+            self.__scd = patterning_metrics.compute_scd_x(self.sequence, group1=["E", "D"], group2=["R", "K"])
 
         return self.__scd
 
@@ -416,9 +410,7 @@ class Protein:
             Mean per-residue Kyte-Doolittle hydrophobicity.
         """
         if self.__hydrophobicity is None:
-            self.__hydrophobicity = calculate_parameters.calculate_hydrophobicity(
-                self.__seq
-            )
+            self.__hydrophobicity = calculate_parameters.calculate_hydrophobicity(self.__seq)
 
         return self.__hydrophobicity
 
@@ -439,9 +431,7 @@ class Protein:
             Fraction between 0 and 1.
         """
         if self.__fraction_chain_expanding is None:
-            self.__fraction_chain_expanding = (
-                physical_properties.fraction_chain_expanding(self.__seq)
-            )
+            self.__fraction_chain_expanding = physical_properties.fraction_chain_expanding(self.__seq)
 
         return self.__fraction_chain_expanding
 
@@ -462,9 +452,7 @@ class Protein:
             Fraction between 0 and 1.
         """
         if self.__fraction_disorder_promoting is None:
-            self.__fraction_disorder_promoting = (
-                physical_properties.fraction_disorder_promoting(self.__seq)
-            )
+            self.__fraction_disorder_promoting = physical_properties.fraction_disorder_promoting(self.__seq)
 
         return self.__fraction_disorder_promoting
 
@@ -513,9 +501,7 @@ class Protein:
             (:data:`sparrow.data.amino_acids.AA_PPII_HILSER`).
         """
         if self.__PPII_propensity is None:
-            self.__PPII_propensity = physical_properties.polyproline_II_propensity(
-                self.__seq
-            )
+            self.__PPII_propensity = physical_properties.polyproline_II_propensity(self.__seq)
 
         return self.__PPII_propensity
 
@@ -541,9 +527,7 @@ class Protein:
             ``log10((count(R) + 1) / (count(K) + 1))``.
         """
         if self.__RK_ratio is None:
-            self.__RK_ratio = physical_properties.log_residue_ratio(
-                self.__seq, "R", "K"
-            )
+            self.__RK_ratio = physical_properties.log_residue_ratio(self.__seq, "R", "K")
 
         return self.__RK_ratio
 
@@ -565,9 +549,7 @@ class Protein:
             ``log10((count(E) + 1) / (count(D) + 1))``.
         """
         if self.__ED_ratio is None:
-            self.__ED_ratio = physical_properties.log_residue_ratio(
-                self.__seq, "E", "D"
-            )
+            self.__ED_ratio = physical_properties.log_residue_ratio(self.__seq, "E", "D")
 
         return self.__ED_ratio
 
@@ -621,9 +603,7 @@ class Protein:
             Compositional complexity of the sequence (>= 0).
         """
         if self.__complexity is None:
-            self.__complexity = calculate_parameters.calculate_seg_complexity(
-                self.__seq
-            )
+            self.__complexity = calculate_parameters.calculate_seg_complexity(self.__seq)
 
         return self.__complexity
 
@@ -738,14 +718,10 @@ class Protein:
 
         for i in group1:
             if i not in amino_acids.VALID_AMINO_ACIDS:
-                raise sparrow_exceptions.ProteinException(
-                    f"Amino acid {i} (in group 1) is not a standard amino acid"
-                )
+                raise sparrow_exceptions.ProteinException(f"Amino acid {i} (in group 1) is not a standard amino acid")
 
         if len(group1) == 0:
-            raise sparrow_exceptions.ProteinException(
-                "group1 must contain one or more amino acids"
-            )
+            raise sparrow_exceptions.ProteinException("group1 must contain one or more amino acids")
 
         # make sure order is always consistent (done AFTER the loop above so an
         # empty group1 cannot leave this as a list and break the cache key below)
@@ -814,9 +790,7 @@ class Protein:
             return_type="list",
         )
 
-        return patterning_metrics.calculate_average_inverse_distance_from_sequence(
-            self.sequence, residues
-        )
+        return patterning_metrics.calculate_average_inverse_distance_from_sequence(self.sequence, residues)
 
     # .................................................................
     #
@@ -1101,17 +1075,13 @@ class Protein:
 
         # calculate or retrieve mask of NCPR for sequence
         if "NCPR-8-extend-ends" not in self.__linear_profiles:
-            self.__linear_profiles["NCPR-8-extend-ends"] = (
-                track_tools.predefined_linear_track(
-                    self.__seq, "NCPR", 8, "extend-ends", None
-                )
+            self.__linear_profiles["NCPR-8-extend-ends"] = track_tools.predefined_linear_track(
+                self.__seq, "NCPR", 8, "extend-ends", None
             )
 
         linear_NCPR = self.__linear_profiles["NCPR-8-extend-ends"]
 
-        return patterning_metrics.calculate_average_inverse_distance_charge(
-            linear_NCPR, self.sequence, charge
-        )
+        return patterning_metrics.calculate_average_inverse_distance_charge(linear_NCPR, self.sequence, charge)
 
     # .................................................................
     #
@@ -1132,17 +1102,13 @@ class Protein:
 
         # calculate or retrieve mask of NCPR for sequence
         if "NCPR-8-extend-ends" not in self.__linear_profiles:
-            self.__linear_profiles["NCPR-8-extend-ends"] = (
-                track_tools.predefined_linear_track(
-                    self.__seq, "NCPR", 8, "extend-ends", None
-                )
+            self.__linear_profiles["NCPR-8-extend-ends"] = track_tools.predefined_linear_track(
+                self.__seq, "NCPR", 8, "extend-ends", None
             )
 
         linear_NCPR = self.__linear_profiles["NCPR-8-extend-ends"]
 
-        return patterning_metrics.calculate_average_bivariate_inverse_distance_charge(
-            linear_NCPR, self.sequence
-        )
+        return patterning_metrics.calculate_average_bivariate_inverse_distance_charge(linear_NCPR, self.sequence)
 
     ## .................................................................
     ##
@@ -1190,9 +1156,7 @@ class Protein:
 
     # .................................................................
     #
-    def linear_sequence_profile(
-        self, mode, window_size=8, end_mode="extend-ends", smooth=None
-    ):
+    def linear_sequence_profile(self, mode, window_size=8, end_mode="extend-ends", smooth=None):
         """
         Function that returns a vectorized representation of local composition/sequence properties, as defined
         by the passed 'mode', which acts as a selector toggle for a large set of pre-defined analyses types.
@@ -1257,9 +1221,7 @@ class Protein:
         # validated here (rather than only inside build_track) so the error names
         # the offending keyword, matching linear_composition_profile /
         # linear_property_profile
-        utilities.validate_keyword_option(
-            end_mode, ["extend-ends", "zero-ends", ""], "end_mode"
-        )
+        utilities.validate_keyword_option(end_mode, ["extend-ends", "zero-ends", ""], "end_mode")
 
         if smooth is not None:
             name = "%s-%i-%s-%i" % (mode, window_size, end_mode, smooth)
@@ -1275,9 +1237,7 @@ class Protein:
 
     # .................................................................
     #
-    def linear_composition_profile(
-        self, composition_list, window_size=8, end_mode="extend-ends", smooth=None
-    ):
+    def linear_composition_profile(self, composition_list, window_size=8, end_mode="extend-ends", smooth=None):
         """
         Function that returns a vectorized representation of local composition/sequence properties, as defined
         by the set of one or more residues passed in composition_list.
@@ -1316,9 +1276,7 @@ class Protein:
             Per-position local density of the residues in ``composition_list``.
         """
 
-        utilities.validate_keyword_option(
-            end_mode, ["extend-ends", "zero-ends", ""], "end_mode"
-        )
+        utilities.validate_keyword_option(end_mode, ["extend-ends", "zero-ends", ""], "end_mode")
 
         # we sort the composition list to unify how it is saved for memoization
         try:
@@ -1327,8 +1285,7 @@ class Protein:
 
         except AttributeError:
             raise sparrow_exceptions.ProteinException(
-                "Unable to sort composition_list (%s) - this should be a list"
-                % (str(composition_list))
+                "Unable to sort composition_list (%s) - this should be a list" % (str(composition_list))
             )
 
         name = (
@@ -1351,9 +1308,7 @@ class Protein:
 
     # .................................................................
     #
-    def linear_property_profile(
-        self, mode, window_size=8, end_mode="extend-ends", smooth=None
-    ):
+    def linear_property_profile(self, mode, window_size=8, end_mode="extend-ends", smooth=None):
         """
         Returns a vectorized representation of a numerical amino-acid property
         averaged over a sliding window. Each residue is mapped to a value taken
@@ -1412,9 +1367,7 @@ class Protein:
         """
         from sparrow.data import aaindex
 
-        utilities.validate_keyword_option(
-            end_mode, ["extend-ends", "zero-ends", ""], "end_mode"
-        )
+        utilities.validate_keyword_option(end_mode, ["extend-ends", "zero-ends", ""], "end_mode")
 
         # resolve the requested index (raises SparrowException if unknown)
         metadata = aaindex.get_property_metadata(mode)
@@ -1425,8 +1378,7 @@ class Protein:
         if missing:
             raise sparrow_exceptions.ProteinException(
                 "Property index '%s' (%s) has no value for residue(s) %s; "
-                "cannot build a profile for this sequence."
-                % (metadata["identifier"], metadata["accession"], missing)
+                "cannot build a profile for this sequence." % (metadata["identifier"], metadata["accession"], missing)
             )
 
         # memoize using the canonical identifier so equivalent modes (slug or
@@ -1485,25 +1437,21 @@ class Protein:
         """
         utilities.validate_keyword_option(mode, ["holt", "holt-permissive"], "mode")
         if mode == "holt":
-            return sequence_complexity.low_complexity_domains_holt(
-                self.sequence, **kwargs
-            )
+            return sequence_complexity.low_complexity_domains_holt(self.sequence, **kwargs)
         if mode == "holt-permissive":
-            return sequence_complexity.low_complexity_domains_holt_permissive(
-                self.sequence, **kwargs
-            )
+            return sequence_complexity.low_complexity_domains_holt_permissive(self.sequence, **kwargs)
 
     def plaac_prion_like_domains(self, simple=True, **kwargs):
         """Extract prion-like domains (PLDs) from the sequence using the PLAAC algorithm.
 
-        NB: We have re-implemented the PLAAC algorithm in pure Python, and this function 
-        provides a convenient wrapper for running PLAAC on the sequence. PLEASE CITE the 
+        NB: We have re-implemented the PLAAC algorithm in pure Python, and this function
+        provides a convenient wrapper for running PLAAC on the sequence. PLEASE CITE the
         original PLAAC paper (Lancaster et al. 2014) if you use this function in your work.
 
         Parameters
         ----------
         simple : bool, default True
-            If True, returns a simplified output format (list of [sequence, start, end] for each PLD). 
+            If True, returns a simplified output format (list of [sequence, start, end] for each PLD).
             If False, returns the full PLAAC output including scores and other metadata for each PLD.
 
         **kwargs
@@ -1548,7 +1496,7 @@ class Protein:
                 Foreground (prion-like) amino-acid frequency dictionary, same
                 format as *bg_freqs*.  Defaults to the Alberti et al. 28-domain
                 S. cerevisiae prion frequencies when ``None``.
-        
+
         Returns
         -------
         list[list] or PLAAC result object
@@ -1575,7 +1523,7 @@ class Protein:
             tmp = plaac_score_sequence(self.sequence, **kwargs).prd_regions
             return [[r.prd_seq, r.prd_start - 1, r.prd_end] for r in tmp]
 
-        else:            
+        else:
             return plaac_score_sequence(self.sequence, **kwargs)
 
     def show_sequence(

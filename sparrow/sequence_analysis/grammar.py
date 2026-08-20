@@ -104,9 +104,7 @@ COMPOSITION_FEATURES = tuple(
 #: the proteome, so the feature carries no signal and its background statistics
 #: are degenerate. Do not "restore" it for symmetry: doing so changes the feature
 #: schema and would not match NARDINI+ or the bundled composition background.
-PATCH_FEATURES = tuple(
-    [f"{aa} Patch" for aa in AMINO_ACIDS if aa != "W"] + ["RG Frac"]
-)
+PATCH_FEATURES = tuple([f"{aa} Patch" for aa in AMINO_ACIDS if aa != "W"] + ["RG Frac"])
 
 PATTERN_FEATURES_KAPPA = tuple(
     f"kappa::{PATTERN_NAMES[i]}-{PATTERN_NAMES[j]}"
@@ -119,13 +117,9 @@ PATTERN_FEATURES_IWD = tuple(
     for j in range(i, len(PATTERN_NAMES))
 )
 
-DEFAULT_COMPOSITION_BACKGROUND_FILENAME = (
-    "human_idrs_new_grammar_composition_background_f32.npz"
-)
+DEFAULT_COMPOSITION_BACKGROUND_FILENAME = "human_idrs_new_grammar_composition_background_f32.npz"
 DEFAULT_COMPOSITION_BACKGROUND_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "data"
-    / DEFAULT_COMPOSITION_BACKGROUND_FILENAME
+    Path(__file__).resolve().parents[1] / "data" / DEFAULT_COMPOSITION_BACKGROUND_FILENAME
 )
 _DEFAULT_COMPOSITION_STATS_CACHE = None
 
@@ -152,9 +146,7 @@ class GrammarPatterningConfig:
 
     def __post_init__(self):
         if self.backend not in ("kappa_cython", "iwd_combined"):
-            raise GrammarException(
-                f"Unknown backend={self.backend!r}; expected 'kappa_cython' or 'iwd_combined'"
-            )
+            raise GrammarException(f"Unknown backend={self.backend!r}; expected 'kappa_cython' or 'iwd_combined'")
         if self.num_scrambles < 1:
             raise GrammarException("num_scrambles must be >= 1")
         if self.blob_size < 2:
@@ -162,9 +154,7 @@ class GrammarPatterningConfig:
         if self.min_fraction < 0 or self.min_fraction > 1:
             raise GrammarException("min_fraction must be between 0 and 1")
         if self.fit_method not in ("gamma_mle", "moments"):
-            raise GrammarException(
-                f"Unknown fit_method={self.fit_method!r}; expected 'gamma_mle' or 'moments'"
-            )
+            raise GrammarException(f"Unknown fit_method={self.fit_method!r}; expected 'gamma_mle' or 'moments'")
 
     def rng(self):
         return random.Random(self.seed)
@@ -258,12 +248,8 @@ def compute_composition_raw(sequence_or_protein):
     features["Frac Aliphatic"] = float(sum(aa_fracs[x] for x in "ALMIV"))
     features["Frac Aromatic"] = float(sum(aa_fracs[x] for x in "FWY"))
 
-    features["R/K Ratio"] = math.log10(
-        ((seq_length * aa_fracs["R"]) + 1) / ((seq_length * aa_fracs["K"]) + 1)
-    )
-    features["E/D Ratio"] = math.log10(
-        ((seq_length * aa_fracs["E"]) + 1) / ((seq_length * aa_fracs["D"]) + 1)
-    )
+    features["R/K Ratio"] = math.log10(((seq_length * aa_fracs["R"]) + 1) / ((seq_length * aa_fracs["K"]) + 1))
+    features["E/D Ratio"] = math.log10(((seq_length * aa_fracs["E"]) + 1) / ((seq_length * aa_fracs["D"]) + 1))
 
     features["FCR"] = float(protein.FCR)
     features["NCPR"] = float(protein.NCPR)
@@ -289,15 +275,13 @@ def compute_composition_raw(sequence_or_protein):
 
 def compute_composition_zscores(raw_composition, composition_stats):
     """Compute z-scores for selected composition/patch features."""
-    if len(composition_stats.mean) != len(composition_stats.std) or len(
-        composition_stats.mean
-    ) != len(composition_stats.feature_names):
+    if len(composition_stats.mean) != len(composition_stats.std) or len(composition_stats.mean) != len(
+        composition_stats.feature_names
+    ):
         raise GrammarException("GrammarCompositionStats mean/std length mismatch")
 
     out = OrderedDict()
-    for name, mean, std in zip(
-        composition_stats.feature_names, composition_stats.mean, composition_stats.std
-    ):
+    for name, mean, std in zip(composition_stats.feature_names, composition_stats.mean, composition_stats.std):
         value = raw_composition.get(name)
         if value is None:
             out[name] = float("nan")
@@ -321,13 +305,9 @@ def _compute_pattern_value(protein, backend, name1, name2, blob_size):
 
     if backend == "kappa_cython":
         if name1 == name2:
-            value = protein.compute_kappa_x(
-                group1=group1, group2=None, window_size=blob_size, flatten=True
-            )
+            value = protein.compute_kappa_x(group1=group1, group2=None, window_size=blob_size, flatten=True)
         else:
-            value = protein.compute_kappa_x(
-                group1=group1, group2=group2, window_size=blob_size, flatten=True
-            )
+            value = protein.compute_kappa_x(group1=group1, group2=group2, window_size=blob_size, flatten=True)
         if value < 0:
             return 0.0
         return float(value)
@@ -353,10 +333,7 @@ def compute_patterning_raw(sequence_or_protein, config):
             if i == j:
                 valid = fractions[name1] > config.min_fraction
             else:
-                valid = (
-                    fractions[name1] > config.min_fraction
-                    and fractions[name2] > config.min_fraction
-                )
+                valid = fractions[name1] > config.min_fraction and fractions[name2] > config.min_fraction
 
             if not valid:
                 values[feature_name] = 0.0
@@ -380,8 +357,7 @@ def compute_patterning_scramble_distribution(sequence_or_protein, config):
 
     raw_template = compute_patterning_raw(protein, config)
     distributions = OrderedDict(
-        (name, np.zeros(config.num_scrambles, dtype=np.float64))
-        for name in raw_template.keys()
+        (name, np.zeros(config.num_scrambles, dtype=np.float64)) for name in raw_template.keys()
     )
 
     seq_chars = list(base_sequence)
@@ -421,12 +397,8 @@ def compute_patterning_zscores(raw_patterning, scramble_distribution, config):
     out = OrderedDict()
     for feature_name, raw_value in raw_patterning.items():
         if feature_name not in scramble_distribution:
-            raise GrammarException(
-                f"Missing scramble distribution for feature {feature_name}"
-            )
-        mean, var = _fit_distribution(
-            scramble_distribution[feature_name], config.fit_method
-        )
+            raise GrammarException(f"Missing scramble distribution for feature {feature_name}")
+        mean, var = _fit_distribution(scramble_distribution[feature_name], config.fit_method)
         if raw_value == 0 or math.isnan(mean) or math.isnan(var) or var == 0:
             out[feature_name] = 0.0
         else:
@@ -516,9 +488,7 @@ def compute_feature_vector(
         raw_blocks = [raw_patterning, raw_composition]
 
     scramble_distribution = compute_patterning_scramble_distribution(protein, config)
-    z_blocks = [
-        compute_patterning_zscores(raw_patterning, scramble_distribution, config)
-    ]
+    z_blocks = [compute_patterning_zscores(raw_patterning, scramble_distribution, config)]
     if composition_stats is not None:
         if raw_composition is None:
             raw_composition = compute_composition_raw(protein)
@@ -597,13 +567,11 @@ def compute_composition_background_stats(sequences_or_proteins, dtype=np.float32
     )
 
 
-def save_composition_stats_npz(
-    output_filename, composition_stats, dtype=np.float32, compressed=True
-):
+def save_composition_stats_npz(output_filename, composition_stats, dtype=np.float32, compressed=True):
     """Save grammar composition background stats to a compact NumPy archive."""
-    if len(composition_stats.mean) != len(composition_stats.std) or len(
-        composition_stats.mean
-    ) != len(composition_stats.feature_names):
+    if len(composition_stats.mean) != len(composition_stats.std) or len(composition_stats.mean) != len(
+        composition_stats.feature_names
+    ):
         raise GrammarException("GrammarCompositionStats mean/std length mismatch")
 
     out_dtype = np.dtype(dtype)
@@ -643,9 +611,7 @@ def load_default_composition_stats():
                 "Pass composition_stats explicitly or set "
                 "use_default_composition_stats=False."
             )
-        _DEFAULT_COMPOSITION_STATS_CACHE = load_composition_stats_npz(
-            DEFAULT_COMPOSITION_BACKGROUND_PATH
-        )
+        _DEFAULT_COMPOSITION_STATS_CACHE = load_composition_stats_npz(DEFAULT_COMPOSITION_BACKGROUND_PATH)
     return _DEFAULT_COMPOSITION_STATS_CACHE
 
 

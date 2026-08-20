@@ -150,18 +150,14 @@ def _run_chunk(chunk):
         results, failures = [], []
         for name, sequence in chunk:
             try:
-                single = nardini_vectors(
-                    {name: sequence}, background=background, **options
-                )
+                single = nardini_vectors({name: sequence}, background=background, **options)
             except Exception as exc:
                 failures.append((name, f"{type(exc).__name__}: {exc}"))
             else:
                 results.append((name, single))
         return results, failures
 
-    return [
-        (name, _slice(result, index)) for index, name in enumerate(result.names)
-    ], []
+    return [(name, _slice(result, index)) for index, name in enumerate(result.names)], []
 
 
 def _slice(result, index):
@@ -294,9 +290,7 @@ def score_in_parallel(
     # we are already inside a worker. The latter is what stops a spawn-platform
     # script with no __main__ guard from recursively spawning: the re-imported
     # module still computes the right answer, just serially.
-    serial = (
-        n_processes == 1 or len(pairs) < _MIN_FOR_PARALLEL or _in_worker_process()
-    )
+    serial = n_processes == 1 or len(pairs) < _MIN_FOR_PARALLEL or _in_worker_process()
 
     if serial:
         _init_worker(background, options)

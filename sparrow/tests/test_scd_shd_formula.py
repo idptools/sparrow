@@ -33,7 +33,7 @@ def _reference_shd(seq, hydro):
 
 
 SEQUENCES = [
-    "ED",                       # 2 residues: only a nearest-neighbor pair
+    "ED",  # 2 residues: only a nearest-neighbor pair
     "EDED",
     "EKEKEKEKEKEK",
     "EEEEKKKK",
@@ -63,9 +63,7 @@ def test_scd_custom_groups_swap_sign():
 def test_compute_shd_matches_reference():
     seq = "ACDEFGHIKLMNPQRSTVWY"
     hydro = {r: float(i + 1) for i, r in enumerate(seq)}
-    assert scd.compute_shd(seq, hydro_dict=hydro) == pytest.approx(
-        _reference_shd(seq, hydro), abs=1e-9
-    )
+    assert scd.compute_shd(seq, hydro_dict=hydro) == pytest.approx(_reference_shd(seq, hydro), abs=1e-9)
 
 
 def test_protein_scd_matches_functional():

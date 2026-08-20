@@ -13,17 +13,13 @@ from sparrow.nardini import (
 )
 from sparrow.sparrow_exceptions import SparrowException
 
-HUMAN_IDR = (
-    "MENDPRVRKFASDGAQWAIKWQKKGWSTLTSRQKQTARAAMGIKLSPVAQPVQKVTRLSAPVALAYREVSTQPRVSTARD"
-)
+HUMAN_IDR = "MENDPRVRKFASDGAQWAIKWQKKGWSTLTSRQKQTARAAMGIKLSPVAQPVQKVTRLSAPVALAYREVSTQPRVSTARD"
 POLY_Q = "Q" * 120
 
 # The synthetic fixtures here are deliberately small, so build_background warns
 # that they are weak. That warning is asserted directly in the dedicated tests
 # below (pytest.warns overrides this filter); everywhere else it is just noise.
-pytestmark = pytest.mark.filterwarnings(
-    "ignore::sparrow.sparrow_exceptions.BackgroundQualityWarning"
-)
+pytestmark = pytest.mark.filterwarnings("ignore::sparrow.sparrow_exceptions.BackgroundQualityWarning")
 
 
 # =====================================================================
@@ -225,9 +221,7 @@ def test_protein_nardini_composition_raw_and_z():
     assert 0.0 <= raw["FCR"] <= 1.0
     assert z["FCR"] != raw["FCR"]
     # background=None is equivalent to raw
-    assert np.allclose(
-        p.nardini.composition(background=None).to_numpy(), raw.to_numpy()
-    )
+    assert np.allclose(p.nardini.composition(background=None).to_numpy(), raw.to_numpy())
 
 
 def test_protein_nardini_results_are_memoized():
@@ -314,9 +308,7 @@ def test_composition_rms_z_separates_idr_like_from_extreme():
     extreme = ["Q" * 120, "E" * 120, "W" * 120, "LLLIIIVVVMMM" * 10]
 
     def rms(sequence):
-        return Protein(sequence).nardini.gin_cluster(seed=1, num_scrambles=100)[
-            "composition_rms_z"
-        ]
+        return Protein(sequence).nardini.gin_cluster(seed=1, num_scrambles=100)["composition_rms_z"]
 
     idr_scores = [rms(s) for s in idr_like]
     extreme_scores = [rms(s) for s in extreme]
@@ -352,9 +344,7 @@ def _background_from(letters, seed, length=60, count=20):
     from sparrow.nardini import build_background
 
     rng = np.random.default_rng(seed)
-    return build_background(
-        {f"s{i}": "".join(rng.choice(list(letters), length)) for i in range(count)}
-    )
+    return build_background({f"s{i}": "".join(rng.choice(list(letters), length)) for i in range(count)})
 
 
 def test_background_cache_key_is_content_based():
@@ -406,9 +396,7 @@ def test_protein_nardini_cache_survives_background_id_reuse():
         letters = "STGQNPEDKRA" if attempt % 2 == 0 else "ILMVFWYAC"
         background = _background_from(letters, attempt)
 
-        got = protein.nardini.vector(
-            background=background, seed=1, num_scrambles=100
-        ).to_numpy()
+        got = protein.nardini.vector(background=background, seed=1, num_scrambles=100).to_numpy()
         expected = nardini_vectors(
             {"sequence": HUMAN_IDR},
             background=background,
@@ -419,9 +407,7 @@ def test_protein_nardini_cache_survives_background_id_reuse():
         reused += id(background) in seen
         seen.add(id(background))
 
-        assert np.allclose(got, expected), (
-            f"stale cache hit on attempt {attempt} (address reuse #{reused})"
-        )
+        assert np.allclose(got, expected), f"stale cache hit on attempt {attempt} (address reuse #{reused})"
 
         del background
         gc.collect()

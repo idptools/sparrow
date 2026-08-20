@@ -77,8 +77,7 @@ class SequenceAlignment:
             # Assume input_data is a path to a FASTA file
             fasta_data = read_fasta(self.input_data)
             sequences = [
-                Sequence(self._encode_string(header), self._encode_string(seq))
-                for header, seq in fasta_data.items()
+                Sequence(self._encode_string(header), self._encode_string(seq)) for header, seq in fasta_data.items()
             ]
         elif isinstance(self.input_data, dict):
             # Assume input_data is a dictionary of header-sequence mappings
@@ -126,9 +125,7 @@ class SequenceAlignment:
             self.construct_msa()
         return self._cached_msa
 
-    def save_msa(
-        self, filename: str, linelength: int = 60, append_to_fasta: bool = False
-    ):
+    def save_msa(self, filename: str, linelength: int = 60, append_to_fasta: bool = False):
         """
         Save the multiple sequence alignment to a FASTA file.
 
@@ -145,9 +142,7 @@ class SequenceAlignment:
         """
         msa = self.alignment
         fasta_data = {seq.id.decode(): seq.sequence.decode() for seq in msa}
-        write_fasta(
-            fasta_data, filename, linelength=linelength, append_to_fasta=append_to_fasta
-        )
+        write_fasta(fasta_data, filename, linelength=linelength, append_to_fasta=append_to_fasta)
 
     def display_msa(self, ljust: int = 10, html: bool = False):
         """

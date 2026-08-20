@@ -256,9 +256,7 @@ class NardiniResult:
         """
         if isinstance(name_or_index, str):
             if name_or_index not in self.names:
-                raise SparrowException(
-                    f"No sequence named '{name_or_index}' in this result."
-                )
+                raise SparrowException(f"No sequence named '{name_or_index}' in this result.")
             index = self.names.index(name_or_index)
         else:
             index = int(name_or_index)
@@ -300,9 +298,7 @@ class NardiniResult:
         """
         from sparrow.nardini.gin import GIN_CLIP, assign_gin_clusters
 
-        return assign_gin_clusters(
-            self, reference=reference, clip=GIN_CLIP if clip is None else clip
-        )
+        return assign_gin_clusters(self, reference=reference, clip=GIN_CLIP if clip is None else clip)
 
 
 # .................................................................
@@ -403,23 +399,13 @@ def _reject_unknown_kwargs(kwargs, sequences, own_parameters):
         return
 
     candidates = set(own_parameters) | fasta_parameters
-    message = (
-        f"Unexpected keyword argument(s) for nardini_vectors(): "
-        f"{sorted(unknown)}."
-    )
+    message = f"Unexpected keyword argument(s) for nardini_vectors(): {sorted(unknown)}."
     for key in sorted(unknown):
-        close = [
-            match
-            for match in difflib.get_close_matches(key, candidates, n=2, cutoff=0.6)
-            if match != key
-        ]
+        close = [match for match in difflib.get_close_matches(key, candidates, n=2, cutoff=0.6) if match != key]
         if close:
             message += f" Did you mean '{close[0]}' instead of '{key}'?"
         elif "worker" in key or "thread" in key or "job" in key or "cpu" in key:
-            message += (
-                f" To compute in parallel, the argument is 'n_processes', "
-                f"not '{key}'."
-            )
+            message += f" To compute in parallel, the argument is 'n_processes', not '{key}'."
     if not reading_a_file:
         message += (
             " Extra keywords are only forwarded to protfasta.read_fasta when "
@@ -649,9 +635,17 @@ def nardini_vectors(
         read_fasta_kwargs,
         sequences,
         (
-            "background", "num_scrambles", "seed", "typeset", "blob_size",
-            "min_fraction", "backend", "n_processes", "chunksize",
-            "start_method", "show_progress",
+            "background",
+            "num_scrambles",
+            "seed",
+            "typeset",
+            "blob_size",
+            "min_fraction",
+            "backend",
+            "n_processes",
+            "chunksize",
+            "start_method",
+            "show_progress",
         ),
     )
 

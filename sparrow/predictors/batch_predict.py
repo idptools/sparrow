@@ -14,12 +14,13 @@ from ..sparrow_exceptions import SparrowException
 
 from sparrow.data.configs import MIN_LENGTH_ALBATROSS_RE_RG
 
+
 # ....................................................................................
 #
 #
 def prepare_model(network, version, gpuid):
     """
-    Given a predictor name and version, load the network weights and parameters 
+    Given a predictor name and version, load the network weights and parameters
     to the appropriate device.
 
     Parameters
@@ -42,7 +43,7 @@ def prepare_model(network, version, gpuid):
     Raises
     ------
     SparrowException
-        An exception is raised if there is no weights file corresponding to the 
+        An exception is raised if there is no weights file corresponding to the
         network and version requested.
     """
     # Check if GPU is available
@@ -53,7 +54,7 @@ def prepare_model(network, version, gpuid):
 
     # the batch predictors are all many-to-one (per-sequence) polymer networks;
     # the shared loader owns the torch.load + hyper-parameter inference logic
-    relative_path = f'networks/{network}/{network}_network_v{version}.pt'
+    relative_path = f"networks/{network}/{network}_network_v{version}.pt"
     model, _meta = load_parrot_network(relative_path, architecture="MtO", device=device)
 
     # inference only: disable dropout/batchnorm-style training behaviour (the
@@ -61,7 +62,6 @@ def prepare_model(network, version, gpuid):
     model.eval()
 
     return (device, model)
-
 
 
 # ....................................................................................
@@ -82,7 +82,7 @@ def __size_filter(inseqs):
     ---------------
     dict
         Returns a dictionary where keys are sequence length and
-        values are a list of sequences where all seqs are same length    
+        values are a list of sequences where all seqs are same length
     """
 
     retdict = {}
@@ -119,38 +119,35 @@ def __list2dict(protein_objs):
          Guarenteed to return a dictionary
 
     Raises
-    sparrow.exception.SparrowException 
+    sparrow.exception.SparrowException
 
 
     """
     if type(protein_objs) is list:
         tmp = {}
-        for i in range(0,len(protein_objs)):
+        for i in range(0, len(protein_objs)):
             tmp[i] = protein_objs[i]
 
         return tmp
     elif type(protein_objs) is dict:
         return protein_objs
     else:
-        raise SparrowException('Input must be one of a list or a dictionary')
-    
-
-
+        raise SparrowException("Input must be one of a list or a dictionary")
 
 
 # ....................................................................................
 #
 #
-def __short_seq_fix(protein_objs,
-                    batch_size : int,
-                    network : str = None,
-                    version : int = 2,
-                    gpuid : int = 0,
-                    batch_algorithm : str = 'default',
-                    return_seq2prediction : bool = False,
-                    show_progress_bar : bool = True):
-                    
-
+def __short_seq_fix(
+    protein_objs,
+    batch_size: int,
+    network: str = None,
+    version: int = 2,
+    gpuid: int = 0,
+    batch_algorithm: str = "default",
+    return_seq2prediction: bool = False,
+    show_progress_bar: bool = True,
+):
     """
     Helper function that deals with datasets when we want to predict Re and Rg.
 
@@ -168,19 +165,19 @@ def __short_seq_fix(protein_objs,
     ----------
     protein_objs : dict or list
         Either a dictionary of key-value pairs where values are either sequence strings
-        or sparrow.protein.Protein objects, or a list, where elements are either sequence 
+        or sparrow.protein.Protein objects, or a list, where elements are either sequence
         strings or sparrow.protein.Protein objects.
 
     batch_size : int
-        The batch size to use for network forward pass. 
+        The batch size to use for network forward pass.
         This should be <= the batch size used during training.
 
     network : str
         Must be either 'rg' or 're'
-        
+
     version : int, optional
         Network version number, by default 2
-    
+
     gpuid : int, optional
         GPU ID to use for predictions, by default 0
 
@@ -188,9 +185,9 @@ def __short_seq_fix(protein_objs,
         Selector which defines the approach used to batch processes
         the sequences. Must be one of the following:
 
-        'default' - Selects either of the following two algorithms, 
+        'default' - Selects either of the following two algorithms,
                     prefering pad-n-pack if verison of torch allows
-   
+
         'size-collect' - Break sequences into groups where all
                          sequences within a group are the same
                          size, and then pass these grouped sequences
@@ -207,14 +204,14 @@ def __short_seq_fix(protein_objs,
                        PyTorch.
 
     return_seq2prediction : bool
-        Flag which, if set to true, means the return from this function is 
-        a dictionary where keys are unique sequences and values are the 
+        Flag which, if set to true, means the return from this function is
+        a dictionary where keys are unique sequences and values are the
         prediction. This is in contrast to the default return which is a
         dictionary where keys are unique indices matching the input dictionary
         are values are a tuple of sequence and prediction. Default = False.
 
     show_progress_bar : bool
-        Flag which, if set to True, means a progress bar is printed as 
+        Flag which, if set to True, means a progress bar is printed as
         predictions are made, while if False no progress bar is printed.
         Default  =  True
 
@@ -222,12 +219,11 @@ def __short_seq_fix(protein_objs,
     -------
     dict
         sequence, value(s) mapping for the requested predictor.
-    
+
     """
 
-    if network not in ['rg', 're']:
+    if network not in ["rg", "re"]:
         raise SparrowException("__short_seq_fix() requires the network to be 'rg' or 're'")
-    
 
     short_seqs = {}
     long_seqs = {}
@@ -236,50 +232,77 @@ def __short_seq_fix(protein_objs,
     # protein_objs is already a dictionary, and one if its a list, whereby we create a new
     # dictionary indexed by unique integers starting at 0 and incrementing with each sequence.
     # NOTE: The new dictionaries, if created, must have unique indices across both sets of
-    # sequences because the short and long sequences will be recombined at the end. 
+    # sequences because the short and long sequences will be recombined at the end.
     if type(protein_objs) is dict:
-        for s in protein_objs:    
+        for s in protein_objs:
             if len(protein_objs[s]) < MIN_LENGTH_ALBATROSS_RE_RG:
                 short_seqs[s] = protein_objs[s]
             else:
                 long_seqs[s] = protein_objs[s]
-                
+
     elif type(protein_objs) is list:
         idx = 0
-        for s in protein_objs:    
+        for s in protein_objs:
             if len(s) < MIN_LENGTH_ALBATROSS_RE_RG:
                 short_seqs[idx] = s
             else:
                 long_seqs[idx] = s
             idx = idx + 1
     else:
-        raise SparrowException('Invalid types passed to protein_objs; must be a dict or list where values/elements are either strings or sparrow.protein.Protein objects') 
+        raise SparrowException(
+            "Invalid types passed to protein_objs; must be a dict or list where values/elements are either strings or sparrow.protein.Protein objects"
+        )
 
     ##
     ## For the code block below, we build a tmp_return_dict which undergoes a final processing step to ensure
     ## its in the same final order as the input dictonary
-    
+
     # if we have 1 or more short sequences then we know at least a subset of sequences must be run using the scaled_ network
     if len(short_seqs) > 0:
-
         # run predictions on each set
-        return_dict1 = batch_predict(short_seqs, batch_size=batch_size, network=f'scaled_{network}', version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, show_progress_bar=show_progress_bar)
+        return_dict1 = batch_predict(
+            short_seqs,
+            batch_size=batch_size,
+            network=f"scaled_{network}",
+            version=version,
+            gpuid=gpuid,
+            batch_algorithm=batch_algorithm,
+            return_seq2prediction=return_seq2prediction,
+            show_progress_bar=show_progress_bar,
+        )
 
         # if we also had 1 or more long sequences then run this using the non-scaled network
         if len(long_seqs) > 0:
-
             # note we have need to set safe=False here or we fall into infinite recursive calls
-            return_dict2 = batch_predict(long_seqs,  batch_size=batch_size, network=network, version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, show_progress_bar=show_progress_bar, safe=False)
+            return_dict2 = batch_predict(
+                long_seqs,
+                batch_size=batch_size,
+                network=network,
+                version=version,
+                gpuid=gpuid,
+                batch_algorithm=batch_algorithm,
+                return_seq2prediction=return_seq2prediction,
+                show_progress_bar=show_progress_bar,
+                safe=False,
+            )
 
             # merge output and return; recall this would destroy any order of insertion, hence why we use a dictionary instead of a list
             tmp_return_dict = {**return_dict1, **return_dict2}
         else:
             tmp_return_dict = return_dict1
     else:
-
         # note we have need to set safe=False here or we fall into infinite recursive calls
-        tmp_return_dict = batch_predict(protein_objs, batch_size=batch_size, network=network, version=version, gpuid=gpuid, batch_algorithm=batch_algorithm, return_seq2prediction=return_seq2prediction, show_progress_bar=show_progress_bar, safe=False)
-
+        tmp_return_dict = batch_predict(
+            protein_objs,
+            batch_size=batch_size,
+            network=network,
+            version=version,
+            gpuid=gpuid,
+            batch_algorithm=batch_algorithm,
+            return_seq2prediction=return_seq2prediction,
+            show_progress_bar=show_progress_bar,
+            safe=False,
+        )
 
     ## this final step ensures we return a dictionary ordered to match the
     ## order of the input
@@ -291,16 +314,14 @@ def __short_seq_fix(protein_objs,
 
     # if return mode is seq2predictions...
     if return_seq2prediction:
-            
         # If we want to return data as seq:pred dictionary
         # then rebuild the final return dict in the order
-        # of the input_dict...            
+        # of the input_dict...
         for k in input_dict:
-
             # get 'value' associated with each input element
             s = input_dict[k]
 
-            # if that value is already a protein string 
+            # if that value is already a protein string
             if type(s) is str:
                 return_dict[s] = tmp_return_dict[s]
 
@@ -310,28 +331,32 @@ def __short_seq_fix(protein_objs,
 
             # else throw an exception
             else:
-                raise SparrowException('Error parsing type of return dictionary. This is a bug, please report https://github.com/idptools/sparrow/issues')
+                raise SparrowException(
+                    "Error parsing type of return dictionary. This is a bug, please report https://github.com/idptools/sparrow/issues"
+                )
 
     # if we're returning the standard key:[seq,pred] mapping
     else:
         for k in input_dict:
             return_dict[k] = tmp_return_dict[k]
-            
+
     return return_dict
-        
-    
+
+
 # ....................................................................................
 #
 #
-def batch_predict(protein_objs,
-                  network : str = None,
-                  batch_size : int = 32,
-                  version : int = 2,
-                  gpuid : int = 0,
-                  batch_algorithm = 'default',
-                  return_seq2prediction : bool = False,
-                  show_progress_bar : bool = True,
-                  safe : bool = True) -> dict:                  
+def batch_predict(
+    protein_objs,
+    network: str = None,
+    batch_size: int = 32,
+    version: int = 2,
+    gpuid: int = 0,
+    batch_algorithm="default",
+    return_seq2prediction: bool = False,
+    show_progress_bar: bool = True,
+    safe: bool = True,
+) -> dict:
     """Perform batch predictions with a PARROT network in sparrow.
 
     Input can be either a dictionary or a list.
@@ -384,7 +409,7 @@ def batch_predict(protein_objs,
     ----------
     protein_objs : dict or list
         Either a dictionary of key-value pairs where values are either sequence strings
-        or sparrow.protein.Protein objects, or a list, where elements are either sequence 
+        or sparrow.protein.Protein objects, or a list, where elements are either sequence
         strings or sparrow.protein.Protein objects.
 
     network : str
@@ -395,18 +420,18 @@ def batch_predict(protein_objs,
             "re",
             "prefactor",
             "asphericity",
-            "scaling_exponent", 
-            "scaled_re", 
+            "scaling_exponent",
+            "scaled_re",
             "scaled_rg"
 
     batch_size : int
-        The batch size to use for network forward pass. 
+        The batch size to use for network forward pass.
         This should be <= the batch size used during training.
         Default = 32.
-        
+
     version : int, optional
         Network version number, by default 2 (released May 21st 2023).
-    
+
     gpuid : int, optional
         GPU ID to use for predictions, by default 0
 
@@ -414,9 +439,9 @@ def batch_predict(protein_objs,
         Selector which defines the approach used to batch processes
         the sequences. Must be one of the following:
 
-        'default' - Selects either of the following two algorithms, 
+        'default' - Selects either of the following two algorithms,
                     prefering pad-n-pack if verison of torch allows
-   
+
         'size-collect' - Break sequences into groups where all
                          sequences within a group are the same
                          size, and then pass these grouped sequences
@@ -433,20 +458,20 @@ def batch_predict(protein_objs,
                        PyTorch.
 
     return_seq2prediction : bool
-        Flag which, if set to true, means the return from this function is 
-        a dictionary where keys are unique sequences and values are the 
+        Flag which, if set to true, means the return from this function is
+        a dictionary where keys are unique sequences and values are the
         prediction. This is in contrast to the default return which is a
         dictionary where keys are unique indices matching the input dictionary
         are values are a tuple of sequence and prediction. Default = False.
 
     show_progress_bar : bool
-        Flag which, if set to True, means a progress bar is printed as 
+        Flag which, if set to True, means a progress bar is printed as
         predictions are made, while if False no progress bar is printed.
         Default  =  True
-            
+
     safe : bool
         Flag which, if set to False, means the requested
-        network will be used for rg/re prediction 
+        network will be used for rg/re prediction
         regardless of the sequence length. NOT RECOMMENDED.
         Default = True.
 
@@ -461,7 +486,6 @@ def batch_predict(protein_objs,
         An exception is raised if the requested network is not one of the available options.
     """
 
-
     ## ------------------------------------------------------------------------------------
     ##
     ## Sanitize inputs
@@ -472,44 +496,47 @@ def batch_predict(protein_objs,
         raise SparrowException("For option 'network': Please choose a valid network for batch predictions")
 
     # check a valid batch_algo was passed
-    if batch_algorithm not in ['default', 'size-collect', 'pad-n-pack']:
-        raise SparrowException("For option 'batch_algorithm': Please choose a valid batch algorithm, one of 'default', 'size-collect', 'pad-n-pack")
+    if batch_algorithm not in ["default", "size-collect", "pad-n-pack"]:
+        raise SparrowException(
+            "For option 'batch_algorithm': Please choose a valid batch algorithm, one of 'default', 'size-collect', 'pad-n-pack"
+        )
 
     # pad-n-pack relies on pack_padded_sequence, only available in PyTorch 1.11.0+
-    if batch_algorithm == 'pad-n-pack' and VERSION_PACKAGE.parse(torch.__version__) < VERSION_PACKAGE.parse("1.11.0"):
-        raise SparrowException("For option 'batch_algorithm': pad-n-pack is only available in PyTorch 1.11.0 or higher. Please use 'default' or 'size-collect'")
+    if batch_algorithm == "pad-n-pack" and VERSION_PACKAGE.parse(torch.__version__) < VERSION_PACKAGE.parse("1.11.0"):
+        raise SparrowException(
+            "For option 'batch_algorithm': pad-n-pack is only available in PyTorch 1.11.0 or higher. Please use 'default' or 'size-collect'"
+        )
 
     # if we've requested to use rg/re predictions, this function ensures short sequences are appropriately
     # dealt with (this is a recurisve function that calls batch_predict)
-    if network in ['rg','re'] and safe:
-        return  __short_seq_fix(protein_objs,
-                                batch_size=batch_size,
-                                network=network,
-                                version=version,
-                                gpuid=gpuid,
-                                batch_algorithm=batch_algorithm,
-                                return_seq2prediction=return_seq2prediction,
-                                show_progress_bar=show_progress_bar)
-
+    if network in ["rg", "re"] and safe:
+        return __short_seq_fix(
+            protein_objs,
+            batch_size=batch_size,
+            network=network,
+            version=version,
+            gpuid=gpuid,
+            batch_algorithm=batch_algorithm,
+            return_seq2prediction=return_seq2prediction,
+            show_progress_bar=show_progress_bar,
+        )
 
     # resolve 'default' to a concrete algorithm: prefer pad-n-pack on modern
     # PyTorch (true mixed-length batching), falling back to size-collect otherwise
-    if batch_algorithm == 'default':
+    if batch_algorithm == "default":
         if VERSION_PACKAGE.parse(torch.__version__) >= VERSION_PACKAGE.parse("1.11.0"):
-            batch_algorithm = 'pad-n-pack'
+            batch_algorithm = "pad-n-pack"
         else:
-            batch_algorithm = 'size-collect'
-    
+            batch_algorithm = "size-collect"
 
     ## ------------------------------------------------------------------------------------
     ##
-    ## Homogenize input to ensure protein_objs is a dictionary 
+    ## Homogenize input to ensure protein_objs is a dictionary
     ##
 
     ## If we passed a list, convert into a dictionary where indices are integers and 0...n
     ## such that we have unique list->dict mapping with same order preserved.
     protein_objs = __list2dict(protein_objs)
-
 
     ## ------------------------------------------------------------------------------------
     ##
@@ -518,9 +545,8 @@ def batch_predict(protein_objs,
     ##
     seq2id = {}
     if sum([1 for i in protein_objs if type(protein_objs[i]) is sparrow.protein.Protein]) == len(protein_objs):
-
         ## for input dictionary, if all elements are sparrow.protein.Protein objects
-        ## extract out sequences,        
+        ## extract out sequences,
         sequence_list = [protein_obj.sequence for _, protein_obj in protein_objs.items()]
 
         # and build mapping between sequence and 1 or more keys
@@ -530,9 +556,8 @@ def batch_predict(protein_objs,
             if seq not in seq2id:
                 seq2id[seq] = []
             seq2id[seq].append(idx)
-            
-    elif sum([1 for i in protein_objs if type(protein_objs[i]) is str]) == len(protein_objs):
 
+    elif sum([1 for i in protein_objs if type(protein_objs[i]) is str]) == len(protein_objs):
         ## if every element is a string use these as sequences
         sequence_list = list(protein_objs.values())
 
@@ -543,11 +568,11 @@ def batch_predict(protein_objs,
             if seq not in seq2id:
                 seq2id[seq] = []
             seq2id[seq].append(idx)
-        
+
     else:
-        raise SparrowException('Invalid input - must pass either a dictionary of key-values where values are sequences (str)\nor sparrow.protein.Protein objects, or a list of sequences (str) or sparrow.protein.Protein objects')
-
-
+        raise SparrowException(
+            "Invalid input - must pass either a dictionary of key-values where values are sequences (str)\nor sparrow.protein.Protein objects, or a list of sequences (str) or sparrow.protein.Protein objects"
+        )
 
     ## ------------------------------------------------------------------------------------
     ##
@@ -558,28 +583,26 @@ def batch_predict(protein_objs,
     device, model = prepare_model(network, version, gpuid)
     model.to(device)
 
-    if batch_algorithm == 'size-collect':
-        # size-collect means we systematically subdivide the sequences into groups 
+    if batch_algorithm == "size-collect":
+        # size-collect means we systematically subdivide the sequences into groups
         # where they're all the same length in a given megabatch, meaning we don't
         # need to pad. This works well in earlier version or torch, but is not optimal
         # in that the effective batch size ends up being 1 for every uniquely-lengthed
         # sequence.
-        
+
         # build a dictionary where keys are sequence length
         # and values is a list of sequences of that exact length
-        size_filtered =  __size_filter(sequence_list)
-        
-        loop_range = tqdm(size_filtered) if show_progress_bar else size_filtered
-        
-        #for local_size in tqdm(size_filtered):
-        for local_size in loop_range:
+        size_filtered = __size_filter(sequence_list)
 
+        loop_range = tqdm(size_filtered) if show_progress_bar else size_filtered
+
+        # for local_size in tqdm(size_filtered):
+        for local_size in loop_range:
             local_seqs = size_filtered[local_size]
 
             seq_loader = DataLoader(local_seqs, batch_size=batch_size, shuffle=False)
 
             for batch in seq_loader:
-
                 # Pad the sequence vector to have the same length as the longest sequence in the batch
                 seqs_padded = pad_sequence([encode_sequence.one_hot(seq).float() for seq in batch], batch_first=True)
 
@@ -594,7 +617,7 @@ def batch_predict(protein_objs,
                 for j, seq in enumerate(batch):
                     pred_dict[seq] = outputs[j][0]
 
-    elif batch_algorithm == 'pad-n-pack':
+    elif batch_algorithm == "pad-n-pack":
         # pad-n-pack batches mixed-length sequences together: each batch is padded
         # to its longest member and packed with pack_padded_sequence so the padding
         # does not contribute to the LSTM state. This mirrors BRNN_MtO.forward
@@ -606,7 +629,6 @@ def batch_predict(protein_objs,
         loop_range = tqdm(seq_loader) if show_progress_bar else seq_loader
 
         for batch in loop_range:
-
             # one-hot encode and pad to the longest sequence in this batch
             seqs_padded = pad_sequence(
                 [encode_sequence.one_hot(seq).float() for seq in batch],
@@ -618,9 +640,7 @@ def batch_predict(protein_objs,
 
             # enforce_sorted=False lets us pass an unsorted batch; the LSTM still
             # returns h_n in the original (input) order
-            packed = pack_padded_sequence(
-                seqs_padded, lengths, batch_first=True, enforce_sorted=False
-            )
+            packed = pack_padded_sequence(seqs_padded, lengths, batch_first=True, enforce_sorted=False)
 
             with torch.no_grad():
                 _, (h_n, _) = model.lstm(packed)
@@ -633,13 +653,12 @@ def batch_predict(protein_objs,
                 pred_dict[seq] = outputs[j][0]
 
     else:
-        raise SparrowException('Invalid batch_algorithm passed')
+        raise SparrowException("Invalid batch_algorithm passed")
 
     # finally, if using a scaled network re-multiply by np.sqrt(N)
-    if network in ['scaled_re', 'scaled_rg']:        
+    if network in ["scaled_re", "scaled_rg"]:
         for s in pred_dict:
-            pred_dict[s] = pred_dict[s]*np.sqrt(len(s))
-
+            pred_dict[s] = pred_dict[s] * np.sqrt(len(s))
 
     if return_seq2prediction:
         return pred_dict
@@ -653,5 +672,5 @@ def batch_predict(protein_objs,
         return_dict = {}
         for idx in protein_objs:
             return_dict[idx] = tmp[idx]
-                
+
         return return_dict

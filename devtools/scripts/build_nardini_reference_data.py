@@ -31,9 +31,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from sparrow.nardini.composition import COMPOSITION_FEATURE_NAMES  # noqa: E402
 from sparrow.nardini.groups import patterning_feature_names  # noqa: E402
 
-OUTPUT_DIR = os.path.join(
-    os.path.dirname(__file__), "..", "..", "sparrow", "data", "nardini"
-)
+OUTPUT_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "sparrow", "data", "nardini")
 
 # Google Sheet holding the per-species compositional priors and GIN centroids
 PRIOR_SHEET_ID = "1yxt0R1G0gdI2bGpjYXgk_h7-1qA6EY6J"
@@ -60,16 +58,11 @@ CITATION = (
     "Cell (2025)."
 )
 
-SOURCE_REPO = (
-    "https://github.com/kierstenruff/RUFF_KING_Grammars_of_IDRs_using_NARDINI-"
-)
+SOURCE_REPO = "https://github.com/kierstenruff/RUFF_KING_Grammars_of_IDRs_using_NARDINI-"
 
 
 def _sheet_csv(sheet_id, worksheet):
-    url = (
-        f"https://docs.google.com/spreadsheets/d/{sheet_id}"
-        f"/gviz/tq?tqx=out:csv&sheet={worksheet}"
-    )
+    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={worksheet}"
     with urllib.request.urlopen(url, timeout=120) as handle:
         text = handle.read().decode("utf-8")
     return list(csv.reader(io.StringIO(text))), url
@@ -108,8 +101,7 @@ def build_priors():
             "citation": CITATION,
             "licence": "MIT",
             "description": (
-                f"Published NARDINI+ compositional background for the {latin} "
-                "IDRome (IDRs >= 30 residues)."
+                f"Published NARDINI+ compositional background for the {latin} IDRome (IDRs >= 30 residues)."
             ),
             "num_sequences_known": False,
         }
@@ -206,5 +198,4 @@ if __name__ == "__main__":
     build_priors()
     build_centroids()
     build_cluster_definitions()
-    print("\nDone. Remember to update sparrow/data/nardini/SOURCES.md if the "
-          "upstream data changed.")
+    print("\nDone. Remember to update sparrow/data/nardini/SOURCES.md if the upstream data changed.")

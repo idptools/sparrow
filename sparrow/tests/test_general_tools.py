@@ -8,6 +8,7 @@ from sparrow.tools import general_tools as gt
 
 # -- validate_protein_sequence ---------------------------------------------
 
+
 def test_validate_uppercases_by_default():
     assert gt.validate_protein_sequence("acdef") == "ACDEF"
 
@@ -45,6 +46,7 @@ def test_validate_custom_exception_class():
 
 
 # -- normalize_residue_selector --------------------------------------------
+
 
 def test_normalize_string_to_list():
     assert gt.normalize_residue_selector("ED") == ["E", "D"]
@@ -87,6 +89,7 @@ def test_normalize_require_nonempty():
 
 # -- is_valid_protein_sequence ---------------------------------------------
 
+
 @pytest.mark.parametrize(
     "seq,expected",
     [("ACDEFGHIKLMNPQRSTVWY", True), ("ACBX", False), ("", True)],
@@ -96,6 +99,7 @@ def test_is_valid_protein_sequence(seq, expected):
 
 
 # -- compare_sequence ------------------------------------------------------
+
 
 def test_compare_sequence_counts_differences():
     assert gt.compare_sequence("ACDE", "AGDE") == 1

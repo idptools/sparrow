@@ -38,7 +38,6 @@ import numpy as np
 from sparrow.data import amino_acids
 
 
-
 def calculate_molecular_weight(sequence):
     """
     Function that returns the molecular weight of a protein sequence assuming standard
@@ -355,6 +354,4 @@ def log_residue_ratio(sequence, numerator, denominator):
         ``log10((count(numerator) + 1) / (count(denominator) + 1))``. Zero when the
         two residues are equally abundant, positive when the numerator dominates.
     """
-    return float(
-        np.log10((sequence.count(numerator) + 1) / (sequence.count(denominator) + 1))
-    )
+    return float(np.log10((sequence.count(numerator) + 1) / (sequence.count(denominator) + 1)))

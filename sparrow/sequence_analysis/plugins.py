@@ -91,9 +91,7 @@ class PluginWrapper:
 
         # Check if the result is cached
         if cache_key not in self.cache_dict[self.name]:
-            self.cache_dict[self.name][cache_key] = self.plugin_instance.calculate(
-                *args, **kwargs
-            )
+            self.cache_dict[self.name][cache_key] = self.plugin_instance.calculate(*args, **kwargs)
 
         return self.cache_dict[self.name][cache_key]
 
@@ -192,9 +190,7 @@ class PluginManager:
         """
         if name not in self.__plugins:
             try:
-                module = importlib.import_module(
-                    "sparrow.sequence_analysis.community_plugins.contributed"
-                )
+                module = importlib.import_module("sparrow.sequence_analysis.community_plugins.contributed")
                 plugin_class = getattr(module, name)
                 if not issubclass(plugin_class, BasePlugin):
                     raise AttributeError(f"{name} is not a valid plugin.")

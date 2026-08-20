@@ -75,9 +75,7 @@ def _validate_partition(typeset, label):
 
     duplicates = {r for r in seen if seen.count(r) > 1}
     if duplicates:
-        raise ValueError(
-            f"{label} assigns these residues to more than one type: {sorted(duplicates)}"
-        )
+        raise ValueError(f"{label} assigns these residues to more than one type: {sorted(duplicates)}")
 
     missing = set(VALID_AMINO_ACIDS) - set(seen)
     if missing:
@@ -125,9 +123,7 @@ def get_typeset(typeset=DEFAULT_TYPESET):
     from sparrow.sparrow_exceptions import SparrowException
 
     if isinstance(typeset, dict):
-        custom = OrderedDict(
-            (name, tuple(residues)) for name, residues in typeset.items()
-        )
+        custom = OrderedDict((name, tuple(residues)) for name, residues in typeset.items())
         _validate_partition(custom, "custom typeset")
         return custom
 
@@ -185,8 +181,4 @@ def patterning_feature_names(typeset=DEFAULT_TYPESET):
     (36, 'pol-pol', 'gly-gly')
     """
     names = type_names(typeset)
-    return tuple(
-        f"{names[i]}-{names[j]}"
-        for i in range(len(names))
-        for j in range(i, len(names))
-    )
+    return tuple(f"{names[i]}-{names[j]}" for i in range(len(names)) for j in range(i, len(names)))

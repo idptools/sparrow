@@ -47,9 +47,7 @@ def test_validate_keyword_option_default_message():
 # sparrow.sparrow_exceptions
 
 
-@pytest.mark.parametrize(
-    "exception_cls", [ProteinException, PatterningException, CalculationException]
-)
+@pytest.mark.parametrize("exception_cls", [ProteinException, PatterningException, CalculationException])
 def test_all_exceptions_derive_from_sparrow_exception(exception_cls):
     """`except SparrowException` must catch everything sparrow raises."""
     assert issubclass(exception_cls, SparrowException)
@@ -85,15 +83,11 @@ def test_nudep_saw_rg_varies_with_nu():
     assert low != pytest.approx(high)
 
     # and the first value is still retrievable (i.e. the cache is per-nu)
-    assert p.polymeric.get_mean_nudep_saw_radius_of_gyration(nu=0.40) == pytest.approx(
-        low
-    )
+    assert p.polymeric.get_mean_nudep_saw_radius_of_gyration(nu=0.40) == pytest.approx(low)
 
     # cross-check against a protein that only ever saw nu=0.6
     fresh = Protein(TEST_SEQ)
-    assert fresh.polymeric.get_mean_nudep_saw_radius_of_gyration(
-        nu=0.60
-    ) == pytest.approx(high)
+    assert fresh.polymeric.get_mean_nudep_saw_radius_of_gyration(nu=0.60) == pytest.approx(high)
 
 
 def test_nudep_saw_re_varies_with_nu_and_prefactor():
@@ -113,9 +107,9 @@ def test_saw_values_vary_with_prefactor():
     )
 
     p2 = Protein(TEST_SEQ)
-    assert p2.polymeric.get_mean_saw_end_to_end_distance(
-        prefactor=5.5
-    ) != pytest.approx(p2.polymeric.get_mean_saw_end_to_end_distance(prefactor=8.0))
+    assert p2.polymeric.get_mean_saw_end_to_end_distance(prefactor=5.5) != pytest.approx(
+        p2.polymeric.get_mean_saw_end_to_end_distance(prefactor=8.0)
+    )
 
 
 def test_afrc_mean_rg_varies_with_mode():
@@ -138,9 +132,7 @@ def test_afrc_mean_re_varies_with_mode():
 # sparrow.polymer -- the empirical mode selector must not be ignored
 
 
-@pytest.mark.parametrize(
-    "method_name", ["empirical_nu", "empirical_radius_of_gyration"]
-)
+@pytest.mark.parametrize("method_name", ["empirical_nu", "empirical_radius_of_gyration"])
 def test_empirical_methods_reject_unknown_mode(method_name):
     p = Protein(TEST_SEQ)
     method = getattr(p.polymeric, method_name)
@@ -183,9 +175,7 @@ def test_show_sequence_defaults_are_not_shared_between_calls():
 
     first = p.show_sequence(return_raw_string=True)
     # a call that supplies its own lists must not contaminate the defaults
-    p.show_sequence(
-        bold_positions=[1, 2, 3], bold_residues=["A"], return_raw_string=True
-    )
+    p.show_sequence(bold_positions=[1, 2, 3], bold_residues=["A"], return_raw_string=True)
     second = p.show_sequence(return_raw_string=True)
 
     assert first == second
@@ -325,8 +315,7 @@ def test_zscore_feature_vector_length():
 
 def test_binary_disorder_respects_changed_threshold():
     p = Protein(
-        "MKYLAAYLLLNAAGNTPDATKIKAILESVGIEIEDEKVSSVLSALEGKSVDELITEGNEKLAA"
-        "VPAAGPASAGGAAAASGDAAAEEEKEEEAAEESDDDMGFGLFD"
+        "MKYLAAYLLLNAAGNTPDATKIKAILESVGIEIEDEKVSSVLSALEGKSVDELITEGNEKLAAVPAAGPASAGGAAAASGDAAAEEEKEEEAAEESDDDMGFGLFD"
     )
 
     permissive = p.predictor.binary_disorder(disorder_threshold=0.1)
@@ -399,10 +388,7 @@ def test_protein_property_matches_nardini_feature(feature, attribute):
     from sparrow.nardini import composition_values
 
     rng = random.Random(99)
-    sequences = [
-        "".join(rng.choice(VALID_AMINO_ACIDS) for _ in range(rng.randint(12, 200)))
-        for _ in range(25)
-    ]
+    sequences = ["".join(rng.choice(VALID_AMINO_ACIDS) for _ in range(rng.randint(12, 200))) for _ in range(25)]
     sequences += ["Q" * 40, "E" * 40, "K" * 40, "GRGRGGYGG" * 5, "MEEEKKKSSSTTT"]
 
     for sequence in sequences:
@@ -476,9 +462,7 @@ def test_new_physical_properties_are_cached():
         "PPII_propensity",
     ):
         first = getattr(protein, attribute)
-        assert (
-            getattr(protein, attribute) is first or getattr(protein, attribute) == first
-        )
+        assert getattr(protein, attribute) is first or getattr(protein, attribute) == first
 
 
 def test_amino_acid_fractions_match_nardini():
@@ -489,9 +473,7 @@ def test_amino_acid_fractions_match_nardini():
         features = composition_values(sequence)
         fractions = Protein(sequence).amino_acid_fractions
         for residue in VALID_AMINO_ACIDS:
-            assert fractions[residue] == features[f"Frac {residue}"], (
-                f"{residue} in {sequence[:20]}"
-            )
+            assert fractions[residue] == features[f"Frac {residue}"], f"{residue} in {sequence[:20]}"
 
 
 def test_patch_features_match_nardini():
@@ -541,10 +523,7 @@ def test_polar_definitions_differ_only_by_cysteine():
     from sparrow.nardini import composition_values
 
     rng = random.Random(17)
-    sequences = [
-        "".join(rng.choice(VALID_AMINO_ACIDS) for _ in range(rng.randint(30, 200)))
-        for _ in range(20)
-    ]
+    sequences = ["".join(rng.choice(VALID_AMINO_ACIDS) for _ in range(rng.randint(30, 200))) for _ in range(20)]
     sequences += ["CCCCSSSSTTTT", "SSSSTTTTQQQQ"]
 
     saw_cysteine = False

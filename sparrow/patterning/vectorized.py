@@ -231,9 +231,7 @@ def _delta_from_ternary(ternary, window_size, sigma):
     difference = _window_sums(ternary, window_size)
     pair_total = _window_sums(ternary != 0, window_size)
 
-    window_asymmetry = _asymmetry_from_parts(
-        difference, pair_total, float(window_size)
-    )
+    window_asymmetry = _asymmetry_from_parts(difference, pair_total, float(window_size))
 
     sigma = np.asarray(sigma, dtype=np.float64)
     if sigma.ndim:
@@ -437,9 +435,7 @@ def kappa_x(sequence, group1, group2, window_size, flatten=0):
         return -1
 
     if window_size < 2:
-        raise sparrow_exceptions.PatterningException(
-            "window_size must be 2 or larger"
-        )
+        raise sparrow_exceptions.PatterningException("window_size must be 2 or larger")
 
     if len(group1) == 0:
         raise sparrow_exceptions.PatterningException(
@@ -523,9 +519,7 @@ def kappa_from_ternary_batch(ternary, window_size, flatten=0, group2_present=Tru
         Kappa per row, with ``-1`` where a required group is absent.
     """
     if window_size < 2:
-        raise sparrow_exceptions.PatterningException(
-            "window_size must be 2 or larger"
-        )
+        raise sparrow_exceptions.PatterningException("window_size must be 2 or larger")
 
     ternary = np.atleast_2d(ternary)
     winged_length = ternary.shape[-1]
@@ -533,16 +527,12 @@ def kappa_from_ternary_batch(ternary, window_size, flatten=0, group2_present=Tru
     count_1 = np.count_nonzero(ternary == 1, axis=-1)
     count_2 = np.count_nonzero(ternary == -1, axis=-1)
 
-    uniform = bool(
-        np.all(count_1 == count_1[0]) and np.all(count_2 == count_2[0])
-    )
+    uniform = bool(np.all(count_1 == count_1[0]) and np.all(count_2 == count_2[0]))
 
     if uniform:
         # one delta_max for the whole stack
         sigma = _asymmetry(count_1[0], count_2[0], float(winged_length))
-        deltamax = _delta_from_ternary(
-            _deltamax_ternary(ternary[0], window_size), window_size, sigma
-        )
+        deltamax = _delta_from_ternary(_deltamax_ternary(ternary[0], window_size), window_size, sigma)
     else:
         deltamax = np.array(
             [
@@ -609,9 +599,7 @@ def kappa_x_batch(sequences, group1, group2, window_size, flatten=0):
 
     lengths = {len(s) for s in sequences}
     if len(lengths) != 1:
-        raise sparrow_exceptions.PatterningException(
-            "kappa_x_batch requires all sequences to be the same length"
-        )
+        raise sparrow_exceptions.PatterningException("kappa_x_batch requires all sequences to be the same length")
 
     if window_size > lengths.pop():
         return np.full(len(sequences), -1.0, dtype=np.float64)
@@ -619,9 +607,7 @@ def kappa_x_batch(sequences, group1, group2, window_size, flatten=0):
     codes = np.stack([_as_byte_array(s) for s in sequences])
     ternary = ternarize_winged_batch(codes, group1, group2, window_size)
 
-    return kappa_from_ternary_batch(
-        ternary, window_size, flatten, group2_present=len(group2) > 0
-    )
+    return kappa_from_ternary_batch(ternary, window_size, flatten, group2_present=len(group2) > 0)
 
 
 def binary_asymmetry(sequence, group):
@@ -653,9 +639,7 @@ def binary_asymmetry(sequence, group):
     return float((fraction - (1.0 - fraction)) ** 2)
 
 
-def patterning_percentile(
-    sequence, group, window_size, count, seed, return_distribution=False
-):
+def patterning_percentile(sequence, group, window_size, count, seed, return_distribution=False):
     """Percentile of a sequence's binary patterning against random shuffles.
 
     Binarizes the sequence into ``group`` vs. everything else, measures how much
@@ -717,20 +701,14 @@ def patterning_percentile(
     length = len(sequence)
 
     if window_size > length:
-        raise sparrow_exceptions.PatterningException(
-            "window_size is larger than sequence length"
-        )
+        raise sparrow_exceptions.PatterningException("window_size is larger than sequence length")
     if window_size < 2:
-        raise sparrow_exceptions.PatterningException(
-            "window_size must be 2 or larger"
-        )
+        raise sparrow_exceptions.PatterningException("window_size must be 2 or larger")
 
     try:
         seed = int(seed)
     except (TypeError, ValueError):
-        raise sparrow_exceptions.PatterningException(
-            "Cannot convert seed into an integer"
-        )
+        raise sparrow_exceptions.PatterningException("Cannot convert seed into an integer")
 
     if len(group) == 0:
         raise sparrow_exceptions.PatterningException(
@@ -755,9 +733,7 @@ def patterning_percentile(
     while done < count:
         block = min(_PERMUTATION_BLOCK, count - done)
         order = rng.random((block, length)).argsort(axis=1)
-        null[done : done + block] = _delta_from_ternary(
-            binary[order], window_size, sigma
-        )
+        null[done : done + block] = _delta_from_ternary(binary[order], window_size, sigma)
         done += block
 
     null.sort()
@@ -1009,12 +985,8 @@ def calculate_average_bivariate_inverse_distance_charge(linear_NCPR, sequence):
     masked[is_negative] = ncpr[is_negative]
     masked[is_positive] = ncpr[is_positive]
 
-    charge_difference = np.abs(
-        masked[positive_positions][None, :] - masked[negative_positions][:, None]
-    )
-    separation = np.abs(
-        positive_positions[None, :] - negative_positions[:, None]
-    ).astype(np.float64)
+    charge_difference = np.abs(masked[positive_positions][None, :] - masked[negative_positions][:, None])
+    separation = np.abs(positive_positions[None, :] - negative_positions[:, None]).astype(np.float64)
 
     return float(np.sum(charge_difference / separation) / negative_positions.size)
 
@@ -1026,10 +998,26 @@ def calculate_average_bivariate_inverse_distance_charge(linear_NCPR, sequence):
 #: Normalized Kyte-Doolittle hydrophobicity used by :func:`compute_shd` when no
 #: scale is supplied. Matches ``sparrow.patterning.scd``.
 DEFAULT_HYDRO_DICT = {
-    "A": 0.730, "R": 0.000, "N": 0.432, "D": 0.378, "C": 0.595,
-    "Q": 0.514, "E": 0.459, "G": 0.649, "H": 0.514, "I": 0.973,
-    "L": 0.973, "K": 0.514, "M": 0.838, "F": 1.000, "P": 1.000,
-    "S": 0.595, "T": 0.676, "W": 0.946, "Y": 0.865, "V": 0.892,
+    "A": 0.730,
+    "R": 0.000,
+    "N": 0.432,
+    "D": 0.378,
+    "C": 0.595,
+    "Q": 0.514,
+    "E": 0.459,
+    "G": 0.649,
+    "H": 0.514,
+    "I": 0.973,
+    "L": 0.973,
+    "K": 0.514,
+    "M": 0.838,
+    "F": 1.000,
+    "P": 1.000,
+    "S": 0.595,
+    "T": 0.676,
+    "W": 0.946,
+    "Y": 0.865,
+    "V": 0.892,
 }
 
 
@@ -1126,10 +1114,7 @@ def compute_shd(seq, hydro_dict=None):
 
     for residue in set(seq):
         if residue not in hydro_dict:
-            raise ValueError(
-                "When calculating SHD the hydrophobicity dictionary lacked the "
-                f"residue {residue}"
-            )
+            raise ValueError(f"When calculating SHD the hydrophobicity dictionary lacked the residue {residue}")
 
     length = len(seq)
     if length < 2:

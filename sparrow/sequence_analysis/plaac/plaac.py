@@ -40,7 +40,7 @@ from __future__ import annotations
 import argparse
 import math
 import sys
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterator, List, Optional, Sequence, TextIO, Tuple
 
@@ -55,9 +55,28 @@ AA_NAMES: List[str] = list("XACDEFGHIKLMNPQRSTVWY*")
 
 #: Three-letter amino acid names indexed 0..21
 AA_NAMES_3: List[str] = [
-    "???", "Ala", "Cys", "Asp", "Glu", "Phe", "Gly", "His", "Ile", "Lys",
-    "Leu", "Met", "Asn", "Pro", "Gln", "Arg", "Ser", "Thr", "Val", "Trp",
-    "Tyr", "***",
+    "???",
+    "Ala",
+    "Cys",
+    "Asp",
+    "Glu",
+    "Phe",
+    "Gly",
+    "His",
+    "Ile",
+    "Lys",
+    "Leu",
+    "Met",
+    "Asn",
+    "Pro",
+    "Gln",
+    "Arg",
+    "Ser",
+    "Thr",
+    "Val",
+    "Trp",
+    "Tyr",
+    "***",
 ]
 
 #: Mapping from single-letter AA code to integer index
@@ -71,6 +90,7 @@ FOLDINDEX_COEFFS: List[float] = [2.785, -1.0, -1.151]
 # Amino Acid Property Tables
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass(frozen=True)
 class AminoAcidProperties:
     """
@@ -82,58 +102,210 @@ class AminoAcidProperties:
 
     #: Formal charge used by FoldIndex (D+1, E+1, K-1, R-1; rest 0)
     charge: Tuple[float, ...] = (
-        0, 0, 0, 1, 1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, -1, 0, 0, 0, 0, 0, 0,
+        0,
+        0,
+        0,
+        1,
+        1,
+        0,
+        0,
+        0,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        -1,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
     )
 
     #: Kyte-Doolittle hydropathicity (J Mol Biol 157:105-132, 1982)
     hydro: Tuple[float, ...] = (
-        0.0, 1.8, 2.5, -3.5, -3.5, 2.8, -0.4, -3.2, 4.5, -3.9,
-        3.8, 1.9, -3.5, -1.6, -3.5, -4.5, -0.8, -0.7, 4.2, -0.9, -1.3, 0.0,
+        0.0,
+        1.8,
+        2.5,
+        -3.5,
+        -3.5,
+        2.8,
+        -0.4,
+        -3.2,
+        4.5,
+        -3.9,
+        3.8,
+        1.9,
+        -3.5,
+        -1.6,
+        -3.5,
+        -4.5,
+        -0.8,
+        -0.7,
+        4.2,
+        -0.9,
+        -1.3,
+        0.0,
     )
 
     #: PAPA foreground frequencies - set 1 (Toombs et al MCB 2010)
     fg_papa1: Tuple[float, ...] = (
-        0.0, 0.042, 0.033, 0.014, 0.009, 0.075, 0.038, 0.059, 0.102, 0.009,
-        0.059, 0.038, 0.096, 0.038, 0.024, 0.054, 0.125, 0.069, 0.102, 0.024,
-        0.054, 0.0,
+        0.0,
+        0.042,
+        0.033,
+        0.014,
+        0.009,
+        0.075,
+        0.038,
+        0.059,
+        0.102,
+        0.009,
+        0.059,
+        0.038,
+        0.096,
+        0.038,
+        0.024,
+        0.054,
+        0.125,
+        0.069,
+        0.102,
+        0.024,
+        0.054,
+        0.0,
     )
 
     #: PAPA background frequencies - set 1 (Toombs et al MCB 2010)
     bg_papa1: Tuple[float, ...] = (
-        0.0, 0.072, 0.022, 0.051, 0.017, 0.032, 0.040, 0.078, 0.045, 0.045,
-        0.061, 0.020, 0.089, 0.127, 0.022, 0.081, 0.109, 0.078, 0.045, 0.012,
-        0.025, 0.0,
+        0.0,
+        0.072,
+        0.022,
+        0.051,
+        0.017,
+        0.032,
+        0.040,
+        0.078,
+        0.045,
+        0.045,
+        0.061,
+        0.020,
+        0.089,
+        0.127,
+        0.022,
+        0.081,
+        0.109,
+        0.078,
+        0.045,
+        0.012,
+        0.025,
+        0.0,
     )
 
     #: PAPA odds-ratios - set 1 (Toombs et al MCB 2010)
     od_papa1: Tuple[float, ...] = (
         0.0,
-        0.67267686, 1.5146198, 0.27887323, 0.5460614, 2.313433,
-        0.96153843, 0.75686276, 2.2562358, 0.20664589, 0.9607843,
-        1.9615384, 1.0836071, 0.30196398, 1.0716166, 0.6664044,
-        1.1432927, 0.8917492, 2.2562358, 1.9478673, 2.1785367,
+        0.67267686,
+        1.5146198,
+        0.27887323,
+        0.5460614,
+        2.313433,
+        0.96153843,
+        0.75686276,
+        2.2562358,
+        0.20664589,
+        0.9607843,
+        1.9615384,
+        1.0836071,
+        0.30196398,
+        1.0716166,
+        0.6664044,
+        1.1432927,
+        0.8917492,
+        2.2562358,
+        1.9478673,
+        2.1785367,
         0.0,
     )
 
     #: S. cerevisiae global AA frequencies (Alberti et al, Cell 2009)
     bg_freq_scer: Tuple[float, ...] = (
-        0, 0.0550, 0.0126, 0.0586, 0.0655, 0.0441, 0.0498, 0.0217, 0.0655,
-        0.0735, 0.0950, 0.0207, 0.0615, 0.0438, 0.0396, 0.0444, 0.0899,
-        0.0592, 0.0556, 0.0104, 0.0337, 0,
+        0,
+        0.0550,
+        0.0126,
+        0.0586,
+        0.0655,
+        0.0441,
+        0.0498,
+        0.0217,
+        0.0655,
+        0.0735,
+        0.0950,
+        0.0207,
+        0.0615,
+        0.0438,
+        0.0396,
+        0.0444,
+        0.0899,
+        0.0592,
+        0.0556,
+        0.0104,
+        0.0337,
+        0,
     )
 
     #: Prion-domain frequencies from 4 S. cer. prions (Alberti et al 2009)
     prd_freq_scer_04: Tuple[float, ...] = (
-        0, 0.0488, 0.0032, 0.0202, 0.0234, 0.0276, 0.1157, 0.0149, 0.0191,
-        0.0329, 0.0456, 0.0149, 0.1444, 0.0308, 0.2208, 0.0202, 0.1008,
-        0.0297, 0.0234, 0.0064, 0.0573, 0,
+        0,
+        0.0488,
+        0.0032,
+        0.0202,
+        0.0234,
+        0.0276,
+        0.1157,
+        0.0149,
+        0.0191,
+        0.0329,
+        0.0456,
+        0.0149,
+        0.1444,
+        0.0308,
+        0.2208,
+        0.0202,
+        0.1008,
+        0.0297,
+        0.0234,
+        0.0064,
+        0.0573,
+        0,
     )
 
     #: Prion-domain frequencies from 28 S. cer. domains (Alberti et al 2009)
     prd_freq_scer_28: Tuple[float, ...] = (
-        0, 0.04865, 0.00219, 0.01638, 0.00783, 0.02537, 0.07603, 0.0181,
-        0.02018, 0.01641, 0.02639, 0.02975, 0.25885, 0.05126, 0.15178,
-        0.025, 0.10988, 0.03841, 0.01972, 0.00157, 0.05624, 0,
+        0,
+        0.04865,
+        0.00219,
+        0.01638,
+        0.00783,
+        0.02537,
+        0.07603,
+        0.0181,
+        0.02018,
+        0.01641,
+        0.02639,
+        0.02975,
+        0.25885,
+        0.05126,
+        0.15178,
+        0.025,
+        0.10988,
+        0.03841,
+        0.01972,
+        0.00157,
+        0.05624,
+        0,
     )
 
     @property
@@ -159,9 +331,7 @@ AA = AminoAcidProperties()
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _LOGLUT_LEN = 4000
-_LOGLUT: List[float] = [
-    math.log(1.0 + math.exp(-i / 100.0)) for i in range(_LOGLUT_LEN + 1)
-]
+_LOGLUT: List[float] = [math.log(1.0 + math.exp(-i / 100.0)) for i in range(_LOGLUT_LEN + 1)]
 
 
 def _log_add_exp(a: float, b: float) -> float:
@@ -174,24 +344,25 @@ def _log_add_exp(a: float, b: float) -> float:
     if a > b:
         c = a - b
         if not (c < 40):
-            return a          # b is negligible
+            return a  # b is negligible
         idx = int(c * 100)
         frac = c * 100 - idx
         return a + ((frac) * _LOGLUT[idx + 1] + (1 - frac) * _LOGLUT[idx])
     elif b > a:
         c = b - a
         if not (c < 40):
-            return b          # a is negligible
+            return b  # a is negligible
         idx = int(c * 100)
         frac = c * 100 - idx
         return b + ((frac) * _LOGLUT[idx + 1] + (1 - frac) * _LOGLUT[idx])
     else:
-        return a + LOG2       # handles a == b == -inf
+        return a + LOG2  # handles a == b == -inf
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Small numeric helpers
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def _normalize(arr: Sequence[float]) -> List[float]:
     """
@@ -268,12 +439,13 @@ def _subvec(vec: Sequence, lo: int, hi: int) -> list:
     n = len(vec)
     lo = max(0, min(lo, n - 1))
     hi = max(lo, min(hi, n - 1))
-    return list(vec[lo: hi + 1])
+    return list(vec[lo : hi + 1])
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # AA <-> integer conversions
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def aa_to_int(c: str) -> int:
     """Convert a single amino acid character to its integer index (0-21)."""
@@ -308,9 +480,11 @@ def is_valid_protein(aa: Sequence[int]) -> bool:
 # FASTA reader
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class FastaRecord:
     """A single FASTA record with a header name and sequence string."""
+
     name: str
     sequence: str
 
@@ -353,6 +527,7 @@ def read_fasta(path: str | Path) -> Iterator[FastaRecord]:
 # ═══════════════════════════════════════════════════════════════════════════════
 # AA frequency I/O
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def compute_aa_freq(path: str | Path) -> List[int]:
     """
@@ -435,6 +610,7 @@ def read_gene_list(path: str | Path) -> Tuple[Dict[str, str], Dict[str, str]]:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Sliding-window averages
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def sliding_average(
     arr: Sequence[float],
@@ -544,12 +720,14 @@ def sliding_average_papa(
 # Highest-Scoring Subsequence (HSS)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class HSSResult:
     """Result of a highest-scoring subsequence search."""
-    start: int     #: Start index (0-based) of the best segment.
-    end: int       #: End index (0-based, inclusive) of the best segment.
-    score: float   #: Sum of values in the best segment.
+
+    start: int  #: Start index (0-based) of the best segment.
+    end: int  #: End index (0-based, inclusive) of the best segment.
+    score: float  #: Sum of values in the best segment.
 
     @property
     def length(self) -> int:
@@ -625,14 +803,13 @@ def highest_scoring_subseq(
 # Hidden Markov Model
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def _safe_log(x: float) -> float:
     """Log that returns -inf for zero."""
     return math.log(x) if x > 0 else float("-inf")
 
 
-def _collapse_posteriors(
-    pp: List[List[float]], classes: List[int], num_classes: int
-) -> List[List[float]]:
+def _collapse_posteriors(pp: List[List[float]], classes: List[int], num_classes: int) -> List[List[float]]:
     """Collapse per-state posteriors into per-class posteriors by summation."""
     n = len(pp[0])
     npp = [[0.0] * n for _ in range(num_classes)]
@@ -940,23 +1117,15 @@ class HMM:
                         lab = f"{self.trans[i][j]:.3f}"
                         if i == j:
                             port = ":w" if i % 2 == 0 else ":e"
-                            out.write(
-                                f'  n{i}{port} -> n{j}{port} [label="{lab}", color=gray];\n'
-                            )
+                            out.write(f'  n{i}{port} -> n{j}{port} [label="{lab}", color=gray];\n')
                         else:
-                            out.write(
-                                f'  n{i} -> n{j} [label="{lab}", color=gray, constraint=false];\n'
-                            )
+                            out.write(f'  n{i} -> n{j} [label="{lab}", color=gray, constraint=false];\n')
             if show_emissions:
                 for i in range(self.ns):
                     fields_aa = "|".join(AA_NAMES[j] for j in range(1, self.no - 1))
-                    fields_pr = "|".join(
-                        f"{self.emis[i][j]:.4f}" for j in range(1, self.no - 1)
-                    )
+                    fields_pr = "|".join(f"{self.emis[i][j]:.4f}" for j in range(1, self.no - 1))
                     out.write(
-                        f'rec{i} [shape=record, label="'
-                        f"{{ <fs> AA|{fields_aa}}}|"
-                        f'{{ <f{i}> prob|{fields_pr}}}"];\n'
+                        f'rec{i} [shape=record, label="{{ <fs> AA|{fields_aa}}}|{{ <f{i}> prob|{fields_pr}}}"];\n'
                     )
                     out.write(f"  n{i} -> rec{i} [style=dashed];\n")
             out.write("}\n")
@@ -965,6 +1134,7 @@ class HMM:
 # ═══════════════════════════════════════════════════════════════════════════════
 # HMM construction
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def build_prion_hmm(fg: Sequence[float], bg: Sequence[float]) -> HMM:
     """
@@ -1022,6 +1192,7 @@ def build_background_hmm(bg: Sequence[float]) -> HMM:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Disorder Report (FoldIndex + PAPA + PLAAC LLR)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @dataclass
 class DisorderReport:
@@ -1225,6 +1396,7 @@ def compute_disorder(
 # Run configuration
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class PLAACConfig:
     """
@@ -1280,6 +1452,7 @@ class PLAACConfig:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Scoring result (public API data structure)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 @dataclass
 class PRDRegion:
@@ -1499,9 +1672,11 @@ class PLAACResult:
 # Internal model builder (shared by CLI and API)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class _PLAACModel:
     """Internal bundle of the fully resolved model components."""
+
     fg: List[float]
     bg: List[float]
     llr: List[float]
@@ -1570,9 +1745,7 @@ def _build_model(
     bg_raw[0] = bg_raw[21] = 0.0
     bg_this = _normalize(bg_raw)
 
-    bg_combo = _normalize(
-        [alpha * bg_scer[i] + (1 - alpha) * bg_this[i] for i in range(22)]
-    )
+    bg_combo = _normalize([alpha * bg_scer[i] + (1 - alpha) * bg_this[i] for i in range(22)])
 
     eps = 1e-5
     fg_freq[0] = fg_freq[21] = eps
@@ -1638,8 +1811,13 @@ def _score_single_sequence(
 
     # -- Disorder --
     dr = compute_disorder(
-        aa, model.window_fi, model.window_papa, ww_llr,
-        llr, lod_papa1, adjust_prolines=model.adjust_prolines,
+        aa,
+        model.window_fi,
+        model.window_papa,
+        ww_llr,
+        llr,
+        lod_papa1,
+        adjust_prolines=model.adjust_prolines,
     )
 
     # -- CORE / PRD from Viterbi path --
@@ -1664,7 +1842,7 @@ def _score_single_sequence(
         while aa_stop < len(vp) and vp[aa_stop] == 1:
             aa_stop += 1
         aa_stop -= 1
-        prd_ints = list(aa[aa_start: aa_stop + 1])
+        prd_ints = list(aa[aa_start : aa_stop + 1])
         prd_score = sum(llr[a] for a in prd_ints)
     else:
         hs_core = HSSResult(start=-1, end=-2, score=float("nan"))
@@ -1675,16 +1853,16 @@ def _score_single_sequence(
 
     # Derived sequences
     has_prd = (aa_stop - aa_start + 1) >= core_len
-    core_seq_str = ints_to_seq(aa[core_start: core_stop + 1]) if has_prd else "-"
-    prd_start_seq = ints_to_seq(aa[aa_start: aa_start + 15]) if has_prd else "-"
-    prd_end_seq = ints_to_seq(aa[max(0, aa_stop - 14): aa_stop + 1]) if has_prd else "-"
+    core_seq_str = ints_to_seq(aa[core_start : core_stop + 1]) if has_prd else "-"
+    prd_start_seq = ints_to_seq(aa[aa_start : aa_start + 15]) if has_prd else "-"
+    prd_end_seq = ints_to_seq(aa[max(0, aa_stop - 14) : aa_stop + 1]) if has_prd else "-"
     prd_seq_str = ints_to_seq(prd_ints) if has_prd else "-"
 
     # -- Extract ALL PRD regions from the Viterbi path --
     prd_regions: List[PRDRegion] = []
     for run_start, run_end in _extract_prd_runs(vp):
         run_len = run_end - run_start + 1
-        run_ints = list(aa[run_start: run_end + 1])
+        run_ints = list(aa[run_start : run_end + 1])
         run_score = sum(llr[a] for a in run_ints)
         run_seq = ints_to_seq(run_ints)
 
@@ -1695,7 +1873,7 @@ def _score_single_sequence(
             r_core_start = run_start + run_hs.start
             r_core_end = run_start + run_hs.end
             r_core_score = _inf_to_nan(run_hs.score)
-            r_core_seq = ints_to_seq(aa[r_core_start: r_core_end + 1])
+            r_core_seq = ints_to_seq(aa[r_core_start : r_core_end + 1])
             r_core_len = r_core_end - r_core_start + 1
         else:
             r_core_start = run_start
@@ -1704,18 +1882,20 @@ def _score_single_sequence(
             r_core_seq = "-"
             r_core_len = 0
 
-        prd_regions.append(PRDRegion(
-            prd_start=run_start + 1,
-            prd_end=run_end + 1,
-            prd_length=run_len,
-            prd_seq=run_seq,
-            prd_score=run_score,
-            core_start=r_core_start + 1,
-            core_end=r_core_end + 1,
-            core_length=r_core_len,
-            core_seq=r_core_seq,
-            core_score=r_core_score,
-        ))
+        prd_regions.append(
+            PRDRegion(
+                prd_start=run_start + 1,
+                prd_end=run_end + 1,
+                prd_length=run_len,
+                prd_seq=run_seq,
+                prd_score=run_score,
+                core_start=r_core_start + 1,
+                core_end=r_core_end + 1,
+                core_length=r_core_len,
+                core_seq=r_core_seq,
+                core_score=r_core_score,
+            )
+        )
 
     # Sort by core_score descending (NaN-safe: NaN sorts to end)
     prd_regions.sort(
@@ -1724,10 +1904,13 @@ def _score_single_sequence(
     )
 
     # PAPA window sequence
-    papa_aa = ints_to_seq(_subvec(
-        aa, dr.papa_max_center - model.window_papa // 2,
-        dr.papa_max_center + model.window_papa // 2,
-    ))
+    papa_aa = ints_to_seq(
+        _subvec(
+            aa,
+            dr.papa_max_center - model.window_papa // 2,
+            dr.papa_max_center + model.window_papa // 2,
+        )
+    )
 
     mw_sc = _inf_to_nan(mw.score)
     llr_sc = _inf_to_nan(hs_llr.score)
@@ -1794,6 +1977,7 @@ def _score_single_sequence(
 # Public API
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 def _freqs_dict_to_list(freqs: Dict[str, float]) -> List[float]:
     """
     Convert an amino-acid frequency dictionary to the 22-element list
@@ -1814,8 +1998,7 @@ def _freqs_dict_to_list(freqs: Dict[str, float]) -> List[float]:
         aa_upper = aa_letter.upper()
         if aa_upper not in _AA_TO_INT:
             raise ValueError(
-                f"Unrecognised amino acid code {aa_letter!r}. "
-                f"Valid one-letter codes: {', '.join(AA_NAMES[1:21])}"
+                f"Unrecognised amino acid code {aa_letter!r}. Valid one-letter codes: {', '.join(AA_NAMES[1:21])}"
             )
         idx = _AA_TO_INT[aa_upper]
         if idx == 0 or idx == 21:
@@ -1911,7 +2094,7 @@ def score_sequence(
     if len(aa) == 0:
         raise ValueError("Empty sequence after stripping stop codons.")
 
-    # parse bg/fg frequencies 
+    # parse bg/fg frequencies
     bg_list = _freqs_dict_to_list(bg_freqs) if bg_freqs is not None else None
     fg_list = _freqs_dict_to_list(fg_freqs) if fg_freqs is not None else None
 
@@ -2051,12 +2234,10 @@ def _print_column_docs() -> None:
         ("PAPAcen", "1-based index of PAPA centre"),
         ("PAPAaa", "AA sequence of PAPA window"),
     ]
-    print("############################ Description of output columns "
-          "############################")
+    print("############################ Description of output columns ############################")
     for col, desc in docs:
         print(f"## {col}: {desc}")
-    print("##########################################################"
-          "#########################")
+    print("###################################################################################")
 
 
 def score_all_fastas(
@@ -2090,9 +2271,15 @@ def score_all_fastas(
     print(_SUMMARY_HEADER)
 
     model = _PLAACModel(
-        fg=fg, bg=bg, llr=llr, hmm1=hmm1, hmm0=hmm0,
-        alpha=cfg.alpha, core_length=cfg.core_length,
-        window_fi=cfg.window_fi, window_papa=cfg.window_papa,
+        fg=fg,
+        bg=bg,
+        llr=llr,
+        hmm1=hmm1,
+        hmm0=hmm0,
+        alpha=cfg.alpha,
+        core_length=cfg.core_length,
+        window_fi=cfg.window_fi,
+        window_papa=cfg.window_papa,
         adjust_prolines=cfg.adjust_prolines,
     )
 
@@ -2109,17 +2296,21 @@ def score_all_fastas(
         mw_disp = r.mw_score if r.mw_score else "NaN"
         w(f"{rec.name}\t{mw_disp}\t{r.mw_start}\t{r.mw_end}\t{r.mw_length}\t")
         w(f"{r.llr:.3f}\t{r.llr_start}\t{r.llr_end}\t{r.llr_length}\t{r.nllr:.3f}\t")
-        w(f"{r.viterbi_max_run}\t{r.core_score:.3f}\t"
-          f"{r.core_start}\t{r.core_end}\t{r.core_length}\t"
-          f"{r.prd_score:.3f}\t{r.prd_start}\t{r.prd_end}\t"
-          f"{r.prd_length}\t{r.protein_length}\t"
-          f"{r.hmm_all:.3f}\t{r.hmm_vit:.3f}\t")
+        w(
+            f"{r.viterbi_max_run}\t{r.core_score:.3f}\t"
+            f"{r.core_start}\t{r.core_end}\t{r.core_length}\t"
+            f"{r.prd_score:.3f}\t{r.prd_start}\t{r.prd_end}\t"
+            f"{r.prd_length}\t{r.protein_length}\t"
+            f"{r.hmm_all:.3f}\t{r.hmm_vit:.3f}\t"
+        )
         w(f"{r.core_seq}\t{r.prd_start_seq}\t{r.prd_end_seq}\t{r.prd_seq}")
-        w(f"\t{r.fi_num_disordered}\t{r.fi_mean_hydro:.3f}\t"
-          f"{r.fi_mean_charge:.3f}\t{r.fi_mean_combo:.3f}\t{r.fi_max_run}\t"
-          f"{r.papa_combo:.3f}\t{r.papa_prop:.3f}\t"
-          f"{r.papa_fi:.3f}\t{r.papa_llr:.3f}\t{r.papa_llr2:.3f}\t"
-          f"{r.papa_center}\t{r.papa_seq}")
+        w(
+            f"\t{r.fi_num_disordered}\t{r.fi_mean_hydro:.3f}\t"
+            f"{r.fi_mean_charge:.3f}\t{r.fi_mean_combo:.3f}\t{r.fi_max_run}\t"
+            f"{r.papa_combo:.3f}\t{r.papa_prop:.3f}\t"
+            f"{r.papa_fi:.3f}\t{r.papa_llr:.3f}\t{r.papa_llr2:.3f}\t"
+            f"{r.papa_center}\t{r.papa_seq}"
+        )
         print()
 
 
@@ -2153,8 +2344,7 @@ def plot_some_fastas(
     ww_llr = cfg.window_papa
 
     # Header
-    hdr = ("ORDER\tSEQid\tAANUM\tAA\tVIT\tMAP\tCHARGE\tHYDRO\tFI\t"
-           "PLAAC\tPAPA\tFIx2\tPLAACx2\tPAPAx2")
+    hdr = "ORDER\tSEQid\tAANUM\tAA\tVIT\tMAP\tCHARGE\tHYDRO\tFI\tPLAAC\tPAPA\tFIx2\tPLAACx2\tPAPAx2"
     for i in range(hmm1.num_classes):
         hdr += f"\tHMM.{hmm1.class_names[i]}"
     print(hdr)
@@ -2177,17 +2367,24 @@ def plot_some_fastas(
 
         hmm1.decode(aa)
         dr = compute_disorder(
-            aa, cfg.window_fi, cfg.window_papa, ww_llr,
-            llr, lod_papa1, adjust_prolines=cfg.adjust_prolines,
+            aa,
+            cfg.window_fi,
+            cfg.window_papa,
+            ww_llr,
+            llr,
+            lod_papa1,
+            adjust_prolines=cfg.adjust_prolines,
         )
 
         w = sys.stdout.write
         for i in range(len(aa)):
-            w(f"{gene_id}\t{nm}\t{i + 1}\t{AA_NAMES[aa[i]]}\t"
-              f"{hmm1.viterbi_path[i]}\t{hmm1.map_path[i]}\t"
-              f"{dr.charge[i]:.4f}\t{dr.hydro[i]:.4f}\t{dr.fi[i]:.8f}\t"
-              f"{dr.plaac_llr[i]:.4f}\t{dr.papa[i]:.8f}\t"
-              f"{dr.fix2[i]:.8f}\t{dr.plaacllr_x2[i]:.4f}\t{dr.papa_x2[i]:.8f}")
+            w(
+                f"{gene_id}\t{nm}\t{i + 1}\t{AA_NAMES[aa[i]]}\t"
+                f"{hmm1.viterbi_path[i]}\t{hmm1.map_path[i]}\t"
+                f"{dr.charge[i]:.4f}\t{dr.hydro[i]:.4f}\t{dr.fi[i]:.8f}\t"
+                f"{dr.plaac_llr[i]:.4f}\t{dr.papa[i]:.8f}\t"
+                f"{dr.fix2[i]:.8f}\t{dr.plaacllr_x2[i]:.4f}\t{dr.papa_x2[i]:.8f}"
+            )
             if hmm1.posterior is not None:
                 for j in range(len(hmm1.posterior)):
                     w(f"\t{hmm1.posterior[j][i]:.4f}")
@@ -2198,6 +2395,7 @@ def plot_some_fastas(
 # ═══════════════════════════════════════════════════════════════════════════════
 # CLI
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def build_parser() -> argparse.ArgumentParser:
     """
@@ -2210,10 +2408,7 @@ def build_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="plaac",
-        description=(
-            "PLAAC: Prion-Like Amino Acid Composition - identify prion-like "
-            "domains in protein sequences."
-        ),
+        description=("PLAAC: Prion-Like Amino Acid Composition - identify prion-like domains in protein sequences."),
         epilog=(
             "Example: python plaac.py -i input.fa > output.txt\n\n"
             "To make plots, use -p to specify a gene list:\n"
@@ -2224,63 +2419,93 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     parser.add_argument(
-        "-i", "--input", dest="input_file", default="",
+        "-i",
+        "--input",
+        dest="input_file",
+        default="",
         help="Input protein FASTA file (required for scoring).",
     )
     parser.add_argument(
-        "-b", "--bg-fasta", dest="bg_fasta", default="",
+        "-b",
+        "--bg-fasta",
+        dest="bg_fasta",
+        default="",
         help=(
             "Background FASTA file for computing AA frequencies. "
             "Ignored if -B is used. Defaults to input file if omitted."
         ),
     )
     parser.add_argument(
-        "-B", "--bg-freqs", dest="bg_freq_file", default="",
+        "-B",
+        "--bg-freqs",
+        dest="bg_freq_file",
+        default="",
         help="File of pre-computed background AA frequencies (one per line).",
     )
     parser.add_argument(
-        "-F", "--fg-freqs", dest="fg_freq_file", default="",
-        help=(
-            "File of prion-like foreground AA frequencies. "
-            "Defaults to S. cerevisiae 28-domain frequencies."
-        ),
+        "-F",
+        "--fg-freqs",
+        dest="fg_freq_file",
+        default="",
+        help=("File of prion-like foreground AA frequencies. Defaults to S. cerevisiae 28-domain frequencies."),
     )
     parser.add_argument(
-        "-c", "--core-length", type=int, default=60,
+        "-c",
+        "--core-length",
+        type=int,
+        default=60,
         help="Minimal contiguous prion-like domain length for HMM. Default: 60.",
     )
     parser.add_argument(
-        "-a", "--alpha", type=float, default=1.0,
+        "-a",
+        "--alpha",
+        type=float,
+        default=1.0,
         help=(
             "Mixing weight for S. cerevisiae vs. input background frequencies "
             "(0 = input only, 1 = S.cer only). Default: 1.0."
         ),
     )
     parser.add_argument(
-        "-w", "--window-fi", type=int, default=41,
+        "-w",
+        "--window-fi",
+        type=int,
+        default=41,
         help="Window size for FoldIndex disorder predictions. Default: 41.",
     )
     parser.add_argument(
-        "-W", "--window-papa", type=int, default=41,
+        "-W",
+        "--window-papa",
+        type=int,
+        default=41,
         help="Window size for PAPA algorithm. Default: 41.",
     )
     parser.add_argument(
-        "-p", "--plot-list", dest="plot_list", default="",
-        help=(
-            "File listing sequence names to plot (one per line), "
-            "or 'all' to plot everything."
-        ),
+        "-p",
+        "--plot-list",
+        dest="plot_list",
+        default="",
+        help=("File listing sequence names to plot (one per line), or 'all' to plot everything."),
     )
     parser.add_argument(
-        "-H", "--hmm-dot", dest="hmm_dot_file", default="",
+        "-H",
+        "--hmm-dot",
+        dest="hmm_dot_file",
+        default="",
         help="Write HMM structure in Graphviz DOT format to this file.",
     )
     parser.add_argument(
-        "-d", "--print-headers", action="store_true", default=False,
+        "-d",
+        "--print-headers",
+        action="store_true",
+        default=False,
         help="Print column documentation at the top of the output.",
     )
     parser.add_argument(
-        "-s", "--skip-parameters", action="store_true", default=False,
+        "-s",
+        "--skip-parameters",
+        action="store_true",
+        default=False,
         help="Skip printing run-time parameters at the top of the output.",
     )
 
@@ -2322,6 +2547,7 @@ def parse_args(argv: Optional[List[str]] = None) -> PLAACConfig:
 # ═══════════════════════════════════════════════════════════════════════════════
 # Main entry point
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 def run(cfg: PLAACConfig) -> None:
     """
@@ -2379,9 +2605,7 @@ def run(cfg: PLAACConfig) -> None:
     bg_this = _normalize(bg_raw)
 
     # Weighted mixture: alpha * S.cer + (1-alpha) * input
-    bg_combo = _normalize(
-        [alpha * bg_scer[i] + (1 - alpha) * bg_this[i] for i in range(22)]
-    )
+    bg_combo = _normalize([alpha * bg_scer[i] + (1 - alpha) * bg_this[i] for i in range(22)])
 
     # Small epsilon for X and * slots so the HMM never sees -inf
     eps = 1e-5
@@ -2397,10 +2621,7 @@ def run(cfg: PLAACConfig) -> None:
 
     # -- Print run-time parameters --
     if not cfg.skip_parameters:
-        print(
-            "############################ parameters at run-time "
-            "####################################"
-        )
+        print("############################ parameters at run-time ####################################")
         print(
             f"## alpha={alpha}; core_length={cfg.core_length}; "
             f"window_fi={cfg.window_fi}; window_papa={cfg.window_papa}; "
@@ -2412,10 +2633,7 @@ def run(cfg: PLAACConfig) -> None:
         print(f"## bg_used: {{{format_aa_params(bg)}}}")
         print(f"## plaac_llr: {{{format_aa_params(llr)}}}")
         print(f"## papa_lods: {{{format_aa_params(AA.lod_papa1)}}}")
-        print(
-            "###############################################################"
-            "########################"
-        )
+        print("#######################################################################################")
 
     # -- Build HMMs --
     hmm1 = build_prion_hmm(fg, bg)

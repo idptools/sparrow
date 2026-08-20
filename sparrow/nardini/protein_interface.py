@@ -184,9 +184,7 @@ class ProteinNardini:
         return resolve_background(background)
 
     @staticmethod
-    def _cache_key(
-        background, num_scrambles, seed, typeset, blob_size, min_fraction, backend
-    ):
+    def _cache_key(background, num_scrambles, seed, typeset, blob_size, min_fraction, backend):
         """The memoization key for one set of options.
 
         Shared with :func:`sparrow.nardini.batch.nardini_proteins`, which computes
@@ -221,9 +219,7 @@ class ProteinNardini:
         """
         self.__cache[self._cache_key(**options)] = result
 
-    def _patterning_result(
-        self, num_scrambles, seed, typeset, blob_size, min_fraction, backend
-    ):
+    def _patterning_result(self, num_scrambles, seed, typeset, blob_size, min_fraction, backend):
         """A result whose patterning block matches these options, at any background.
 
         The patterning half is z-scored against scrambles of the sequence itself and
@@ -242,9 +238,7 @@ class ProteinNardini:
             if key[1:] == wanted:
                 return cached
 
-        return self._result(
-            None, num_scrambles, seed, typeset, blob_size, min_fraction, backend
-        )
+        return self._result(None, num_scrambles, seed, typeset, blob_size, min_fraction, backend)
 
     def _result(
         self,
@@ -259,9 +253,7 @@ class ProteinNardini:
         """Compute (and cache) the underlying NardiniResult for one option set."""
         from sparrow.nardini.vectors import nardini_vectors
 
-        key = self._cache_key(
-            background, num_scrambles, seed, typeset, blob_size, min_fraction, backend
-        )
+        key = self._cache_key(background, num_scrambles, seed, typeset, blob_size, min_fraction, backend)
         if key not in self.__cache:
             self.__cache[key] = nardini_vectors(
                 {"sequence": self.__protein.sequence},
@@ -330,9 +322,7 @@ class ProteinNardini:
         >>> v.to_numpy().shape                         # doctest: +SKIP
         (90,)
         """
-        result = self._result(
-            background, num_scrambles, seed, typeset, blob_size, min_fraction, backend
-        )
+        result = self._result(background, num_scrambles, seed, typeset, blob_size, min_fraction, backend)
         vector = result.vector(0, raw=raw)
         vector.label = "sequence"
         return vector
@@ -373,13 +363,9 @@ class ProteinNardini:
         """
         from sparrow.nardini.table import FeatureVector
 
-        result = self._patterning_result(
-            num_scrambles, seed, typeset, blob_size, min_fraction, backend
-        )
+        result = self._patterning_result(num_scrambles, seed, typeset, blob_size, min_fraction, backend)
         values = result.raw_patterning[0] if raw else result.patterning_zscores[0]
-        return FeatureVector(
-            values, result.patterning_feature_names, label="patterning"
-        )
+        return FeatureVector(values, result.patterning_feature_names, label="patterning")
 
     def composition(self, background=DEFAULT_REFERENCE, raw=False):
         """Return only the compositional half of the NARDINI+ vector.
@@ -417,14 +403,10 @@ class ProteinNardini:
         raw_array = [values[name] for name in COMPOSITION_FEATURE_NAMES]
 
         if raw or background is None:
-            return FeatureVector(
-                raw_array, COMPOSITION_FEATURE_NAMES, label="composition (raw)"
-            )
+            return FeatureVector(raw_array, COMPOSITION_FEATURE_NAMES, label="composition (raw)")
 
         resolved = self._resolve_background(background)
-        return FeatureVector(
-            resolved.zscores(values), COMPOSITION_FEATURE_NAMES, label="composition"
-        )
+        return FeatureVector(resolved.zscores(values), COMPOSITION_FEATURE_NAMES, label="composition")
 
     # .................................................................
     #
@@ -553,36 +535,24 @@ class ProteinNardini:
             f"  distance to centroid   {record['distance']:.2f}",
             f"  gap to runner-up       {record['separation']:.2f}",
             f"  saturated features     {record['n_saturated']} of 90",
-            f"  composition RMS z      {record['composition_rms_z']:.2f}"
-            f"   (~1 = typical of the reference IDRome)",
+            f"  composition RMS z      {record['composition_rms_z']:.2f}   (~1 = typical of the reference IDRome)",
         ]
 
         if record["is_typical"]:
-            lines.append(
-                "  -> composition is consistent with the reference IDRome; the"
-            )
+            lines.append("  -> composition is consistent with the reference IDRome; the")
             lines.append("     label is usable.")
         else:
             reasons = []
             if record["composition_rms_z"] > TYPICAL_COMPOSITION_RMS_Z:
                 reasons.append(
-                    f"composition RMS z of {record['composition_rms_z']:.1f} is far "
-                    "from the reference IDRome"
+                    f"composition RMS z of {record['composition_rms_z']:.1f} is far from the reference IDRome"
                 )
             if record["n_saturated"] > TYPICAL_MAX_SATURATED:
-                reasons.append(
-                    f"{record['n_saturated']} features pinned at the +/-3 clip"
-                )
+                reasons.append(f"{record['n_saturated']} features pinned at the +/-3 clip")
             lines.append("  -> CAUTION: " + "; ".join(reasons) + ".")
-            lines.append(
-                "     This sequence sits outside the region the human GIN clusters"
-            )
-            lines.append(
-                "     describe, so the label is an extrapolation. The patterning"
-            )
-            lines.append(
-                "     half of the vector is unaffected and remains meaningful."
-            )
+            lines.append("     This sequence sits outside the region the human GIN clusters")
+            lines.append("     describe, so the label is an extrapolation. The patterning")
+            lines.append("     half of the vector is unaffected and remains meaningful.")
 
         alternatives = assignment.ranked_clusters(0, n=n_alternatives + 1)[1:]
         if alternatives:

@@ -173,9 +173,7 @@ class NardiniBackground:
             If the input width does not match the background.
         """
         if isinstance(values, Mapping):
-            values = np.asarray(
-                [values[name] for name in self.feature_names], dtype=np.float64
-            )
+            values = np.asarray([values[name] for name in self.feature_names], dtype=np.float64)
         else:
             values = np.asarray(values, dtype=np.float64)
 
@@ -209,8 +207,7 @@ class NardiniBackground:
         from collections import OrderedDict
 
         return OrderedDict(
-            (name, {"mean": float(m), "std": float(s)})
-            for name, m, s in zip(self.feature_names, self.mean, self.std)
+            (name, {"mean": float(m), "std": float(s)}) for name, m, s in zip(self.feature_names, self.mean, self.std)
         )
 
     # .................................................................
@@ -238,9 +235,7 @@ class NardiniBackground:
             "feature_names": np.asarray(self.feature_names, dtype=f"<U{max_name_len}"),
             "mean": self.mean,
             "std": self.std,
-            "num_sequences": np.asarray(
-                -1 if self.num_sequences is None else self.num_sequences
-            ),
+            "num_sequences": np.asarray(-1 if self.num_sequences is None else self.num_sequences),
             "format_version": np.asarray(_FORMAT_VERSION),
             # JSON keeps the metadata readable and avoids pickled objects, so the
             # archive can be loaded with allow_pickle=False
@@ -388,10 +383,7 @@ def _iter_named_sequences(source, **read_fasta_kwargs):
             return value.sequence
         if isinstance(value, str):
             return value.upper()
-        raise SparrowException(
-            "Sequences must be strings or sparrow.Protein objects, got "
-            f"{type(value).__name__}"
-        )
+        raise SparrowException(f"Sequences must be strings or sparrow.Protein objects, got {type(value).__name__}")
 
     # os.PathLike covers pathlib.Path, which is otherwise iterable-ish enough to
     # fall through to the positional-names branch and fail confusingly
@@ -589,9 +581,7 @@ def build_background(
             continue
 
         values = composition_values(sequence, validate=False)
-        row = np.asarray(
-            [values[name] for name in COMPOSITION_FEATURE_NAMES], dtype=np.float64
-        )
+        row = np.asarray([values[name] for name in COMPOSITION_FEATURE_NAMES], dtype=np.float64)
 
         # Welford's online update keeps memory flat over a whole IDRome
         count += 1

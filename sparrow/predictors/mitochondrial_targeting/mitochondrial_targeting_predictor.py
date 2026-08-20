@@ -19,10 +19,7 @@ _MTS_WINDOW = 168
 class MitochondrialTargetingPredictor(BaseNetworkPredictor):
     """Loads a network so :meth:`predict_mitochondrial_targeting` can classify MTSs."""
 
-    NETWORK_PATH = (
-        "networks/mitochondrial_targeting/"
-        "mitochondrial_targeting_predictor_network_v{version}.pt"
-    )
+    NETWORK_PATH = "networks/mitochondrial_targeting/mitochondrial_targeting_predictor_network_v{version}.pt"
     DEFAULT_VERSION = DEFAULT_VERSION
     ARCHITECTURE = "MtM"
 

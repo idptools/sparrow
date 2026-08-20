@@ -8,9 +8,7 @@ from sparrow.sequence_analysis import physical_properties as pp
 
 
 def test_single_residue_weight_is_free_amino_acid():
-    assert pp.calculate_molecular_weight("G") == pytest.approx(
-        amino_acids.AA_MOLECULAR_WEIGHT["G"]
-    )
+    assert pp.calculate_molecular_weight("G") == pytest.approx(amino_acids.AA_MOLECULAR_WEIGHT["G"])
 
 
 def test_dipeptide_loses_one_water():
@@ -26,6 +24,4 @@ def test_tripeptide_loses_two_waters():
 
 def test_protein_molecular_weight_property_matches_function():
     seq = "MEEEKKKKSSSTTTDDD"
-    assert Protein(seq).molecular_weight == pytest.approx(
-        pp.calculate_molecular_weight(seq)
-    )
+    assert Protein(seq).molecular_weight == pytest.approx(pp.calculate_molecular_weight(seq))

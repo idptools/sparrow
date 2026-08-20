@@ -31,7 +31,7 @@ from __future__ import annotations
 import functools
 import json
 from pathlib import Path
-from typing import Iterator, Optional, Union
+from typing import Iterator, Optional
 
 __all__ = ["available", "load", "AAindexDataset"]
 
@@ -100,9 +100,7 @@ class AAindexDataset:
 
     def __init__(self, name: str) -> None:
         if name not in _DATASETS:
-            raise ValueError(
-                f"Unknown dataset {name!r}; choose from {available()}."
-            )
+            raise ValueError(f"Unknown dataset {name!r}; choose from {available()}.")
         self.name = name
         self.is_pairwise = name in ("aaindex2", "aaindex3")
         self._data = _load_json(_DATASETS[name])
@@ -116,9 +114,7 @@ class AAindexDataset:
         return iter(self._data)
 
     def __contains__(self, accession: object) -> bool:
-        return self._resolve(accession) is not None if isinstance(
-            accession, str
-        ) else False
+        return self._resolve(accession) is not None if isinstance(accession, str) else False
 
     def __getitem__(self, accession: str) -> Entry:
         return self._data[self._require(accession)]
@@ -144,8 +140,7 @@ class AAindexDataset:
         resolved = self._resolve(accession)
         if resolved is None:
             raise KeyError(
-                f"{accession!r} is not in {self.name}. Use "
-                f"{self.name}_dataset.accessions() to list valid keys."
+                f"{accession!r} is not in {self.name}. Use {self.name}_dataset.accessions() to list valid keys."
             )
         return resolved
 
@@ -174,18 +169,11 @@ class AAindexDataset:
         list of (str, str)
             Sorted ``(accession, description)`` tuples.
         """
-        rows = [
-            (acc, str(self._data[acc].get("description", "")))
-            for acc in sorted(self._data)
-        ]
+        rows = [(acc, str(self._data[acc].get("description", ""))) for acc in sorted(self._data)]
         if search is None:
             return rows
         needle = search.lower()
-        return [
-            (acc, desc)
-            for acc, desc in rows
-            if needle in acc.lower() or needle in desc.lower()
-        ]
+        return [(acc, desc) for acc, desc in rows if needle in acc.lower() or needle in desc.lower()]
 
     def metadata(self, accession: str) -> dict[str, str]:
         """Return descriptive metadata for one entry.

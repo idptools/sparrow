@@ -251,9 +251,7 @@ def compute_lost_elms(target_protein, query: Union[Tuple[int, str], str]) -> Set
         position, mutation = query
 
     mutant_protein = sparrow.Protein(
-        target_protein.sequence[:position]
-        + mutation
-        + target_protein.sequence[position + 1 :]
+        target_protein.sequence[:position] + mutation + target_protein.sequence[position + 1 :]
     )
 
     wt_elms = target_protein.elms
@@ -291,9 +289,7 @@ def compute_gained_elms(target_protein, query: Union[Tuple[int, str], str]) -> S
         position, mutation = query
 
     mutant_protein = sparrow.Protein(
-        target_protein.sequence[:position]
-        + mutation
-        + target_protein.sequence[position + 1 :]
+        target_protein.sequence[:position] + mutation + target_protein.sequence[position + 1 :]
     )
 
     wt_elms = target_protein.elms
@@ -330,9 +326,7 @@ def compute_retained_elms(target_protein, query: Union[Tuple[int, str], str]) ->
         position, mutation = query
 
     mutant_protein = sparrow.Protein(
-        target_protein.sequence[:position]
-        + mutation
-        + target_protein.sequence[position + 1 :]
+        target_protein.sequence[:position] + mutation + target_protein.sequence[position + 1 :]
     )
 
     wt_elms = target_protein.elms

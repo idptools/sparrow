@@ -1,5 +1,6 @@
 from sparrow.sparrow_exceptions import SparrowException
 
+
 def validate_keyword_option(keyword, allowed_vals, keyword_name, error_message=None):
     """
     Helper function that checks a passed keyword is only one of a set of possible
@@ -39,8 +40,8 @@ def validate_keyword_option(keyword, allowed_vals, keyword_name, error_message=N
     if keyword not in allowed_vals:
         if error_message is None:
             error_message = (
-                f'Keyword {keyword_name} passed value [{keyword}], but this is not valid.'
-                f'\nMust be one of: {str(allowed_vals)}'
+                f"Keyword {keyword_name} passed value [{keyword}], but this is not valid."
+                f"\nMust be one of: {str(allowed_vals)}"
             )
 
         raise SparrowException(error_message)

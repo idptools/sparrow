@@ -31,9 +31,7 @@ def test_feature_vector_deterministic_with_seed():
 
 
 def test_feature_names_match_vector_length():
-    vec, names = grammar.compute_feature_vector(
-        SEQ, num_scrambles=64, seed=1, return_feature_names=True
-    )
+    vec, names = grammar.compute_feature_vector(SEQ, num_scrambles=64, seed=1, return_feature_names=True)
     assert len(names) == len(vec)
     assert all(isinstance(n, str) for n in names)
 
@@ -53,7 +51,5 @@ def test_protein_extract_feature_vector_matches_function():
 
 def test_include_raw_adds_features():
     base = grammar.compute_feature_vector(SEQ, num_scrambles=64, seed=1)
-    with_raw = grammar.compute_feature_vector(
-        SEQ, num_scrambles=64, seed=1, include_raw=True
-    )
+    with_raw = grammar.compute_feature_vector(SEQ, num_scrambles=64, seed=1, include_raw=True)
     assert len(with_raw) > len(base)

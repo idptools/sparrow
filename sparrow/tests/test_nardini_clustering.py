@@ -25,18 +25,12 @@ from sparrow.sparrow_exceptions import ClusteringQualityWarning, SparrowExceptio
 
 # these fixtures are small on purpose, so the "too few per cluster" advisory is
 # expected noise; the tests that care about it assert it directly
-pytestmark = pytest.mark.filterwarnings(
-    "ignore::sparrow.sparrow_exceptions.ClusteringQualityWarning"
-)
+pytestmark = pytest.mark.filterwarnings("ignore::sparrow.sparrow_exceptions.ClusteringQualityWarning")
 
 PLANTED_GRAMMARS = {
-    "DE_tract": lambda rng: (
-        "GS" + "DE" * rng.randint(30, 45) + "GSGS" * rng.randint(3, 8)
-    ),
+    "DE_tract": lambda rng: "GS" + "DE" * rng.randint(30, 45) + "GSGS" * rng.randint(3, 8),
     "polyQ": lambda rng: "GS" + "Q" * rng.randint(50, 80) + "PSPS" * rng.randint(3, 8),
-    "S_rich": lambda rng: "".join(
-        rng.choice("SSSSTGSP") for _ in range(rng.randint(120, 180))
-    ),
+    "S_rich": lambda rng: "".join(rng.choice("SSSSTGSP") for _ in range(rng.randint(120, 180))),
     "K_blocks": lambda rng: "GS" + ("K" * 12 + "GSGS") * rng.randint(4, 7),
 }
 
@@ -65,10 +59,7 @@ def diverse():
     """A compositionally bland set - no planted structure."""
     rng = random.Random(7)
     sequences = {
-        f"s{i}": "".join(
-            rng.choice("SSTTGGQQNNPPEEDDKKRRAAILVM")
-            for _ in range(rng.randint(120, 260))
-        )
+        f"s{i}": "".join(rng.choice("SSTTGGQQNNPPEEDDKKRRAAILVM") for _ in range(rng.randint(120, 260)))
         for i in range(40)
     }
     return nardini_vectors(
@@ -96,15 +87,11 @@ def test_recovers_planted_grammars(planted):
     dominant = {}
     for label in PLANTED_GRAMMARS:
         members = [
-            int(cluster)
-            for cluster, planted_label in zip(assignment.clusters, labels)
-            if planted_label == label
+            int(cluster) for cluster, planted_label in zip(assignment.clusters, labels) if planted_label == label
         ]
         counts = np.bincount(members, minlength=4)
         dominant[label] = int(np.argmax(counts))
-        assert counts.max() == len(members), (
-            f"{label} was split across clusters: {counts.tolist()}"
-        )
+        assert counts.max() == len(members), f"{label} was split across clusters: {counts.tolist()}"
 
     assert len(set(dominant.values())) == 4, f"grammars collided: {dominant}"
 
@@ -178,9 +165,7 @@ def test_bare_array_needs_feature_names(planted):
 
 def test_bare_array_works_with_feature_names(planted):
     result, _ = planted
-    reference = build_gin_reference(
-        result.zscores, k=3, seed=0, feature_names=result.feature_names
-    )
+    reference = build_gin_reference(result.zscores, k=3, seed=0, feature_names=result.feature_names)
     assert len(reference) == 3
     assert reference.feature_names == tuple(result.feature_names)
 
@@ -292,9 +277,7 @@ def test_describe_centroid_orders_by_magnitude_and_truncates():
 
 
 def test_describe_centroid_says_so_when_nothing_stands_out():
-    assert (
-        describe_centroid([0.1, -0.2], ["a-a", "Frac E"]) == "no distinctive features"
-    )
+    assert describe_centroid([0.1, -0.2], ["a-a", "Frac E"]) == "no distinctive features"
 
 
 def test_describe_centroid_validates_shape():
@@ -304,9 +287,7 @@ def test_describe_centroid_validates_shape():
 
 def test_supplied_descriptions_win(planted):
     result, _ = planted
-    reference = build_gin_reference(
-        result, k=3, seed=0, descriptions={1: "my own label"}
-    )
+    reference = build_gin_reference(result, k=3, seed=0, descriptions={1: "my own label"})
 
     assert reference.describe(1) == "my own label"
     # the others are still derived
@@ -356,12 +337,8 @@ def test_comparison_reports_both_separation_scales(planted):
 
     report = compare_gin_references(reference)
 
-    assert report["separation_scale"] == pytest.approx(
-        load_gin_reference().separation_scale
-    )
-    assert report["reference_separation_scale"] == pytest.approx(
-        reference.separation_scale
-    )
+    assert report["separation_scale"] == pytest.approx(load_gin_reference().separation_scale)
+    assert report["reference_separation_scale"] == pytest.approx(reference.separation_scale)
     # 4 of my clusters paired against 30 published ones leaves 26 unmatched
     assert report["num_pairs"] == 4
     assert report["unmatched"] == 26

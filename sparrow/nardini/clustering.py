@@ -140,8 +140,7 @@ def describe_centroid(centroid, feature_names, n=DEFAULT_DESCRIPTION_FEATURES):
 
     if centroid.ndim != 1 or centroid.size != len(names):
         raise SparrowException(
-            f"describe_centroid needs a 1D centroid matching {len(names)} feature "
-            f"names, got shape {centroid.shape}"
+            f"describe_centroid needs a 1D centroid matching {len(names)} feature names, got shape {centroid.shape}"
         )
 
     phrases = []
@@ -157,9 +156,7 @@ def describe_centroid(centroid, feature_names, n=DEFAULT_DESCRIPTION_FEATURES):
         elif name.endswith(" Patch"):
             # "Q Patch" reads better as "Q patches" / "few Q patches"
             residue = name[: -len(" Patch")]
-            phrases.append(
-                f"{residue} patches" if value > 0 else f"few {residue} patches"
-            )
+            phrases.append(f"{residue} patches" if value > 0 else f"few {residue} patches")
         else:
             phrases.append(f"{'high' if value > 0 else 'low'} {name}")
 
@@ -311,22 +308,17 @@ def build_gin_reference(
         num_sequences = vectors.shape[0]
 
     if vectors.shape[1] != len(names):
-        raise SparrowException(
-            f"Got {vectors.shape[1]} features but {len(names)} feature names."
-        )
+        raise SparrowException(f"Got {vectors.shape[1]} features but {len(names)} feature names.")
 
     k = int(k)
     if k < 2:
         raise SparrowException(f"k must be at least 2, got {k}")
     if k > vectors.shape[0]:
         raise SparrowException(
-            f"Cannot fit {k} clusters to {vectors.shape[0]} sequences. Use a "
-            "smaller k, or cluster more sequences."
+            f"Cannot fit {k} clusters to {vectors.shape[0]} sequences. Use a smaller k, or cluster more sequences."
         )
     if not np.all(np.isfinite(vectors)):
-        raise SparrowException(
-            "The vectors contain non-finite values, which k-means cannot handle."
-        )
+        raise SparrowException("The vectors contain non-finite values, which k-means cannot handle.")
 
     # clip exactly as assignment does, so centroids and queries share a space
     clustered = vectors if clip is None else np.clip(vectors, -abs(clip), abs(clip))
@@ -358,9 +350,7 @@ def build_gin_reference(
     resolved_descriptions = {}
     for cluster in range(k):
         given = (descriptions or {}).get(cluster)
-        resolved_descriptions[cluster] = given or describe_centroid(
-            centroids[cluster], names
-        )
+        resolved_descriptions[cluster] = given or describe_centroid(centroids[cluster], names)
 
     metadata = {
         "derived_from": "build_gin_reference",
@@ -483,9 +473,7 @@ def compare_gin_references(reference, other=None, clip=GIN_CLIP):
                 "matched_cluster": int(other.clusters[column]),
                 "matched_description": other.describe(int(other.clusters[column])),
                 "distance": float(distances[row, column]),
-                "num_idrs": int(
-                    reference.num_idrs.get(int(reference.clusters[row]), 0)
-                ),
+                "num_idrs": int(reference.num_idrs.get(int(reference.clusters[row]), 0)),
             }
         )
 

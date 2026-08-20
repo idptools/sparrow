@@ -64,9 +64,7 @@ def _mask_from(sequence, residues):
 @pytest.fixture(scope="module")
 def golden():
     """400 cases scored by the Cython extensions before they were removed."""
-    data = np.load(
-        reference_data_path("cython_patterning_golden_v1.npz"), allow_pickle=False
-    )
+    data = np.load(reference_data_path("cython_patterning_golden_v1.npz"), allow_pickle=False)
     return {key: data[key] for key in data.files}
 
 
@@ -96,49 +94,42 @@ def test_kappa_x_matches_cython_golden(golden):
         for key, flatten in (("kappa_x_flat", 1), ("kappa_x_noflat", 0)):
             expected = float(golden[key][index])
             got = vec.kappa_x(
-                case["sequence"], case["group1"], case["group2"],
-                case["window_size"], flatten,
+                case["sequence"],
+                case["group1"],
+                case["group2"],
+                case["window_size"],
+                flatten,
             )
             if expected == -1:
                 assert got == -1
             else:
-                assert got == pytest.approx(
-                    expected, rel=KAPPA_TOLERANCE, abs=1e-9
-                ), f"case {index}"
+                assert got == pytest.approx(expected, rel=KAPPA_TOLERANCE, abs=1e-9), f"case {index}"
 
 
 def test_calculate_sigma_matches_cython_golden(golden):
     for index in range(len(golden["sequence"])):
         case = _case(golden, index)
-        got = vec.calculate_sigma(
-            case["sequence"], case["group1"], case["group2"] or ["K"]
-        )
-        assert got == pytest.approx(
-            float(golden["sigma"][index]), rel=DOUBLE_TOLERANCE, abs=1e-15
-        ), f"case {index}"
+        got = vec.calculate_sigma(case["sequence"], case["group1"], case["group2"] or ["K"])
+        assert got == pytest.approx(float(golden["sigma"][index]), rel=DOUBLE_TOLERANCE, abs=1e-15), f"case {index}"
 
 
 def test_calculate_delta_matches_cython_golden(golden):
     for index in range(len(golden["sequence"])):
         case = _case(golden, index)
         got = vec.calculate_delta(
-            case["sequence"], case["group1"], case["group2"] or ["K"],
+            case["sequence"],
+            case["group1"],
+            case["group2"] or ["K"],
             case["window_size"],
         )
-        assert got == pytest.approx(
-            float(golden["delta"][index]), rel=DOUBLE_TOLERANCE, abs=1e-15
-        ), f"case {index}"
+        assert got == pytest.approx(float(golden["delta"][index]), rel=DOUBLE_TOLERANCE, abs=1e-15), f"case {index}"
 
 
 def test_iwd_matches_cython_golden(golden):
     for index in range(len(golden["sequence"])):
         case = _case(golden, index)
-        got = vec.calculate_average_inverse_distance_from_sequence(
-            case["sequence"], case["targets"]
-        )
-        assert got == pytest.approx(
-            float(golden["iwd"][index]), rel=DOUBLE_TOLERANCE, abs=1e-14
-        ), f"case {index}"
+        got = vec.calculate_average_inverse_distance_from_sequence(case["sequence"], case["targets"])
+        assert got == pytest.approx(float(golden["iwd"][index]), rel=DOUBLE_TOLERANCE, abs=1e-14), f"case {index}"
 
 
 def test_iwd_charge_matches_cython_golden(golden):
@@ -149,19 +140,15 @@ def test_iwd_charge_matches_cython_golden(golden):
             dtype=np.float64,
         )
         for charge, key in (("-", "iwd_charge_neg"), ("+", "iwd_charge_pos")):
-            got = vec.calculate_average_inverse_distance_charge(
-                ncpr, case["sequence"], charge
+            got = vec.calculate_average_inverse_distance_charge(ncpr, case["sequence"], charge)
+            assert got == pytest.approx(float(golden[key][index]), rel=DOUBLE_TOLERANCE, abs=1e-14), (
+                f"case {index} charge {charge}"
             )
-            assert got == pytest.approx(
-                float(golden[key][index]), rel=DOUBLE_TOLERANCE, abs=1e-14
-            ), f"case {index} charge {charge}"
 
-        got = vec.calculate_average_bivariate_inverse_distance_charge(
-            ncpr, case["sequence"]
+        got = vec.calculate_average_bivariate_inverse_distance_charge(ncpr, case["sequence"])
+        assert got == pytest.approx(float(golden["iwd_bivariate"][index]), rel=DOUBLE_TOLERANCE, abs=1e-14), (
+            f"case {index}"
         )
-        assert got == pytest.approx(
-            float(golden["iwd_bivariate"][index]), rel=DOUBLE_TOLERANCE, abs=1e-14
-        ), f"case {index}"
 
 
 def test_scd_shd_match_cython_golden(golden):
@@ -172,15 +159,13 @@ def test_scd_shd_match_cython_golden(golden):
             float(golden["scd"][index]), rel=1e-11, abs=1e-11
         ), f"case {index}"
 
-        assert vec.compute_scd_x(
-            case["sequence"], case["scd_group1"], case["scd_group2"]
-        ) == pytest.approx(
+        assert vec.compute_scd_x(case["sequence"], case["scd_group1"], case["scd_group2"]) == pytest.approx(
             float(golden["scd_custom"][index]), rel=1e-11, abs=1e-11
         ), f"case {index}"
 
-        assert vec.compute_shd(case["sequence"]) == pytest.approx(
-            float(golden["shd"][index]), rel=1e-11, abs=1e-11
-        ), f"case {index}"
+        assert vec.compute_shd(case["sequence"]) == pytest.approx(float(golden["shd"][index]), rel=1e-11, abs=1e-11), (
+            f"case {index}"
+        )
 
 
 def test_patterning_percentile_statistic_matches_cython_golden(golden):
@@ -192,12 +177,17 @@ def test_patterning_percentile_statistic_matches_cython_golden(golden):
     for index in range(len(golden["sequence"])):
         case = _case(golden, index)
         _, observed, _ = vec.patterning_percentile(
-            case["sequence"], case["targets"], case["window_size"], 1, 1,
+            case["sequence"],
+            case["targets"],
+            case["window_size"],
+            1,
+            1,
             return_distribution=True,
         )
         assert observed == pytest.approx(
             float(golden["percentile_observed"][index]),
-            rel=KAPPA_TOLERANCE, abs=1e-9,
+            rel=KAPPA_TOLERANCE,
+            abs=1e-9,
         ), f"case {index}"
 
 
@@ -218,11 +208,7 @@ def test_numpy_kappa_is_more_accurate_than_cython(golden):
         n_b = int((ternary == -1).sum())
         frac_a, frac_b = f32(n_a / winged_length), f32(n_b / winged_length)
         sigma = (
-            f32(0.0)
-            if (n_a + n_b) == 0
-            else f32(
-                f32(frac_a - frac_b) * f32(frac_a - frac_b) / f32(frac_a + frac_b)
-            )
+            f32(0.0) if (n_a + n_b) == 0 else f32(f32(frac_a - frac_b) * f32(frac_a - frac_b) / f32(frac_a + frac_b))
         )
 
         def delta(arr):
@@ -251,16 +237,27 @@ def test_numpy_kappa_is_more_accurate_than_cython(golden):
             continue
 
         float64_errors.append(
-            abs(expected - vec.kappa_x(
-                case["sequence"], case["group1"], case["group2"],
-                case["window_size"], 0,
-            ))
+            abs(
+                expected
+                - vec.kappa_x(
+                    case["sequence"],
+                    case["group1"],
+                    case["group2"],
+                    case["window_size"],
+                    0,
+                )
+            )
         )
         float32_errors.append(
-            abs(expected - float32_replica(
-                case["sequence"], case["group1"], case["group2"],
-                case["window_size"],
-            ))
+            abs(
+                expected
+                - float32_replica(
+                    case["sequence"],
+                    case["group1"],
+                    case["group2"],
+                    case["window_size"],
+                )
+            )
         )
 
     assert len(float64_errors) > 40
@@ -344,17 +341,13 @@ def test_kappa_batch_matches_per_sequence():
         group1, group2 = rng.choice(GROUP_PAIRS)
         window = rng.choice([3, 5, 6])
 
-        expected = np.array(
-            [vec.kappa_x(s, list(group1), list(group2), window, 1) for s in scrambles]
-        )
+        expected = np.array([vec.kappa_x(s, list(group1), list(group2), window, 1) for s in scrambles])
         got = vec.kappa_x_batch(scrambles, list(group1), list(group2), window, 1)
 
         assert np.array_equal(expected == -1, got == -1)
         defined = expected != -1
         if defined.any():
-            assert np.allclose(
-                expected[defined], got[defined], rtol=KAPPA_TOLERANCE, atol=1e-9
-            )
+            assert np.allclose(expected[defined], got[defined], rtol=KAPPA_TOLERANCE, atol=1e-9)
 
 
 def test_kappa_batch_agrees_with_single_call():
@@ -363,9 +356,7 @@ def test_kappa_batch_agrees_with_single_call():
     sequences = [_random_sequence(rng, 60) for _ in range(20)]
 
     batch = vec.kappa_x_batch(sequences, ["E", "D"], ["K", "R"], 5, 1)
-    single = np.array(
-        [vec.kappa_x(s, ["E", "D"], ["K", "R"], 5, 1) for s in sequences]
-    )
+    single = np.array([vec.kappa_x(s, ["E", "D"], ["K", "R"], 5, 1) for s in sequences])
     assert np.allclose(batch, single, rtol=1e-14, atol=1e-15)
 
 
@@ -392,9 +383,6 @@ def test_kappa_batch_rejects_ragged_input():
 # =====================================================================
 
 
-
-
-
 # =====================================================================
 # IWD -- edge cases and batch path
 # =====================================================================
@@ -416,12 +404,8 @@ def test_iwd_empty_sequence():
 
 
 def test_iwd_clustered_exceeds_dispersed():
-    clustered = vec.calculate_average_inverse_distance_from_sequence(
-        "AAAAAQQQQQ", ["Q"]
-    )
-    dispersed = vec.calculate_average_inverse_distance_from_sequence(
-        "AQAQAQAQAQ", ["Q"]
-    )
+    clustered = vec.calculate_average_inverse_distance_from_sequence("AAAAAQQQQQ", ["Q"])
+    dispersed = vec.calculate_average_inverse_distance_from_sequence("AQAQAQAQAQ", ["Q"])
     assert clustered > dispersed
 
 
@@ -433,12 +417,7 @@ def test_iwd_batch_matches_per_sequence():
         scrambles = ["".join(rng.sample(base, length)) for _ in range(48)]
         targets = rng.sample(list(AMINO_ACIDS), rng.randint(1, 6))
 
-        expected = np.array(
-            [
-                vec.calculate_average_inverse_distance_from_sequence(s, targets)
-                for s in scrambles
-            ]
-        )
+        expected = np.array([vec.calculate_average_inverse_distance_from_sequence(s, targets) for s in scrambles])
         masks = np.stack([_mask_from(s, targets) for s in scrambles])
         got = vec.iwd_batch(masks)
 
@@ -453,12 +432,7 @@ def test_iwd_batch_dense_masks():
     scrambles = ["".join(rng.sample(base, length)) for _ in range(16)]
     targets = list("ACDEFGHIKL")  # ~50% occupancy
 
-    expected = np.array(
-        [
-            vec.calculate_average_inverse_distance_from_sequence(s, targets)
-            for s in scrambles
-        ]
-    )
+    expected = np.array([vec.calculate_average_inverse_distance_from_sequence(s, targets) for s in scrambles])
     got = vec.iwd_batch(np.stack([_mask_from(s, targets) for s in scrambles]))
     assert np.allclose(expected, got, rtol=DOUBLE_TOLERANCE, atol=1e-14)
 
@@ -504,9 +478,6 @@ def test_ternarize_binary_mode():
 # =====================================================================
 
 
-
-
-
 def test_patterning_percentile_ranks_blocky_above_mixed():
     blocky = vec.patterning_percentile("Q" * 20 + "A" * 20, ["Q"], 5, 1000, 1)
     mixed = vec.patterning_percentile("QA" * 20, ["Q"], 5, 1000, 1)
@@ -544,9 +515,7 @@ def test_patterning_percentile_return_distribution():
     ],
 )
 def test_patterning_percentile_validation(kwargs, match):
-    call = dict(
-        sequence="MEEEKKKKSSSTTTDDD", group=["E"], window_size=5, count=10, seed=1
-    )
+    call = dict(sequence="MEEEKKKKSSSTTTDDD", group=["E"], window_size=5, count=10, seed=1)
     call.update(kwargs)
     with pytest.raises(PatterningException, match=match):
         vec.patterning_percentile(**call)
@@ -564,8 +533,6 @@ def test_binary_asymmetry():
 # =====================================================================
 # SCD / SHD
 # =====================================================================
-
-
 
 
 def test_scd_blocky_versus_mixed():
@@ -590,12 +557,8 @@ def test_shd_rejects_unknown_residue():
 def test_ternarize_batch_matches_single():
     rng = random.Random(15)
     sequences = [_random_sequence(rng, 40) for _ in range(8)]
-    codes = np.stack(
-        [np.frombuffer(s.encode("ascii"), dtype=np.uint8) for s in sequences]
-    )
+    codes = np.stack([np.frombuffer(s.encode("ascii"), dtype=np.uint8) for s in sequences])
 
     batch = vec.ternarize_winged_batch(codes, ["E", "D"], ["K", "R"], 5)
     for row, sequence in enumerate(sequences):
-        assert np.array_equal(
-            batch[row], vec.ternarize_winged(sequence, ["E", "D"], ["K", "R"], 5)
-        )
+        assert np.array_equal(batch[row], vec.ternarize_winged(sequence, ["E", "D"], ["K", "R"], 5))

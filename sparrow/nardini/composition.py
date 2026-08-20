@@ -210,17 +210,11 @@ def composition_values(sequence, validate=True):
     features["E/D Ratio"] = physical_properties.log_residue_ratio(sequence, "E", "D")
 
     # whole-sequence properties
-    features["Frac Chain Expanding"] = physical_properties.fraction_chain_expanding(
-        sequence
-    )
+    features["Frac Chain Expanding"] = physical_properties.fraction_chain_expanding(sequence)
     features["FCR"] = physical_properties.fraction_charged(sequence)
     features["NCPR"] = physical_properties.net_charge_per_residue(sequence)
-    features["Hydrophobicity"] = physical_properties.mean_residue_scale(
-        sequence, amino_acids.AA_hydro_KD
-    )
-    features["Disorder Promoting"] = physical_properties.fraction_disorder_promoting(
-        sequence
-    )
+    features["Hydrophobicity"] = physical_properties.mean_residue_scale(sequence, amino_acids.AA_hydro_KD)
+    features["Disorder Promoting"] = physical_properties.fraction_disorder_promoting(sequence)
     features["Iso point"] = physical_properties.isoelectric_point(sequence)
     features["PPII"] = physical_properties.polyproline_II_propensity(sequence)
 

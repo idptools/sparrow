@@ -1,6 +1,5 @@
 """Tests for sparrow.calculate_parameters."""
 
-
 import numpy as np
 import pytest
 
@@ -10,6 +9,7 @@ from sparrow.sparrow_exceptions import CalculationException
 
 
 # -- calculate_aa_fractions ------------------------------------------------
+
 
 def test_aa_fractions_sum_to_one():
     fr = cp.calculate_aa_fractions("ACDEFGHIKLMNPQRSTVWYAA")
@@ -29,6 +29,7 @@ def test_aa_fractions_has_twenty_keys():
 
 # -- calculate_seg_complexity ----------------------------------------------
 
+
 def test_seg_complexity_homopolymer_is_zero():
     assert cp.calculate_seg_complexity("AAAAAAAA") == pytest.approx(0.0)
 
@@ -44,6 +45,7 @@ def test_seg_complexity_increases_with_diversity():
 
 
 # -- hydrophobicity --------------------------------------------------------
+
 
 def test_linear_hydrophobicity_known_kd_values():
     # values from the shipped KD table
@@ -62,9 +64,7 @@ def test_linear_hydrophobicity_normalized_range():
 
 def test_mean_hydrophobicity_matches_mean_of_linear():
     seq = "ACDEFGHIKL"
-    assert cp.calculate_hydrophobicity(seq) == pytest.approx(
-        np.mean(cp.calculate_linear_hydrophobicity(seq))
-    )
+    assert cp.calculate_hydrophobicity(seq) == pytest.approx(np.mean(cp.calculate_linear_hydrophobicity(seq)))
 
 
 def test_hydrophobicity_invalid_residue_raises():

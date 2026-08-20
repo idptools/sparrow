@@ -30,6 +30,4 @@ class NESPredictor(BaseNetworkPredictor):
         list of float
             Per-residue probability of being in an NES.
         """
-        return outputs.per_residue_class1_probability(
-            self._raw_predict(seq), self.number_of_classes
-        )
+        return outputs.per_residue_class1_probability(self._raw_predict(seq), self.number_of_classes)

@@ -18,10 +18,9 @@ def protein():
 
 # -- scalar properties match their functional implementations --------------
 
+
 def test_molecular_weight_matches_function(protein):
-    assert protein.molecular_weight == pytest.approx(
-        physical_properties.calculate_molecular_weight(SEQ)
-    )
+    assert protein.molecular_weight == pytest.approx(physical_properties.calculate_molecular_weight(SEQ))
 
 
 def test_complexity_matches_function(protein):
@@ -29,9 +28,7 @@ def test_complexity_matches_function(protein):
 
 
 def test_ncpr_is_pos_minus_neg(protein):
-    assert protein.NCPR == pytest.approx(
-        protein.fraction_positive - protein.fraction_negative
-    )
+    assert protein.NCPR == pytest.approx(protein.fraction_positive - protein.fraction_negative)
 
 
 def test_fcr_is_sum_of_charged_fractions(protein):
@@ -44,6 +41,7 @@ def test_fraction_proline_matches_dict(protein):
 
 
 # -- kappa family ----------------------------------------------------------
+
 
 def test_kappa_in_unit_range(protein):
     assert 0.0 <= protein.kappa <= 1.0
@@ -70,6 +68,7 @@ def test_compute_kappa_x_invalid_residue_raises(protein):
 
 # -- IWD -------------------------------------------------------------------
 
+
 def test_compute_iwd_accepts_string_or_list():
     p = Protein("ILVAMILVAMGGGGILVAM")
     assert p.compute_iwd("ILVAM") == p.compute_iwd(["I", "L", "V", "A", "M"])
@@ -86,6 +85,7 @@ def test_compute_iwd_charged_weighted_signs(protein):
 
 
 # -- caching ---------------------------------------------------------------
+
 
 def test_amino_acid_fractions_cached(protein):
     assert protein.amino_acid_fractions is protein.amino_acid_fractions
@@ -104,6 +104,7 @@ def test_accessors_are_reused(protein):
 
 
 # -- validation / normalization --------------------------------------------
+
 
 def test_sequence_is_uppercased():
     assert Protein("acdef").sequence == "ACDEF"
@@ -125,6 +126,7 @@ def test_validation_unfixable_raises():
 
 
 # -- dunders ---------------------------------------------------------------
+
 
 def test_len(protein):
     assert len(protein) == len(SEQ)

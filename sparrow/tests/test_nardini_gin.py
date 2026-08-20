@@ -26,15 +26,11 @@ from sparrow.sparrow_exceptions import SparrowException
 # The synthetic fixtures here are deliberately small, so build_background warns
 # that they are weak. That warning is asserted directly in the dedicated tests
 # below (pytest.warns overrides this filter); everywhere else it is just noise.
-pytestmark = pytest.mark.filterwarnings(
-    "ignore::sparrow.sparrow_exceptions.BackgroundQualityWarning"
-)
+pytestmark = pytest.mark.filterwarnings("ignore::sparrow.sparrow_exceptions.BackgroundQualityWarning")
 
 
 # sequences designed to land in specific published clusters
-NOTEBOOK_IDR = (
-    "MENDPRVRKFASDGAQWAIKWQKKGWSTLTSRQKQTARAAMGIKLSPVAQPVQKVTRLSAPVALAYREVSTQPRVSTARD"
-)
+NOTEBOOK_IDR = "MENDPRVRKFASDGAQWAIKWQKKGWSTLTSRQKQTARAAMGIKLSPVAQPVQKVTRLSAPVALAYREVSTQPRVSTARD"
 DE_TRACT = "EEEEEEDDDDEEEEEEDDDDEEEEEEDDDDEEEEEEDDDD"
 S_PATCH = "SSSSSSSSSSGGSSSSSSSSSSGGSSSSSSSSSSGGSSSS"
 Q_TRACT = "QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ"
@@ -222,9 +218,7 @@ def test_assignment_matches_reference_implementation(gin_result):
         )
 
         assert int(assignment.clusters[index]) == int(expected_cluster)
-        assert np.allclose(
-            assignment.all_distances[index], expected_distances, rtol=1e-12
-        )
+        assert np.allclose(assignment.all_distances[index], expected_distances, rtol=1e-12)
         # separations agree unless the reference hit its 100 sentinel, which does
         # not happen for real z-vectors
         if expected_sep < 100:
@@ -309,16 +303,12 @@ def test_ranked_clusters(gin_result):
     distances = [d for _, _, d in ranked]
     assert distances == sorted(distances)
     # the best entry must agree with the assignment itself
-    assert ranked[0][0] == int(
-        assignment.clusters[list(gin_result.names).index("de_tract")]
-    )
+    assert ranked[0][0] == int(assignment.clusters[list(gin_result.names).index("de_tract")])
 
 
 def test_ranked_clusters_by_index_and_unknown_name(gin_result):
     assignment = assign_gin_clusters(gin_result)
-    assert assignment.ranked_clusters(0, n=3) == assignment.ranked_clusters(
-        gin_result.names[0], n=3
-    )
+    assert assignment.ranked_clusters(0, n=3) == assignment.ranked_clusters(gin_result.names[0], n=3)
 
     with pytest.raises(SparrowException):
         assignment.ranked_clusters("not-a-sequence")
@@ -409,9 +399,7 @@ def test_assignment_repr(gin_result):
 
 
 def test_assignment_is_deterministic_given_a_seed():
-    kwargs = dict(
-        background=load_reference_background("human"), num_scrambles=200, seed=5
-    )
+    kwargs = dict(background=load_reference_background("human"), num_scrambles=200, seed=5)
     a = nardini_vectors({"x": NOTEBOOK_IDR}, **kwargs).gin_clusters()
     b = nardini_vectors({"x": NOTEBOOK_IDR}, **kwargs).gin_clusters()
 

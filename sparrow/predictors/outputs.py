@@ -18,7 +18,7 @@ __all__ = [
 
 def softmax(v):
     """Numerically-plain softmax over a 1D array (matches legacy behaviour)."""
-    return (np.e ** v) / np.sum(np.e ** v)
+    return (np.e**v) / np.sum(np.e**v)
 
 
 def scalar_regression(raw):

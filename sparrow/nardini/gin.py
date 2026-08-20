@@ -243,12 +243,8 @@ class GINReference:
             "format_version": np.asarray(_REFERENCE_FORMAT_VERSION),
             # JSON rather than pickled dicts, so the archive loads with
             # allow_pickle=False. Integer keys become strings and are restored.
-            "descriptions_json": np.asarray(
-                json.dumps({str(k): v for k, v in self.descriptions.items()})
-            ),
-            "num_idrs_json": np.asarray(
-                json.dumps({str(k): int(v) for k, v in self.num_idrs.items()})
-            ),
+            "descriptions_json": np.asarray(json.dumps({str(k): v for k, v in self.descriptions.items()})),
+            "num_idrs_json": np.asarray(json.dumps({str(k): int(v) for k, v in self.num_idrs.items()})),
             "metadata_json": np.asarray(json.dumps(self.metadata)),
         }
 
@@ -297,14 +293,10 @@ class GINReference:
                 feature_names=[str(name) for name in data["feature_names"]],
                 clusters=data["clusters"],
                 centroids=data["centroids"],
-                descriptions={
-                    int(k): v for k, v in load_json("descriptions_json").items()
-                },
+                descriptions={int(k): v for k, v in load_json("descriptions_json").items()},
                 num_idrs={int(k): v for k, v in load_json("num_idrs_json").items()},
                 metadata=load_json("metadata_json"),
-                backend=(
-                    str(data["backend"]) if "backend" in data.files else DEFAULT_BACKEND
-                ),
+                backend=(str(data["backend"]) if "backend" in data.files else DEFAULT_BACKEND),
             )
 
     # .................................................................
@@ -546,9 +538,7 @@ class GINAssignment:
         self.all_distances = np.asarray(all_distances, dtype=np.float64)
         self.reference = reference
         self.n_saturated = (
-            np.zeros(len(self.names), dtype=int)
-            if n_saturated is None
-            else np.asarray(n_saturated, dtype=int)
+            np.zeros(len(self.names), dtype=int) if n_saturated is None else np.asarray(n_saturated, dtype=int)
         )
         self.composition_rms_z = (
             np.full(len(self.names), np.nan)
@@ -665,9 +655,7 @@ class GINAssignment:
         """
         if isinstance(name_or_index, str):
             if name_or_index not in self.names:
-                raise SparrowException(
-                    f"No sequence named '{name_or_index}' in this assignment."
-                )
+                raise SparrowException(f"No sequence named '{name_or_index}' in this assignment.")
             index = self.names.index(name_or_index)
         else:
             index = int(name_or_index)

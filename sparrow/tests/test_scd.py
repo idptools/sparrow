@@ -9,9 +9,7 @@ from . import reference_data_path
 onehundred_seqs = reference_data_path("test_seqs_100.fasta")
 
 seqs = protfasta.read_fasta(onehundred_seqs)
-shd_paper_toy_sequences = np.load(
-    reference_data_path("shd_paper_toy_sequences.npy"), allow_pickle=True
-).item()
+shd_paper_toy_sequences = np.load(reference_data_path("shd_paper_toy_sequences.npy"), allow_pickle=True).item()
 
 
 def test_scd():

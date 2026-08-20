@@ -16,6 +16,7 @@ def _const(_frag):
 
 # -- build_track end modes -------------------------------------------------
 
+
 def test_extend_ends_length_matches_sequence():
     track = track_tools.build_track(SEQ, _const, window_size=8, end_mode="extend-ends")
     assert len(track) == len(SEQ)
@@ -58,6 +59,7 @@ def test_invalid_end_mode_raises():
 
 # -- linear_track_property -------------------------------------------------
 
+
 def test_linear_track_property_window_mean():
     value_map = {r: float(i) for i, r in enumerate(SEQ)}
     w = 4
@@ -69,10 +71,21 @@ def test_linear_track_property_window_mean():
 
 # -- predefined_linear_track via Protein -----------------------------------
 
+
 @pytest.mark.parametrize(
     "mode",
-    ["FCR", "NCPR", "aromatic", "aliphatic", "polar", "proline",
-     "positive", "negative", "hydrophobicity", "seg-complexity"],
+    [
+        "FCR",
+        "NCPR",
+        "aromatic",
+        "aliphatic",
+        "polar",
+        "proline",
+        "positive",
+        "negative",
+        "hydrophobicity",
+        "seg-complexity",
+    ],
 )
 def test_linear_sequence_profile_length(mode):
     p = Protein(SEQ)
