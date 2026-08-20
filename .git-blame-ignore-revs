@@ -1,0 +1,11 @@
+# Commits listed here are skipped by `git blame`. Use it for commits that only
+# move whitespace around, never for ones that change behaviour.
+#
+# Activate locally (once per clone -- git does not read this file by default):
+#
+#     git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# After making the bulk-reformat commit, append its full 40-character SHA below
+# with a comment naming it. `git log --format=%H -1` gives you the SHA.
+
+# <sha>  Reformat the tree with ruff format

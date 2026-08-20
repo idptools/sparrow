@@ -1,0 +1,39 @@
+# Install the git hook once:   pre-commit install
+# Check the whole repo:        pre-commit run --all-files
+#
+# Rule selection, line length and exclusions all live in pyproject.toml under
+# [tool.ruff] / [tool.ty.src], so the CLI and these hooks agree by construction.
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.16.4
+    hooks:
+      - id: ruff-check
+        args: [--fix]
+      - id: ruff-format
+
+  # ty is wired in at the `manual` stage rather than as a commit gate, for two
+  # reasons:
+  #
+  #  1. The hook sets pass_filenames: false and always_run: true -- it type-checks
+  #     the *whole project* on every commit regardless of what you touched. The
+  #     project currently reports ~229 diagnostics, most of them numpy / pandas /
+  #     torch stub friction rather than real defects.
+  #  2. The hook's entry point is `uv check`, which resolves against the project
+  #     .venv rather than your active environment. Unless that .venv has sparrow's
+  #     dependencies installed, ty cannot see numpy/pandas/torch at all and the
+  #     unresolved-import count is inflated (297 vs 229).
+  #
+  # So for output you can act on, prefer the CLI in your project environment:
+  #
+  #     uvx ty check sparrow/
+  #
+  # and use the hook to keep the version pinned / reproducible:
+  #
+  #     pre-commit run ty --hook-stage manual
+  #
+  # Delete the `stages:` line below to promote it to a blocking commit gate.
+  - repo: https://github.com/astral-sh/ty-pre-commit
+    rev: v0.0.73
+    hooks:
+      - id: ty
+        stages: [manual]
