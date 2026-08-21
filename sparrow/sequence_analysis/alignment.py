@@ -1,7 +1,7 @@
-from typing import Dict, List, Union
+from typing import Dict, List, Literal, Union, cast
 
 from protfasta import read_fasta, write_fasta
-from pyfamsa import Aligner, Sequence
+from pyfamsa import Aligner, Alignment, Sequence
 
 from sparrow import Protein
 from sparrow.visualize.sequence_visuals import show_sequence
@@ -13,8 +13,8 @@ class SequenceAlignment:
         input_data: Union[str, Dict[str, Protein]],
         threads: int = 0,
         scoring_matrix: str = "BLOSUM62",
-        guide_tree: str = "upgma",
-        tree_heuristic: Union[str, None] = None,
+        guide_tree: Literal["sl", "slink", "upgma", "nj"] = "upgma",
+        tree_heuristic: Union[Literal["medoid", "parttree"], None] = None,
         medoid_threshold: int = 0,
         n_refinements: int = 200,
         keep_duplicates: bool = False,
@@ -39,7 +39,7 @@ class SequenceAlignment:
         self.refine = refine
         self.scoring_matrix = scoring_matrix
         self.aligner = self._initialize_aligner()
-        self._cached_msa = None  # Cache for the computed MSA
+        self._cached_msa: Union[Alignment, None] = None  # Cache for the computed MSA
 
     def _initialize_aligner(self) -> Aligner:
         """
@@ -48,7 +48,10 @@ class SequenceAlignment:
         return Aligner(
             threads=self.threads,
             guide_tree=self.guide_tree,
-            tree_heuristic=self.tree_heuristic,
+            # pyfamsa's own _famsa.pyi declares Literal['medoid', 'part'], but its
+            # runtime validator accepts 'parttree' and rejects 'part'. Trust the
+            # runtime: the annotation above is correct and the stub is wrong.
+            tree_heuristic=self.tree_heuristic,  # ty: ignore[invalid-argument-type]
             medoid_threshold=self.medoid_threshold,
             n_refinements=self.n_refinements,
             keep_duplicates=self.keep_duplicates,
@@ -75,7 +78,9 @@ class SequenceAlignment:
         """
         if isinstance(self.input_data, str):
             # Assume input_data is a path to a FASTA file
-            fasta_data = read_fasta(self.input_data)
+            # read_fasta is annotated Union[dict, list[list[str]]] because of its
+            # return_list flag; with the default it always returns the dict form.
+            fasta_data = cast(Dict[str, str], read_fasta(self.input_data))
             sequences = [
                 Sequence(self._encode_string(header), self._encode_string(seq)) for header, seq in fasta_data.items()
             ]
@@ -93,14 +98,14 @@ class SequenceAlignment:
 
         return sequences
 
-    def construct_msa(self) -> Aligner:
+    def construct_msa(self) -> Alignment:
         """
         Construct a multiple sequence alignment with pyFAMSA.
 
         Returns
         -------
-        Aligner
-            Returns the constructed MSA as a pyfamsa._famsa.Alignment.
+        Alignment
+            The constructed MSA, as a ``pyfamsa.Alignment``.
         """
         if self._cached_msa is not None:
             # Return cached MSA if it exists
@@ -111,19 +116,18 @@ class SequenceAlignment:
         return self._cached_msa
 
     @property
-    def alignment(self) -> Aligner:
+    def alignment(self) -> Alignment:
         """
         Property to access the cached MSA result.
 
         Returns
         -------
-        Aligner
-            Returns the cached MSA if available, otherwise computes it.
+        Alignment
+            The cached MSA if available, otherwise computes it.
         """
-        if self._cached_msa is None:
-            # Compute MSA if it hasn't been computed yet
-            self.construct_msa()
-        return self._cached_msa
+        # construct_msa() returns the cached alignment when there is one, so this
+        # both computes on first access and keeps the return type non-optional.
+        return self.construct_msa()
 
     def save_msa(self, filename: str, linelength: int = 60, append_to_fasta: bool = False):
         """

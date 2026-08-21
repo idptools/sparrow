@@ -403,7 +403,7 @@ class Polymeric:
             self.__saw = SAW(self.__protein.sequence, self.__p_of_r_resolution)
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__saw.end_to_end_distribution(prefactor)
+            self.__precomputed[selector] = self.__saw.get_end_to_end_distribution(prefactor)
 
         return self.__precomputed[selector]
 
@@ -526,7 +526,7 @@ class Polymeric:
             self.__nudepsaw = NuDepSAW(self.__protein.sequence, self.__p_of_r_resolution)
 
         if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__nudepsaw.end_to_end_distribution(nu=nu, prefactor=prefactor)
+            self.__precomputed[selector] = self.__nudepsaw.get_end_to_end_distribution(nu=nu, prefactor=prefactor)
 
         return self.__precomputed[selector]
 
