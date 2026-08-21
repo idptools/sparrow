@@ -7,7 +7,10 @@ build-backend = "setuptools.build_meta"
 
 # define project info
 [project]
-name = "sparrow"
+# The import name stays `sparrow`; only the distribution is namespaced, matching
+# idptools-parrot / idptools-metapredict. Plain `sparrow` on PyPI belongs to an
+# unrelated project, so it is not available to us.
+name = "idptools-sparrow"
 dynamic = ["version"]
 description = "Next generation sequence analysis package for working with disordered regions and disordered proteins"
 authors = [
