@@ -1,7 +1,7 @@
 Installation
 ============
 
-sparrow runs on **Python 3.9+** and is **pure Python** - there is nothing to
+sparrow runs on **Python 3.10+** and is **pure Python** - there is nothing to
 compile, so no C compiler is required. The sections below cover setting up an
 isolated environment and installing sparrow directly from GitHub with either
 ``pip`` or ``uv``.

@@ -15,7 +15,7 @@ authors = [
 ]
 license = {text = "CC-NC-ND"}
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 
 # add in as needed  
 dependencies = [
@@ -30,7 +30,11 @@ dependencies = [
     # input size, layer count and hidden size from the state-dict key names PARROT
     # emits - so an upstream rename would silently break every predictor.
     "idptools-parrot>=1.7.5",
-    "afrc",
+    # 0.4.2 widened the SAW P(r) grid to max(3*(7*nres**0.5), 4*Ree). Earlier
+    # versions sized it from chain length alone, truncating the tail and biasing
+    # the mean end-to-end distance low, worse as the prefactor grows. 0.4.2
+    # requires Python >= 3.10, which is why sparrow does too.
+    "afrc>=0.4.2",
     "tqdm",
     "pyfamsa",
 ]

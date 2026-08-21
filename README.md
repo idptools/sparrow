@@ -4,7 +4,7 @@
 
 **Current version is 1.0.x (June 2026)** 
 
-[![Python](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
 
@@ -42,7 +42,7 @@ SPARROW integrates direct sequence calculations with per-residue predictions fro
 
 ## Installation
 
-SPARROW runs on **Python 3.9+** and is **pure Python** — nothing to compile, no C compiler needed. Installing into an isolated environment is recommended.
+SPARROW runs on **Python 3.10+** and is **pure Python** — nothing to compile, no C compiler needed. Installing into an isolated environment is recommended.
 
 ```bash
 # create and activate an environment (venv shown; uv also works)
