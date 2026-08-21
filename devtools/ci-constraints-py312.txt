@@ -1,0 +1,33 @@
+# Known-good dependency set for CI, verified on Python 3.12.
+#
+# This is a pip *constraints* file, not a requirements file: it pins versions
+# without adding dependencies, and it is never seen by anyone installing sparrow.
+# Users keep the loose ranges declared in pyproject.toml -- pinning a library's
+# runtime dependencies would make it uninstallable alongside anything with a
+# different constraint. Reproducibility belongs to the CI environment, not to the
+# package metadata.
+#
+# Only sparrow's direct dependencies are pinned. Transitive packages float, so the
+# file stays portable across runner platforms rather than carrying wheels that only
+# exist for one of them.
+#
+# Verified: 665 tests pass and `ty check sparrow/` reports zero diagnostics against
+# this set (Python 3.12.14).
+#
+# To refresh: build a clean env, run the suite and ty, then record the versions.
+
+numpy==2.5.2
+scipy==1.18.0
+pandas==3.0.5
+torch==2.13.0
+protfasta==0.1.23
+metapredict==3.0.2
+idptools-parrot==1.7.5
+afrc==0.4.2
+pyfamsa==0.7.0
+tqdm==4.70.0
+ipython==9.16.1
+
+# test extra
+pytest==9.1.1
+localcider==0.1.21

@@ -15,6 +15,7 @@ dependencies:
   - codecov
 
     # Pip-only installs
-  #- pip:
-  #  - codecov
+  - pip:
+    # not on conda-forge; see the note in pyproject.toml's [test] extra
+    - localcider
 

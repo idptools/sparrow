@@ -25,7 +25,11 @@ dependencies = [
     "protfasta",
     "metapredict>2",
     "ipython",
-    "idptools-parrot @ git+https://git@github.com/idptools/parrot.git",
+    # PyPI rather than a bare git URL: an unpinned git dependency resolves to a
+    # different commit on every install, and predictors/network_loader.py infers
+    # input size, layer count and hidden size from the state-dict key names PARROT
+    # emits - so an upstream rename would silently break every predictor.
+    "idptools-parrot>=1.7.5",
     "afrc",
     "tqdm",
     "pyfamsa",
@@ -34,6 +38,14 @@ dependencies = [
 [project.optional-dependencies]
 test = [
   "pytest>=6.1.2",
+  # test_sparrow_vs_localcider.py imports this at module scope, so without it
+  # `pytest sparrow/tests` fails during *collection* and no tests run at all;
+  # test_kappa.py also needs it. It is the suite's only external oracle.
+  "localcider",
+]
+dev = [
+  "sparrow[test]",
+  "pre-commit",
 ]
 
 
@@ -105,6 +117,21 @@ select = ["E4", "E7", "E9", "F"]
 "__init__.py" = ["F401"]
 
 [tool.ty.src]
-# Notebooks account for 67 of ty's diagnostics, all of them cross-cell name
-# resolution rather than real type errors.
-exclude = ["**/*.ipynb"]
+exclude = [
+    # 67 diagnostics, all cross-cell name resolution rather than real type errors.
+    "**/*.ipynb",
+]
+
+# protfasta.read_fasta is annotated Union[dict[str, str], list[list[str]]] rather
+# than overloaded on its return_list flag, so a type checker cannot narrow it, and
+# every seqs[key] / .items() / .keys() on the result reports. That accounted for 184
+# of ty's original 229 diagnostics (test_albatross.py alone had 136). Scoping those
+# two rules off for the test tree - rather than excluding the tree outright - keeps
+# tests checked for everything else, so a genuinely new class of error there still
+# surfaces. It also leaves the undeclared-localcider imports visible.
+[[tool.ty.overrides]]
+include = ["sparrow/tests/**"]
+
+[tool.ty.overrides.rules]
+invalid-argument-type = "ignore"
+unresolved-attribute = "ignore"

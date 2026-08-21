@@ -11,29 +11,38 @@ repos:
         args: [--fix]
       - id: ruff-format
 
-  # ty is wired in at the `manual` stage rather than as a commit gate, for two
-  # reasons:
+  # ty runs as a LOCAL hook rather than via astral-sh/ty-pre-commit, whose entry
+  # point is `uv check`. That type-checks against the project .venv, which on this
+  # repo is worse in three ways no amount of hook config fixes:
   #
-  #  1. The hook sets pass_filenames: false and always_run: true -- it type-checks
-  #     the *whole project* on every commit regardless of what you touched. The
-  #     project currently reports ~229 diagnostics, most of them numpy / pandas /
-  #     torch stub friction rather than real defects.
-  #  2. The hook's entry point is `uv check`, which resolves against the project
-  #     .venv rather than your active environment. Unless that .venv has sparrow's
-  #     dependencies installed, ty cannot see numpy/pandas/torch at all and the
-  #     unresolved-import count is inflated (297 vs 229).
+  #   1. `uv check` accepts no path argument, so it checks the whole tree --
+  #      benchmarks/, devtools/, and inside .venv/ itself.
+  #   2. It syncs only [project] dependencies, not extras, so every `import pytest`
+  #      in the suite reports unresolved-import (26 of them).
+  #   3. It needs an ~844 MB second environment (torch included) kept in step with
+  #      the conda env sparrow is actually run from -- and then checks the copy
+  #      rather than the one you use.
   #
-  # So for output you can act on, prefer the CLI in your project environment:
+  # Measured on this repo: packaged hook 79 diagnostics, this hook 2.
   #
-  #     uvx ty check sparrow/
+  # This form resolves whichever environment is active (conda, venv, whatever).
+  # Requires `uv` on PATH -- uvx fetches ty into ~/.cache/uv on first run; note that
+  # uv does NOT bundle ty. The version is pinned so the count cannot drift with
+  # upstream releases; bump it deliberately.
   #
-  # and use the hook to keep the version pinned / reproducible:
+  # It stays on the `manual` stage because ty checks the whole project on every run
+  # regardless of what you touched:
   #
   #     pre-commit run ty --hook-stage manual
   #
-  # Delete the `stages:` line below to promote it to a blocking commit gate.
-  - repo: https://github.com/astral-sh/ty-pre-commit
-    rev: v0.0.73
+  # Drop `stages: [manual]` to make it a commit gate. Two diagnostics remain, both
+  # the genuinely-undeclared localcider test dependency.
+  - repo: local
     hooks:
       - id: ty
+        name: ty (active environment)
+        entry: uvx ty@0.0.73 check sparrow/
+        language: system
+        pass_filenames: false
+        always_run: true
         stages: [manual]

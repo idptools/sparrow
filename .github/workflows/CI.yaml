@@ -19,9 +19,57 @@ on:
     - cron: "0 0 * * *"
 
 jobs:
+  # Fast, deterministic checks. Deliberately one OS and one Python rather than the
+  # test matrix: ruff's result does not vary by platform, and running it twelve
+  # times would only slow the feedback down.
+  lint:
+    name: Lint and type-check
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    # the ty hook shells out to `uvx`, so uv has to be on PATH
+    - uses: astral-sh/setup-uv@v5
+
+    - name: Install pre-commit
+      run: python -m pip install --upgrade pip pre-commit
+
+    # ruff check + ruff format at the versions pinned in .pre-commit-config.yaml,
+    # so CI and a local `pre-commit run --all-files` cannot drift apart
+    - name: Run ruff
+      run: pre-commit run --all-files --show-diff-on-failure
+
+    # ty must run against a populated environment. With dependencies missing, their
+    # imports resolve to Unknown and genuine type errors stop being reported rather
+    # than being flagged -- the run would pass while checking almost nothing.
+    #
+    # The constraints file pins that environment to a set the suite and ty are known
+    # to pass against, so a new numpy or pandas cannot turn this job red on an
+    # unrelated PR. The `test` matrix below deliberately stays unpinned, and the
+    # nightly schedule runs it, so upstream breakage still gets found -- just not in
+    # the middle of someone's review.
+    - name: Install sparrow and its test dependencies (pinned)
+      run: python -m pip install -e '.[test]' -c devtools/ci-constraints-py312.txt
+
+    - name: Run ty
+      run: pre-commit run ty --hook-stage manual --all-files
+
   test:
     name: Test on ${{ matrix.os }}, Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
+
+    # Codecov uploads via OIDC rather than a shared upload token, which needs
+    # id-token: write. Naming permissions explicitly also narrows the job's token
+    # to just these two.
+    permissions:
+      contents: read
+      id-token: write
+
     strategy:
       matrix:
         os: [macOS-latest, ubuntu-latest, windows-latest]
@@ -29,7 +77,7 @@ jobs:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v4
 
     - name: Additional info about the build
       shell: bash
@@ -70,9 +118,16 @@ jobs:
       run: |
         pytest -v --cov=sparrow --cov-report=xml --color=yes sparrow/tests/
 
+    # v1 used the retired uploader, so this step had become a silent no-op. Note the
+    # input is `files` (plural) in v4+ -- the old `file` is gone and would be ignored.
+    # use_oidc avoids a repository upload token entirely, which matters because fork
+    # PRs cannot read repository secrets and most contributions here arrive from
+    # forks. A failed coverage upload should not fail a build whose tests passed.
     - name: CodeCov
-      uses: codecov/codecov-action@v1
+      uses: codecov/codecov-action@v7
       with:
-        file: ./coverage.xml
+        files: ./coverage.xml
         flags: unittests
         name: codecov-${{ matrix.os }}-py${{ matrix.python-version }}
+        use_oidc: true
+      continue-on-error: true

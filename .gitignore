@@ -96,8 +96,8 @@ celerybeat-schedule
 
 # virtualenv
 .venv
-# created by the ty pre-commit hook (its entry point is `uv check`);
-# sparrow is a library, so the resolved lock is not a build input
+# uv byproducts (the packaged ty hook used to create these via `uv check`);
+# sparrow is a library, so a resolved lock is not a build input
 uv.lock
 venv/
 ENV/
