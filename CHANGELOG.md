@@ -4,6 +4,32 @@ All notable changes to SPARROW are documented here.
 
 ## Unreleased
 
+### Added — ruff, ty and a pinned CI environment
+
+* **`ruff check` and `ruff format` gate commits** via pre-commit, and `ty` is available as a manual-stage hook (`pre-commit run ty --hook-stage manual`). Library code is type-clean. Configuration is in `pyproject.toml`; the superseded `[flake8]` and `[yapf]` sections are gone from `setup.cfg`. The tree was reformatted in a single commit, recorded in `.git-blame-ignore-revs`.
+* **A new `lint` CI job** runs both, against the dependency set pinned in `devtools/ci-constraints-py312.txt`. That is a pip *constraints* file, so it pins CI without constraining anyone installing sparrow; the `test` matrix stays unpinned and the nightly schedule keeps running it.
+* **`localcider` is now declared in the `test` extra.** Two modules import it, one at module scope, so without it `pytest sparrow/tests` failed during collection and no tests ran. A new `dev` extra installs the test dependencies plus pre-commit.
+
+### Changed — dependencies and supported Python versions
+
+* **sparrow now requires Python 3.10 and pins `afrc>=0.4.2`.** These are one decision. afrc 0.4.2 corrected the SAW P(r) grid; earlier releases sized it from chain length alone, truncating the tail of the distribution and biasing the mean end-to-end distance low by an amount that grows with the prefactor — on a 40-mer, prefactor 8.0 moves 67.589 → 68.166 Å. afrc 0.4.2 requires Python 3.10, and the newest 3.9-compatible release still carries the old grid, so supporting 3.9 would have meant shipping knowingly biased SAW numbers. **Any SAW value recorded against afrc < 0.4.2 carries that bias.** The CI matrix drops its 3.9 leg.
+* **PARROT now comes from PyPI** as `idptools-parrot>=1.7.5`, rather than a bare git URL that resolved to a different commit on every install. The pieces sparrow uses are unchanged between the two.
+* **`build_background()` accepts either `protfasta` return shape.** It assumed the name-to-sequence mapping and failed with an opaque `AttributeError` if a caller forwarded `return_list=True`; it now iterates either, matching `sparrow.read_fasta`.
+
+### Fixed — crashes in public API
+
+* **Two `Polymeric` SAW accessors raised `AttributeError` for every input.** `get_saw_end_to_end_distribution()` and `get_nudep_saw_end_to_end_distribution()` called `end_to_end_distribution` on the afrc model objects, which expose `get_end_to_end_distribution`. The sibling call in the same module already used the correct name, so this was a typo rather than an afrc API change; all eleven afrc calls have now been checked.
+* **`SequenceAlignment(...)` raised `ValueError` on construction with default arguments**, so the class was unusable. sparrow defaulted `medoid_threshold` to `0`, overriding pyFAMSA's own default of 2000 — and `0` means "always use medoid seeding", not "off", which pyFAMSA rejects for any threshold below its `medoid_seeds` (100). It now defaults to `None` and is only forwarded when set, leaving pyFAMSA's default in place rather than restating a number that can drift upstream.
+* **`SequenceAlignment.construct_msa()` and `.alignment` were annotated `-> Aligner`** but return a `pyfamsa.Alignment`, which the docstring already said; iterating the result — as `save_msa()` and `display_msa()` both do — contradicted the annotation. `tree_heuristic` is now annotated `Literal["medoid", "parttree"]`; pyFAMSA's own stub declares `"part"`, which its runtime rejects.
+* **The Codecov upload had silently stopped working.** The workflow pinned `codecov/codecov-action@v1`, which uses the uploader Codecov has retired, and passed `file:` — an input removed in v4. It is now `@v7` with `files:` and `use_oidc: true`, which also works for fork PRs, since those cannot read repository secrets. `actions/checkout` moved from v1 to v4.
+
+### Fixed — missing and fragile tests
+
+* **`test_polymeric.py` was a zero-byte file**, which is why two crash-on-every-input bugs in public API went unnoticed. It now pins both, asserting real distributions rather than merely that the call does not raise, and that `prefactor` and `nu` participate in the memoization key.
+* **`sparrow/tests/test_alignment.py` is new.** `SequenceAlignment` had no tests at all, which is why a constructor that raised for every caller shipped. It covers construction with defaults, gap padding with sequences preserved, caching, FASTA round-trip, and that the `guide_tree` / `tree_heuristic` annotations match what pyFAMSA accepts at runtime.
+* Two `test_polymeric.py` cache-key assertions compared probability arrays with `np.allclose`, which assumes both calls return the same grid length. Under afrc 0.4.2 the grid depends on the prefactor, so the lengths differ and `np.allclose` raises instead of reporting a difference. They now compare the probability-weighted mean, which is grid-independent.
+* `test_regressions.py::test_protein_property_matches_nardini_feature` demanded bit-equality between `Protein` properties and their NARDINI+ counterparts. `physical_properties.fraction_in_set` sums per-residue fractions to preserve the exact floats the bundled backgrounds and centroids were built against, and floating-point addition is not associative — so residue-set *order* changes the last bit. `amino_acids.ARO` is `['Y', 'W', 'F']` where NARDINI+ uses `tuple("FWY")`, putting "Frac Aromatic" 1 ULP apart. Agreement is now asserted within 2 ULP, which still rejects any relative error above ~5e-16.
+
 ### Added — `sparrow.patterning.vectorized`
 
 Pure-NumPy reimplementations of the compiled patterning routines, as a step towards dropping the Cython extensions. Every public Cython entry point except `patterning_percentile` now has a signature-compatible twin:
