@@ -15,7 +15,7 @@ class SequenceAlignment:
         scoring_matrix: str = "BLOSUM62",
         guide_tree: Literal["sl", "slink", "upgma", "nj"] = "upgma",
         tree_heuristic: Union[Literal["medoid", "parttree"], None] = None,
-        medoid_threshold: int = 0,
+        medoid_threshold: Union[int, None] = None,
         n_refinements: int = 200,
         keep_duplicates: bool = False,
         refine: Union[bool, None] = None,
@@ -28,6 +28,11 @@ class SequenceAlignment:
         input_data : Union[List[Protein], str, Dict[str, str]]
             A list of Protein objects, a path to a FASTA file, or a dictionary
             of FASTA headers to sequences.
+        medoid_threshold : int or None, optional
+            Number of sequences at or above which pyFAMSA switches to medoid-seeded
+            guide-tree construction. ``None`` (the default) leaves pyFAMSA's own
+            default in place, currently 2000. If you do set it, pyFAMSA requires it
+            to be at least ``medoid_seeds`` (100 by default) and raises otherwise.
         """
         self.input_data = input_data
         self.threads = threads
@@ -52,11 +57,16 @@ class SequenceAlignment:
             # runtime validator accepts 'parttree' and rejects 'part'. Trust the
             # runtime: the annotation above is correct and the stub is wrong.
             tree_heuristic=self.tree_heuristic,  # ty: ignore[invalid-argument-type]
-            medoid_threshold=self.medoid_threshold,
             n_refinements=self.n_refinements,
             keep_duplicates=self.keep_duplicates,
             refine=self.refine,
             scoring_matrix=self.scoring_matrix,
+            # Only forwarded when set. This used to default to 0, which is not
+            # "off" but "always" - and pyFAMSA rejects any threshold below its
+            # medoid_seeds (100), so every SequenceAlignment(...) raised
+            # ValueError on construction. Omitting the argument keeps pyFAMSA's
+            # default rather than restating a number that can drift upstream.
+            **({} if self.medoid_threshold is None else {"medoid_threshold": self.medoid_threshold}),
         )
 
     @staticmethod
