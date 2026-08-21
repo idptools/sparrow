@@ -106,11 +106,10 @@ def read_fasta(filename, **kwargs):
     """
     # read in file
     F = protfasta.read_fasta(filename, **kwargs)
-    return_list = kwargs.get("return_list", False)
-    if return_list:
-        return [[h, Protein(seq)] for h, seq in F]
-    else:
+
+    if isinstance(F, dict):
         return {h: Protein(seq) for h, seq in F.items()}
+    return [[h, Protein(seq)] for h, seq in F]
 
 
 def build_grammar_background_from_fasta(

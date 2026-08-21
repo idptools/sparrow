@@ -886,7 +886,7 @@ class HMM:
         # Class collapsing (multiple states -> one output class)
         self.classes: List[int] = list(range(self.ns))
         self.num_classes: int = self.ns
-        self.class_names: List[str] = self.names[:]
+        self.class_names: List[Optional[str]] = [*self.names]
 
         # Results from most recent decoding
         self.viterbi_path: List[int] = []
@@ -900,7 +900,7 @@ class HMM:
     def set_names(self, names: List[str]) -> None:
         """Set human-readable state names."""
         self.names = names
-        self.class_names = names[:]
+        self.class_names = [*names]
 
     def set_classes(self, classes: List[int]) -> None:
         """
@@ -913,7 +913,9 @@ class HMM:
         """
         self.classes = classes
         self.num_classes = max(classes) + 1
-        self.class_names = [None] * self.num_classes  # type: ignore[list-item]
+        # sparse by design: max(classes) + 1 slots, and only the indices that
+        # appear in `classes` get filled, so a gap stays None
+        self.class_names = [None] * self.num_classes
         for i in range(len(classes) - 1, -1, -1):
             self.class_names[classes[i]] = self.names[i]
 
@@ -1179,8 +1181,8 @@ def build_background_hmm(bg: Sequence[float]) -> HMM:
     HMM
         Background-only hidden Markov model.
     """
-    tmat = [[1, 0], [0, 1]]
-    imat = [1, 0]
+    tmat = [[1.0, 0.0], [0.0, 1.0]]
+    imat = [1.0, 0.0]
     emat = [_normalize(bg), _normalize(bg)]
     h = HMM(tmat, emat, imat)
     h.subtrellis = [1, 0]

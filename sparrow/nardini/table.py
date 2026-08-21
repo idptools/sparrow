@@ -111,7 +111,7 @@ class FeatureVector:
         """Return a one-column pandas DataFrame indexed by feature name."""
         import pandas as pd
 
-        return pd.DataFrame({self.label or "value": self.values}, index=list(self.names))
+        return pd.DataFrame({self.label or "value": self.values}, index=pd.Index(self.names))
 
 
 class FeatureTable:
@@ -223,4 +223,4 @@ class FeatureTable:
         """Return the table as a pandas DataFrame indexed by row name."""
         import pandas as pd
 
-        return pd.DataFrame(self.values, index=list(self.row_names), columns=list(self.column_names))
+        return pd.DataFrame(self.values, index=pd.Index(self.row_names), columns=pd.Index(self.column_names))

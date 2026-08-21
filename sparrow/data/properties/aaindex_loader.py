@@ -31,7 +31,7 @@ from __future__ import annotations
 import functools
 import json
 from pathlib import Path
-from typing import Iterator, Optional
+from typing import Dict, Iterator, List, Optional, Tuple, TypedDict
 
 __all__ = ["available", "load", "AAindexDataset"]
 
@@ -45,7 +45,27 @@ _DATASETS = {
 }
 
 Number = Optional[float]
-Entry = dict[str, object]
+
+
+class Entry(TypedDict, total=False):
+    """One AAindex record, as stored in the bundled JSON.
+
+    ``total=False`` because the metadata fields vary by dataset and the payload
+    key differs: aaindex1 entries carry ``values`` (per-residue), aaindex2/3
+    entries carry ``matrix`` (pairwise). Spelling the shape out here rather than
+    using ``dict[str, object]`` is what lets :meth:`AAindexDataset.values` and
+    :meth:`AAindexDataset.matrix` return their declared types without a cast.
+    """
+
+    accession: str
+    description: str
+    reference: str
+    authors: str
+    title: str
+    journal: str
+    comment: str
+    values: Dict[str, Number]
+    matrix: Dict[str, Dict[str, Number]]
 
 
 @functools.lru_cache(maxsize=None)
@@ -146,7 +166,7 @@ class AAindexDataset:
 
     # -- listing / search ---------------------------------------------------
 
-    def accessions(self) -> list[str]:
+    def accessions(self) -> List[str]:
         """Return all accessions in the dataset, sorted.
 
         Returns
@@ -155,7 +175,11 @@ class AAindexDataset:
         """
         return sorted(self._data)
 
-    def list(self, search: Optional[str] = None) -> list[tuple[str, str]]:
+    # NB: this method shadows the builtin `list` inside the class body, so bare
+    # `list[...]` annotations here resolve to it under static analysis (runtime is
+    # unaffected - the name is still the builtin when the body executes). Use
+    # typing.List in this class rather than renaming a public method.
+    def list(self, search: Optional[str] = None) -> List[Tuple[str, str]]:
         """List ``(accession, description)`` pairs, optionally filtered.
 
         Parameters
@@ -218,7 +242,7 @@ class AAindexDataset:
             If called on a pairwise (matrix) dataset.
         """
         self._check_single("values")
-        return dict(self[accession]["values"])  # type: ignore[arg-type]
+        return dict(self[accession]["values"])
 
     def value(self, accession: str, residue: str) -> Number:
         """Return the value of one amino acid for a single-residue index.
@@ -258,7 +282,7 @@ class AAindexDataset:
             If called on the single-residue dataset.
         """
         self._check_pairwise("matrix")
-        return self[accession]["matrix"]  # type: ignore[return-value]
+        return self[accession]["matrix"]
 
     def pair(self, accession: str, residue_i: str, residue_j: str) -> Number:
         """Return the pairwise value for an ordered residue pair.

@@ -6,6 +6,8 @@ per-residue positive-class probabilities and then optionally mask those to
 phosphosites via :func:`phospho_predictor_utils.return_hits`.
 """
 
+from typing import ClassVar
+
 import numpy as np
 
 from sparrow.predictors import outputs
@@ -25,7 +27,8 @@ class PhosphoPredictor(BaseNetworkPredictor):
     """
 
     ARCHITECTURE = "MtM"
-    TARGET_RESIDUE: str = None
+    # annotation-only: subclasses must set it (see BaseNetworkPredictor)
+    TARGET_RESIDUE: ClassVar[str]
 
     def _predict_phospho(self, seq, raw_values=False, return_sites_only=False, windowsize=4, threshold=0.6):
         """Predict phosphosites for :attr:`TARGET_RESIDUE` in a sequence.

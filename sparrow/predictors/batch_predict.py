@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 import numpy as np
 from torch.utils.data import DataLoader
@@ -141,7 +143,7 @@ def __list2dict(protein_objs):
 def __short_seq_fix(
     protein_objs,
     batch_size: int,
-    network: str = None,
+    network: Optional[str] = None,
     version: int = 2,
     gpuid: int = 0,
     batch_algorithm: str = "default",
@@ -348,7 +350,7 @@ def __short_seq_fix(
 #
 def batch_predict(
     protein_objs,
-    network: str = None,
+    network: Optional[str] = None,
     batch_size: int = 32,
     version: int = 2,
     gpuid: int = 0,
@@ -624,7 +626,16 @@ def batch_predict(
         # exactly -- it decodes the concatenated final hidden states (h_n) of the
         # last forward and reverse layers -- but on the packed input, so every
         # sequence's output is computed from its true final timestep.
-        seq_loader = DataLoader(sequence_list, batch_size=batch_size, shuffle=False)
+        # torch declares DataLoader(dataset: Dataset[_T_co]) nominally, but a
+        # map-style dataset only needs __len__/__getitem__, which a list has
+        # (isinstance([], Dataset) is False). cast(Dataset, ...) would also silence
+        # this; the directive is preferred because ty reports unused-ignore-comment
+        # if the stub is ever fixed, whereas a cast would silently outlive it.
+        seq_loader = DataLoader(
+            sequence_list,  # ty: ignore[invalid-argument-type]
+            batch_size=batch_size,
+            shuffle=False,
+        )
 
         loop_range = tqdm(seq_loader) if show_progress_bar else seq_loader
 

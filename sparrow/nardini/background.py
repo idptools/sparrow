@@ -231,21 +231,22 @@ class NardiniBackground:
             filename = f"{filename}.npz"
 
         max_name_len = max(len(name) for name in self.feature_names)
-        payload = {
-            "feature_names": np.asarray(self.feature_names, dtype=f"<U{max_name_len}"),
-            "mean": self.mean,
-            "std": self.std,
-            "num_sequences": np.asarray(-1 if self.num_sequences is None else self.num_sequences),
-            "format_version": np.asarray(_FORMAT_VERSION),
+
+        # Passed as explicit keywords rather than **payload: np.savez's signature is
+        # (file, *args, allow_pickle=True, **kwds), so unpacking a dict[str, ndarray]
+        # cannot be shown not to supply allow_pickle, and type checkers flag it.
+        saver = np.savez_compressed if compressed else np.savez
+        saver(
+            filename,
+            feature_names=np.asarray(self.feature_names, dtype=f"<U{max_name_len}"),
+            mean=self.mean,
+            std=self.std,
+            num_sequences=np.asarray(-1 if self.num_sequences is None else self.num_sequences),
+            format_version=np.asarray(_FORMAT_VERSION),
             # JSON keeps the metadata readable and avoids pickled objects, so the
             # archive can be loaded with allow_pickle=False
-            "metadata_json": np.asarray(json.dumps(self.metadata)),
-        }
-
-        if compressed:
-            np.savez_compressed(filename, **payload)
-        else:
-            np.savez(filename, **payload)
+            metadata_json=np.asarray(json.dumps(self.metadata)),
+        )
 
         return filename
 
@@ -395,7 +396,11 @@ def _iter_named_sequences(source, **read_fasta_kwargs):
         import protfasta
 
         records = protfasta.read_fasta(source, **read_fasta_kwargs)
-        for name, sequence in records.items():
+        # protfasta returns a name -> sequence mapping by default, or a list of
+        # [name, sequence] pairs under return_list=True. Both iterate to the same
+        # pairs, so accept either rather than constraining the caller's kwargs.
+        pairs = records.items() if isinstance(records, dict) else records
+        for name, sequence in pairs:
             yield name, sequence.upper()
         return
 

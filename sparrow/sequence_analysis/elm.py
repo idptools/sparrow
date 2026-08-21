@@ -137,7 +137,7 @@ def generate_elm_df(file: str):
     import pandas as pd
 
     columns, elm_data = read_elm_table(file)
-    return pd.DataFrame(elm_data, columns=columns)
+    return pd.DataFrame(elm_data, columns=pd.Index(columns))
 
 
 @functools.lru_cache(maxsize=1)

@@ -13,7 +13,10 @@ from sparrow.tools.io import build_grammar_background_from_fasta, read_fasta
 
 # Generate _version.py if missing and in the Read the Docs environment
 if os.getenv("READTHEDOCS") == "True" and not os.path.isfile("../sparrow/_version.py"):
-    import versioningit
+    # versioningit is a build-time dependency ([build-system] requires), present
+    # only in the Read the Docs environment - not a runtime dependency, so a type
+    # checker resolving against a normal install cannot see it.
+    import versioningit  # ty: ignore[unresolved-import]
 
     __version__ = versioningit.get_version("../")
 else:

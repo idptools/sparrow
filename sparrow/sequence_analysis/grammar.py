@@ -539,7 +539,10 @@ def compute_composition_background_stats(sequences_or_proteins, dtype=np.float32
 
     for entry in iterator:
         raw = compute_composition_raw(entry)
-        if feature_names is None:
+        # Test all three, not just feature_names: they are initialised together on
+        # the first iteration, and naming each one is what lets the arithmetic below
+        # see them as arrays rather than Optional.
+        if feature_names is None or mean is None or m2 is None:
             feature_names = tuple(raw.keys())
             mean = np.zeros(len(feature_names), dtype=np.float64)
             m2 = np.zeros(len(feature_names), dtype=np.float64)
@@ -552,7 +555,10 @@ def compute_composition_background_stats(sequences_or_proteins, dtype=np.float32
         delta2 = values - mean
         m2 += delta * delta2
 
-    if count == 0:
+    # Guard on the accumulators rather than on `count`: all three are assigned
+    # together in the first loop iteration, so this is the same condition, but it
+    # also narrows them away from None for the arithmetic below.
+    if feature_names is None or mean is None or m2 is None:
         raise GrammarException("Cannot compute composition background from empty input")
 
     # Population variance (ddof=0) matches np.std default semantics.
@@ -578,16 +584,15 @@ def save_composition_stats_npz(output_filename, composition_stats, dtype=np.floa
     feature_names = tuple(str(x) for x in composition_stats.feature_names)
     max_name_len = max(len(name) for name in feature_names) if feature_names else 1
 
-    payload = {
-        "feature_names": np.asarray(feature_names, dtype=f"<U{max_name_len}"),
-        "mean": np.asarray(composition_stats.mean, dtype=out_dtype),
-        "std": np.asarray(composition_stats.std, dtype=out_dtype),
-    }
-
-    if compressed:
-        np.savez_compressed(output_filename, **payload)
-    else:
-        np.savez(output_filename, **payload)
+    # Explicit keywords rather than **payload - see the note in
+    # sparrow.nardini.background.NardiniBackground.save.
+    saver = np.savez_compressed if compressed else np.savez
+    saver(
+        output_filename,
+        feature_names=np.asarray(feature_names, dtype=f"<U{max_name_len}"),
+        mean=np.asarray(composition_stats.mean, dtype=out_dtype),
+        std=np.asarray(composition_stats.std, dtype=out_dtype),
+    )
 
 
 def load_composition_stats_npz(input_filename):

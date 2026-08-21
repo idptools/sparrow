@@ -11,6 +11,8 @@ the raw network output (from :meth:`BaseNetworkPredictor._raw_predict`) into the
 desired result, typically using a helper from :mod:`sparrow.predictors.outputs`.
 """
 
+from typing import ClassVar
+
 from parrot import encode_sequence
 
 from sparrow.predictors.network_loader import load_parrot_network
@@ -33,9 +35,12 @@ class BaseNetworkPredictor:
         Network architecture passed to :func:`load_parrot_network`.
     """
 
-    NETWORK_PATH: str = None
-    DEFAULT_VERSION: str = None
-    ARCHITECTURE: str = "MtO"
+    # Declared without a value: every subclass must supply them, and an
+    # annotation-only class attribute makes a missing one an AttributeError naming
+    # the attribute, rather than a None that fails later inside .format().
+    NETWORK_PATH: ClassVar[str]
+    DEFAULT_VERSION: ClassVar[str]
+    ARCHITECTURE: ClassVar[str] = "MtO"
 
     def __init__(self, version=None):
         """Load the versioned network for this predictor.

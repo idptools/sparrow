@@ -235,23 +235,23 @@ class GINReference:
             filename = f"{filename}.npz"
 
         width = max(len(name) for name in self.feature_names)
-        payload = {
-            "feature_names": np.asarray(self.feature_names, dtype=f"<U{width}"),
-            "clusters": self.clusters,
-            "centroids": self.centroids,
-            "backend": np.asarray(self.backend),
-            "format_version": np.asarray(_REFERENCE_FORMAT_VERSION),
+
+        # Explicit keywords rather than **payload - see the note in
+        # sparrow.nardini.background.NardiniBackground.save.
+        saver = np.savez_compressed if compressed else np.savez
+        saver(
+            filename,
+            feature_names=np.asarray(self.feature_names, dtype=f"<U{width}"),
+            clusters=self.clusters,
+            centroids=self.centroids,
+            backend=np.asarray(self.backend),
+            format_version=np.asarray(_REFERENCE_FORMAT_VERSION),
             # JSON rather than pickled dicts, so the archive loads with
             # allow_pickle=False. Integer keys become strings and are restored.
-            "descriptions_json": np.asarray(json.dumps({str(k): v for k, v in self.descriptions.items()})),
-            "num_idrs_json": np.asarray(json.dumps({str(k): int(v) for k, v in self.num_idrs.items()})),
-            "metadata_json": np.asarray(json.dumps(self.metadata)),
-        }
-
-        if compressed:
-            np.savez_compressed(filename, **payload)
-        else:
-            np.savez(filename, **payload)
+            descriptions_json=np.asarray(json.dumps({str(k): v for k, v in self.descriptions.items()})),
+            num_idrs_json=np.asarray(json.dumps({str(k): int(v) for k, v in self.num_idrs.items()})),
+            metadata_json=np.asarray(json.dumps(self.metadata)),
+        )
 
         return filename
 
