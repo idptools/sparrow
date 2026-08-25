@@ -51,7 +51,9 @@ test = [
   "localcider",
 ]
 dev = [
-  "sparrow[test]",
+  # must match [project] name -- a bare "sparrow[test]" resolves to an unrelated
+  # PyPI project of that name rather than to this package
+  "idptools-sparrow[test]",
   "pre-commit",
 ]
 
