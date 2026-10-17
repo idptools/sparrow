@@ -23,6 +23,8 @@ is a pure re-encoding of the sequence.
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
+from functools import cached_property
 
 import numpy as np
 from numpy.typing import NDArray
@@ -43,7 +45,8 @@ __all__ = [
     "membership_lookup",
     "residue_codes",
     "as_batch",
-    "concatenated_residue_codes",
+    "EncodedBatch",
+    "encode_batch",
     "scale_values",
     "scale_vector",
     "ternarize_winged",
@@ -341,24 +344,57 @@ def as_batch(sequences: str | Sequence[str]) -> list[str]:
     return batch
 
 
-def concatenated_residue_codes(batch: Sequence[str]) -> tuple[NDArray[np.int8], NDArray[np.int64]]:
-    """Residue codes for a whole batch, end to end, plus each sequence's length.
+@dataclass(frozen=True)
+class EncodedBatch:
+    """A batch of sequences as residue codes, laid end to end.
 
     Concatenating means a batch of thousands of sequences is validated and
-    encoded in one pass. Sequence ``i`` occupies
-    ``codes[offsets[i]:offsets[i + 1]]``, where ``offsets`` is the cumulative sum
-    of ``lengths`` with a leading zero.
+    encoded in one pass, and that calculations which run along the sequence can
+    work on all of them at once. Sequence ``i`` occupies
+    ``codes[offsets[i]:offsets[i + 1]]``.
+
+    Attributes
+    ----------
+    codes : numpy.ndarray
+        ``int8`` residue codes of every sequence in turn.
+    lengths : numpy.ndarray
+        ``int64`` length of each sequence.
+    """
+
+    codes: NDArray[np.int8]
+    lengths: NDArray[np.int64]
+
+    def __len__(self) -> int:
+        """Number of sequences in the batch."""
+        return int(self.lengths.size)
+
+    @cached_property
+    def offsets(self) -> NDArray[np.int64]:
+        """Where each sequence starts in :attr:`codes`, plus the total length at the end."""
+        offsets = np.zeros(self.lengths.size + 1, dtype=np.int64)
+        np.cumsum(self.lengths, out=offsets[1:])
+        return offsets
+
+    @cached_property
+    def owner(self) -> NDArray[np.int64]:
+        """Which sequence each position of :attr:`codes` belongs to."""
+        owner: NDArray[np.int64] = np.repeat(np.arange(self.lengths.size, dtype=np.int64), self.lengths)
+        return owner
+
+
+def encode_batch(sequences: str | Sequence[str] | EncodedBatch) -> EncodedBatch:
+    """Validate and encode a batch of sequences.
 
     Parameters
     ----------
-    batch : sequence of str
-        Upper-case amino acid sequences, as returned by :func:`as_batch`.
+    sequences : str, sequence of str, or EncodedBatch
+        One sequence, or many. Lower-case residues are upper-cased first. An
+        :class:`EncodedBatch` is returned unchanged.
 
     Returns
     -------
-    tuple of numpy.ndarray
-        ``(codes, lengths)``: ``int8`` residue codes of every sequence in turn,
-        and the ``int64`` length of each sequence.
+    EncodedBatch
+        The batch's residue codes and lengths.
 
     Raises
     ------
@@ -366,6 +402,10 @@ def concatenated_residue_codes(batch: Sequence[str]) -> tuple[NDArray[np.int8], 
         If any sequence contains a non-standard residue. For a batch of more
         than one, the message says which sequence.
     """
+    if isinstance(sequences, EncodedBatch):
+        return sequences
+
+    batch = as_batch(sequences)
     lengths = np.fromiter((len(sequence) for sequence in batch), dtype=np.int64, count=len(batch))
     try:
         codes = residue_codes("".join(batch))
@@ -379,7 +419,7 @@ def concatenated_residue_codes(batch: Sequence[str]) -> tuple[NDArray[np.int8], 
             except SparrowException as error:
                 raise SparrowException(f"Sequence {index} of {len(batch)} in the batch: {error}") from error
         raise
-    return codes, lengths
+    return EncodedBatch(codes=codes, lengths=lengths)
 
 
 def scale_values(sequence: str, scale: Mapping[str, float | None]) -> NDArray[np.float64]:

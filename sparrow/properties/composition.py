@@ -94,16 +94,18 @@ class ResidueCounts:
 
 
 #: What every property in this module accepts.
-Batch = str | Sequence[str] | ResidueCounts
+Batch = str | Sequence[str] | encoding.EncodedBatch | ResidueCounts
 
 
-def count_residues(sequences: str | Sequence[str]) -> ResidueCounts:
+def count_residues(sequences: str | Sequence[str] | encoding.EncodedBatch) -> ResidueCounts:
     """Count every standard residue in every sequence of a batch.
 
     Parameters
     ----------
-    sequences : str or sequence of str
-        One sequence, or many. Lower-case residues are upper-cased first.
+    sequences : str, sequence of str, or EncodedBatch
+        One sequence, or many, or a batch already encoded with
+        :func:`sparrow.properties.encoding.encode_batch`. Lower-case residues
+        are upper-cased first.
 
     Returns
     -------
@@ -121,18 +123,20 @@ def count_residues(sequences: str | Sequence[str]) -> ResidueCounts:
     >>> counts.lengths.tolist()
     [4, 2]
     """
-    batch = encoding.as_batch(sequences)
-    codes, lengths = encoding.concatenated_residue_codes(batch)
+    encoded = encoding.encode_batch(sequences)
+    codes, lengths = encoded.codes, encoded.lengths
+    n_sequences = len(encoded)
 
-    if len(batch) == 1:
+    if n_sequences == 1:
         # the same counts as below, without the bookkeeping that tells sequences
         # apart - worth having, because Protein counts one sequence at a time
         counts = np.bincount(codes, minlength=encoding.NUM_RESIDUES).astype(np.int64)[None, :]
     else:
         # one bincount over (sequence index, residue code) pairs counts the batch
-        owner = np.repeat(np.arange(len(batch), dtype=np.int64), lengths)
-        flat = np.bincount(owner * encoding.NUM_RESIDUES + codes, minlength=len(batch) * encoding.NUM_RESIDUES)
-        counts = flat.astype(np.int64).reshape(len(batch), encoding.NUM_RESIDUES)
+        flat = np.bincount(
+            encoded.owner * encoding.NUM_RESIDUES + codes, minlength=n_sequences * encoding.NUM_RESIDUES
+        )
+        counts = flat.astype(np.int64).reshape(n_sequences, encoding.NUM_RESIDUES)
     return ResidueCounts(counts=counts, lengths=lengths)
 
 

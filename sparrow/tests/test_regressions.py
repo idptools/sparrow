@@ -443,7 +443,7 @@ def test_amino_acid_fractions_match_nardini():
 
 
 def test_patch_features_match_nardini():
-    """Patch fractions come from sequence_analysis.patching, used by both."""
+    """Patch fractions come from sparrow.properties.patches, used by both."""
     from sparrow.nardini.composition import (
         PATCH_INTERRUPTION,
         PATCH_MIN_TARGET_COUNT,

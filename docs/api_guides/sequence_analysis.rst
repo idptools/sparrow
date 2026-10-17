@@ -64,15 +64,16 @@ human GIN grammars -- live in :mod:`sparrow.nardini`. See :doc:`nardini`.
 Patch Primitives
 ----------------
 
-Patch metrics used by NARDINI+ are available directly as reusable primitives:
+The patch metrics used by NARDINI+ are batch functions too, in
+:mod:`sparrow.properties.patches`:
 
 .. code-block:: python
 
-   from sparrow.sequence_analysis.patching import patch_fraction, rg_patch_fraction
+   from sparrow.properties.patches import patch_fraction, rg_patch_fraction
 
-   seq = "AAAAQQRGRGTTTAAAQQ"
-   a_patch = patch_fraction(seq, "A")
-   rg_patch = rg_patch_fraction(seq)
+   sequences = ["AAAAQQRGRGTTTAAAQQ", "GRGRGGYGGSSSS"]
+   a_patch = patch_fraction(sequences, "A")      # one fraction per sequence
+   rg_patch = rg_patch_fraction(sequences)
 
 Protein vs Functional API
 -------------------------
@@ -99,8 +100,8 @@ Key function entry points:
 * :func:`sparrow.properties.composition.seg_complexity`
 * :func:`sparrow.properties.composition.hydrophobicity`
 * :func:`sparrow.properties.encoding.scale_values`
-* :func:`sparrow.sequence_analysis.patching.patch_fraction`
-* :func:`sparrow.sequence_analysis.patching.rg_patch_fraction`
+* :func:`sparrow.properties.patches.patch_fraction`
+* :func:`sparrow.properties.patches.rg_patch_fraction`
 
 Sequence properties
 -------------------
@@ -121,5 +122,5 @@ compositional features, so the two cannot disagree. Every function takes a batch
 .. automodule:: sparrow.properties.encoding
    :members:
 
-.. automodule:: sparrow.sequence_analysis.patching
-   :no-index:
+.. automodule:: sparrow.properties.patches
+   :members:

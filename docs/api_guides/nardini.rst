@@ -1140,7 +1140,8 @@ comparable across sequences.
 Patches are contiguous runs of the target residue tolerating up to 2
 interrupting residues, requiring at least 4 target residues; ``'RG Frac'``
 requires at least 2 adjacent ``RG`` pairs. These are computed with sparrow's
-:func:`~sparrow.sequence_analysis.patching.patch_fraction` primitives.
+:func:`~sparrow.properties.patches.patch_fraction`, the same function behind
+``Protein.compute_patch_fraction``.
 
 Relationship to the reference implementations
 ---------------------------------------------
@@ -1169,10 +1170,9 @@ in sparrow. Differences worth knowing about:
 * **Nothing compositional is computed twice.** The same applies to every other
   feature that has a ``Protein`` counterpart: the amino acid fractions, the grouped
   fractions, FCR, NCPR, hydrophobicity, the R/K and E/D ratios and all 20 patch
-  features come from :mod:`sparrow.properties` and
-  :mod:`sparrow.sequence_analysis.patching` -- the same code paths ``Protein``
-  uses. A whole batch is counted once and every compositional feature read off
-  those counts. The patterning half likewise: the ``'kappa'`` and ``'iwd'`` backends call
+  features come from :mod:`sparrow.properties` -- the same code paths
+  ``Protein`` uses. A whole batch is encoded once, every compositional feature
+  read off its residue counts, and every patch found in one pass along it. The patterning half likewise: the ``'kappa'`` and ``'iwd'`` backends call
   :mod:`sparrow.patterning.vectorized`, and only the NARDINI omega/kappa window
   asymmetry itself is implemented in this module, because nothing else in sparrow
   computes it.

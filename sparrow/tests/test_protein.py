@@ -8,7 +8,7 @@ import pytest
 
 import sparrow
 from sparrow.protein import Protein
-from sparrow.sequence_analysis import patching
+from sparrow.properties import patches
 from sparrow.sequence_analysis.elm import (
     compute_gained_elms,
     compute_lost_elms,
@@ -53,14 +53,14 @@ def test_sparrow_imported():
 def test_compute_patch_fraction_wrapper_matches_functional_api(patch_protein):
     assert np.isclose(
         patch_protein.compute_patch_fraction("A"),
-        patching.patch_fraction(PATCH_SEQUENCE, "A"),
+        patches.patch_fraction(PATCH_SEQUENCE, "A")[0],
     )
 
 
 def test_compute_rg_patch_fraction_wrapper_matches_functional_api(patch_protein):
     assert np.isclose(
         patch_protein.compute_rg_patch_fraction(),
-        patching.rg_patch_fraction(PATCH_SEQUENCE),
+        patches.rg_patch_fraction(PATCH_SEQUENCE)[0],
     )
 
 
@@ -128,7 +128,7 @@ def test_compute_residue_fractions_for_custom_group(canonical_protein):
 def test_patch_fraction_matches_functional_api_on_canonical_sequence(canonical_protein):
     assert np.isclose(
         canonical_protein.compute_patch_fraction("Q"),
-        patching.patch_fraction(canonical_protein.sequence, "Q"),
+        patches.patch_fraction(canonical_protein.sequence, "Q")[0],
     )
 
 
@@ -137,7 +137,7 @@ def test_rg_patch_fraction_matches_functional_api_on_canonical_sequence(
 ):
     assert np.isclose(
         canonical_protein.compute_rg_patch_fraction(),
-        patching.rg_patch_fraction(canonical_protein.sequence),
+        patches.rg_patch_fraction(canonical_protein.sequence)[0],
     )
 
 

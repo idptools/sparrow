@@ -33,10 +33,11 @@ Each one comes from the same function behind the corresponding
 * the amino acid fractions, grouped fractions, ratios and whole-sequence
   properties - :mod:`sparrow.properties.composition` and
   :mod:`sparrow.properties.charge`;
-* the patch features - :mod:`sparrow.sequence_analysis.patching`.
+* the patch features - :mod:`sparrow.properties.patches`.
 
-A batch is counted once and every compositional feature read off those counts, so
-``composition_matrix`` over a whole IDRome costs little more than reading it in.
+A batch is encoded once; every compositional feature is read off its residue
+counts, and every patch feature found in one pass along the whole batch, so
+``composition_matrix`` over a whole IDRome takes about a second.
 ``composition_values(seq)['FCR']`` and ``Protein(seq).FCR`` are the same number by
 construction, and a test asserts that for every feature with a counterpart.
 
@@ -63,8 +64,7 @@ from collections import OrderedDict
 import numpy as np
 
 from sparrow.data import amino_acids
-from sparrow.properties import charge, composition, encoding
-from sparrow.sequence_analysis.patching import patch_fraction, rg_patch_fraction
+from sparrow.properties import charge, composition, encoding, patches
 from sparrow.sparrow_exceptions import SparrowException
 
 __all__ = [
@@ -79,13 +79,13 @@ __all__ = [
 ]
 
 #: Maximum number of non-target residues bridged inside a patch.
-PATCH_INTERRUPTION = 2
+PATCH_INTERRUPTION = patches.DEFAULT_INTERRUPTION
 
 #: Minimum number of target residues required for a patch to count.
-PATCH_MIN_TARGET_COUNT = 4
+PATCH_MIN_TARGET_COUNT = patches.DEFAULT_MIN_TARGET_COUNT
 
 #: Minimum number of adjacent ``RG`` pairs required for an RG patch to count.
-RG_MIN_ADJACENT_PAIRS = 2
+RG_MIN_ADJACENT_PAIRS = patches.DEFAULT_MIN_ADJACENT_RG_PAIRS
 
 #: Residues that get a patch feature. Tryptophan is deliberately excluded.
 PATCH_RESIDUES = tuple(aa for aa in amino_acids.VALID_AMINO_ACIDS if aa != "W")
@@ -142,25 +142,25 @@ def composition_feature_names():
     return COMPOSITION_FEATURE_NAMES
 
 
-def _patch_columns(sequence):
-    """The 19 single-residue patch fractions and the RG fraction of one sequence."""
-    patches = [
-        patch_fraction(
-            sequence,
+def _patch_columns(encoded):
+    """The 19 single-residue patch fractions and the RG fraction, one column each."""
+    columns = [
+        patches.patch_fraction(
+            encoded,
             residue_selector=aa,
             interruption=PATCH_INTERRUPTION,
             min_target_count=PATCH_MIN_TARGET_COUNT,
         )
         for aa in PATCH_RESIDUES
     ]
-    patches.append(
-        rg_patch_fraction(
-            sequence,
+    columns.append(
+        patches.rg_patch_fraction(
+            encoded,
             interruption=PATCH_INTERRUPTION,
             min_adjacent_rg_pairs=RG_MIN_ADJACENT_PAIRS,
         )
     )
-    return patches
+    return columns
 
 
 def composition_matrix(sequences, validate=True):
@@ -206,10 +206,11 @@ def composition_matrix(sequences, validate=True):
     if not batch:
         return np.zeros((0, len(COMPOSITION_FEATURE_NAMES)), dtype=np.float64)
 
-    # every feature below is read off one count of the batch, through the same
+    # every feature below comes from one encoding of the batch, through the same
     # functions behind the corresponding Protein properties. The one deliberate
     # difference is 'Frac Polar' - see amino_acids.NARDINI_POLAR.
-    counts = composition.count_residues(batch)
+    encoded = encoding.encode_batch(batch)
+    counts = composition.count_residues(encoded)
 
     columns = list(composition.amino_acid_fractions(counts).T)
     columns += [composition.fraction_in_set(counts, residues) for residues in _GROUPED_FRACTIONS.values()]
@@ -225,8 +226,7 @@ def composition_matrix(sequences, validate=True):
         composition.polyproline_II_propensity(counts),
     ]
 
-    patches = np.array([_patch_columns(sequence) for sequence in batch], dtype=np.float64)
-    matrix = np.column_stack(columns + list(patches.T))
+    matrix = np.column_stack(columns + _patch_columns(encoded))
 
     assert matrix.shape == (len(batch), len(COMPOSITION_FEATURE_NAMES)), matrix.shape
     return matrix

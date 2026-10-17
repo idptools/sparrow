@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 
 from sparrow.data import amino_acids
-from sparrow.properties import charge, composition
+from sparrow.properties import charge, composition, encoding, patches
 
 BATCH = [
     "MEEEKKKKSSSTTTDDDQQQQNNNNGGG",
@@ -52,6 +52,8 @@ CALLS = {
     "composition.seg_complexity": composition.seg_complexity,
     "charge.charge_at_pH": lambda batch: charge.charge_at_pH(batch, pH=5.0, normalize=False),
     "charge.isoelectric_point": charge.isoelectric_point,
+    "patches.patch_fraction": lambda batch: patches.patch_fraction(batch, "EK", interruption=1, min_target_count=3),
+    "patches.rg_patch_fraction": lambda batch: patches.rg_patch_fraction(batch, min_adjacent_rg_pairs=1),
 }
 
 #: Public names that are not batch property functions.
@@ -61,7 +63,7 @@ NOT_BATCH_FUNCTIONS = {
     "composition.as_counts",
 }
 
-MODULES = {"composition": composition, "charge": charge}
+MODULES = {"composition": composition, "charge": charge, "patches": patches}
 
 
 def test_every_batch_function_is_covered():
@@ -98,10 +100,15 @@ def test_a_large_batch_matches_one_sequence_at_a_time(name):
     np.testing.assert_array_equal(batch, np.concatenate([one_at_a_time] * 300))
 
 
-@pytest.mark.parametrize("name", sorted(CALLS))
+@pytest.mark.parametrize("name", sorted(name for name in CALLS if not name.startswith("patches.")))
 def test_counts_and_sequences_give_the_same_answer(name):
     counts = composition.count_residues(BATCH)
     np.testing.assert_array_equal(CALLS[name](counts), CALLS[name](BATCH))
+
+
+@pytest.mark.parametrize("name", sorted(CALLS))
+def test_an_encoded_batch_gives_the_same_answer(name):
+    np.testing.assert_array_equal(CALLS[name](encoding.encode_batch(BATCH)), CALLS[name](BATCH))
 
 
 @pytest.mark.parametrize("name", sorted(CALLS))

@@ -16,10 +16,9 @@ from sparrow.data import amino_acids
 # compiled code's single-precision arithmetic, and more accurate where they
 # differ - see sparrow.patterning.vectorized and its test module.
 from sparrow.patterning import vectorized as patterning_metrics
-from sparrow.properties import charge, composition, encoding
+from sparrow.properties import charge, composition, encoding, patches
 from sparrow.sequence_analysis import (
     elm,
-    patching,
     phospho_isoforms,
     sequence_complexity,
 )
@@ -86,6 +85,7 @@ class Protein:
             self.__seq = s.upper()
 
         # all sequence parameters are initialized as unset class variables
+        self.__encoded = None
         self.__residue_counts = None
         self.__aa_fracts = None
         self.__FCR = None
@@ -118,11 +118,18 @@ class Protein:
 
     # .................................................................
     #
+    def __encoded_sequence(self):
+        """This sequence as residue codes, encoded once and shared by every
+        property that needs them."""
+        if self.__encoded is None:
+            self.__encoded = encoding.encode_batch(self.__seq)
+        return self.__encoded
+
     def __counts(self):
         """Residue counts of this sequence, computed once and shared by every
         composition property."""
         if self.__residue_counts is None:
-            self.__residue_counts = composition.count_residues(self.__seq)
+            self.__residue_counts = composition.count_residues(self.__encoded_sequence())
         return self.__residue_counts
 
     # .................................................................
@@ -840,14 +847,15 @@ class Protein:
         float
             Fraction of sequence positions covered by valid patch spans.
         """
-        return patching.patch_fraction(
-            self.sequence,
+        fraction = patches.patch_fraction(
+            self.__encoded_sequence(),
             residue_selector=residue_selector,
             interruption=interruption,
             min_target_count=min_target_count,
             adjacent_pair_pattern=adjacent_pair_pattern,
             min_adjacent_pair_count=min_adjacent_pair_count,
         )
+        return float(fraction[0])
 
     # .................................................................
     #
