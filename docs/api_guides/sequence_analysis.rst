@@ -35,6 +35,7 @@ Direct Parameter Calculations
 The calculations behind the ``Protein`` properties live in
 :mod:`sparrow.properties`, and every one of them works on a batch: pass a list of
 sequences and get back one value per sequence. A single string is a batch of one.
+:doc:`sequence_properties` covers them in full; in short:
 
 .. code-block:: python
 
@@ -54,6 +55,14 @@ counts instead of the sequences:
    counts = composition.count_residues(sequences)
    fcr = composition.fraction_charged(counts)
    ncpr = composition.net_charge_per_residue(counts)
+
+Or ask for ``Protein`` properties by name, for the whole batch at once:
+
+.. code-block:: python
+
+   from sparrow.properties import compute
+
+   table = compute(sequences, ["FCR", "kappa", "SCD"])   # dict of arrays
 
 NARDINI+ Feature Vectors
 ------------------------
@@ -114,8 +123,9 @@ Reference: Alignment Module
 Reference: Parameter Functions
 ------------------------------
 
-Key function entry points:
+Key function entry points (all documented in :doc:`sequence_properties`):
 
+* :func:`sparrow.properties.compute`
 * :func:`sparrow.properties.composition.amino_acid_fractions`
 * :func:`sparrow.properties.composition.seg_complexity`
 * :func:`sparrow.properties.composition.hydrophobicity`
@@ -131,21 +141,4 @@ Sequence properties
 The single implementation behind the corresponding
 :class:`~sparrow.protein.Protein` properties *and* the matching NARDINI+
 compositional features, so the two cannot disagree. Every function takes a batch.
-
-.. automodule:: sparrow.properties
-   :no-index:
-
-.. automodule:: sparrow.properties.composition
-   :members:
-
-.. automodule:: sparrow.properties.charge
-   :members: charge_at_pH, isoelectric_point, DEFAULT_PH, PI_THRESHOLD
-
-.. automodule:: sparrow.properties.encoding
-   :members:
-
-.. automodule:: sparrow.properties.patches
-   :members:
-
-.. automodule:: sparrow.properties.profiles
-   :members:
+The full reference is in :doc:`sequence_properties`.

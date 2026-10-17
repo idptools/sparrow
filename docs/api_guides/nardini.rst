@@ -393,7 +393,7 @@ per call.
    The NumPy reimplementations carry their intermediates in ``float64`` where the
    Cython extensions use C ``float``. For IWD both are double precision and agree
    to ~1e-15; for kappa they agree to ~1e-6, and the NumPy value is the more
-   accurate of the two. ``sparrow/tests/test_patterning_vectorized.py`` pins both
+   accurate of the two. ``sparrow/tests/test_properties_patterning.py`` pins both
    claims, including a test that replays the Cython arithmetic in single
    precision to demonstrate the residual gap is the compiled code's precision and
    not an error here.

@@ -140,8 +140,9 @@ Most of these properties are *also* NARDINI+ compositional features. There is on
 implementation of each, in :mod:`sparrow.properties`, read by both -- so a
 ``Protein`` property and its corresponding feature are bit-identical by
 construction, and a test pins that for every one of them. The same functions
-compute any of these properties for a whole list of sequences at once -- see
-:mod:`sparrow.properties.composition`.
+compute any of these properties for a whole list of sequences at once --
+``sparrow.properties.compute(sequences, ["FCR", "kappa"])`` gives them by name;
+see :doc:`sequence_properties`.
 
 .. warning::
    The single exception is **polar**. NARDINI+ counts cysteine as polar
@@ -192,7 +193,7 @@ Windowed tracks with one value per residue -- ideal for plotting (see
 The 500+ AAindex scales usable with ``linear_property_profile`` are catalogued in
 :doc:`properties`. For a whole list of sequences, the same profiles come from
 :mod:`sparrow.properties.profiles`, which these methods call (see
-:doc:`sequence_analysis`).
+:doc:`sequence_properties`).
 
 Domains, motifs & isoforms
 --------------------------

@@ -35,6 +35,7 @@ takes the index's values directly:
    from sparrow.data import aaindex
    from sparrow.properties import profiles
 
+   sequences = ["MEEEKKKKSSSTTTDDDQQQQNNNN", "GRGRGGYGGRGGYGGSRGGYGG"]
    scale = aaindex.get_property_values("hydropathy-kyte-1982")
    hydropathy = profiles.scale_profile(sequences, scale, window_size=9)  # one per sequence
 

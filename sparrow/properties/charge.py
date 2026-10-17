@@ -58,7 +58,9 @@ _TITRATABLE_SIGN = np.array([1.0] * len(amino_acids.TITRATABLE_BASES) + [-1.0] *
 
 def _titratable_counts(counts: ResidueCounts) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Counts of each titratable residue, ``(n, 7)``, and their total, ``(n,)``."""
-    titratable = counts.counts[:, _TITRATABLE_COLUMNS].astype(np.float64)
+    # row-major, so each row's charges are summed in the same order alone or in
+    # a batch (indexing columns can return them laid out column by column)
+    titratable = np.ascontiguousarray(counts.counts[:, _TITRATABLE_COLUMNS], dtype=np.float64)
     return titratable, titratable.sum(axis=1)
 
 

@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 
 from sparrow.data import amino_acids
+import sparrow.properties
 from sparrow.properties import charge, composition, encoding, patches, patterning, profiles
 
 BATCH = [
@@ -30,6 +31,10 @@ BATCH = [
     "GSGSGSGSGSGS",
     "KEDR" * 30,
     "mEEKkk",
+    # many residue types in uneven amounts, so that a sum over them gives
+    # different last bits when its terms are added in a different order
+    "MEEEKKKKSSSTTTDDD",
+    "MSDNGPQSNQRSAPRITFGGPTDSTDNNQNGGRNGARPKQRRPQGLPNNTASWFTALTQHGK",
 ]
 
 #: Every public batch function, called with representative arguments.
@@ -139,6 +144,12 @@ def test_every_batch_function_is_covered():
             assert covered, f"{key} is not covered by the batch test"
 
 
+@pytest.mark.parametrize("name", sorted(CALLS) + sorted(PROFILE_CALLS))
+def test_every_batch_function_is_exported_from_the_package(name):
+    module_name, function_name = name.split(".")
+    assert getattr(sparrow.properties, function_name) is getattr(MODULES[module_name], function_name)
+
+
 @pytest.mark.parametrize("name", sorted(CALLS))
 def test_batch_returns_one_entry_per_sequence(name):
     batch = batch_for(name)
@@ -171,6 +182,14 @@ def test_a_large_batch_matches_one_sequence_at_a_time(name):
 def test_counts_and_sequences_give_the_same_answer(name):
     counts = composition.count_residues(BATCH)
     np.testing.assert_array_equal(CALLS[name](counts), CALLS[name](BATCH))
+
+
+@pytest.mark.parametrize("name", sorted(TAKES_COUNTS))
+def test_counts_laid_out_column_by_column_give_the_same_answer(name):
+    """How the count matrix sits in memory must not change how a row is summed."""
+    counts = composition.count_residues(BATCH)
+    by_column = composition.ResidueCounts(counts=np.asfortranarray(counts.counts), lengths=counts.lengths)
+    np.testing.assert_array_equal(CALLS[name](by_column), CALLS[name](counts))
 
 
 @pytest.mark.parametrize("name", sorted(set(CALLS) - TAKES_CHARACTERS))

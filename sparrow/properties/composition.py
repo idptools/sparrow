@@ -80,13 +80,23 @@ class ResidueCounts:
     ----------
     counts : numpy.ndarray
         ``int64`` array of shape ``(n_sequences, 20)``; column ``j`` counts
-        residue :data:`sparrow.properties.encoding.RESIDUES` ``[j]``.
+        residue :data:`sparrow.properties.encoding.RESIDUES` ``[j]``. Always
+        held row-major (copied into that order if given otherwise).
     lengths : numpy.ndarray
         ``int64`` array of shape ``(n_sequences,)``, each sequence's length.
     """
 
     counts: NDArray[np.int64]
     lengths: NDArray[np.int64]
+
+    def __post_init__(self) -> None:
+        """Hold the counts row-major.
+
+        NumPy sums a row of a row-major array pairwise, but a row of a
+        column-major one term by term, so the same counts laid out the other way
+        would give a weighted sum different last bits.
+        """
+        object.__setattr__(self, "counts", np.ascontiguousarray(self.counts))
 
     def __len__(self) -> int:
         """Number of sequences in the batch."""
@@ -496,7 +506,11 @@ def seg_complexity(
         raise SparrowException(f"SEG complexity needs an alphabet of at least two residues, not {list(alphabet)}")
     log_base = np.log(len(columns))
 
-    fractions = _per_residue(counts.counts[:, columns], counts.lengths[:, None])
+    # copied into row-major order: indexing columns can return them laid out
+    # column by column, and NumPy then adds up a row's terms in a different order
+    # than for a single sequence, which changes the last bit
+    selected = np.ascontiguousarray(counts.counts[:, columns])
+    fractions = _per_residue(selected, counts.lengths[:, None])
     # 0 log 0 is taken as 0, its limit: an absent residue's log stays 0
     logs = np.zeros_like(fractions)
     np.log(fractions, out=logs, where=fractions > 0)

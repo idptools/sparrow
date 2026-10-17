@@ -37,7 +37,7 @@ SPARROW integrates direct sequence calculations with per-residue predictions fro
 - **Deep-learning predictions** via `Protein.predictor` — disorder and pLDDT, DSSP secondary structure, polymer dimensions (Rg, Re, scaling exponent, asphericity, prefactor), phosphorylation, localization signals, transactivation domains, transmembrane regions, and phase-separation propensity. Built on the [ALBATROSS](https://www.nature.com/articles/s41592-023-02159-5) networks.
 - **Polymer-model properties** via `Protein.polymeric` — analytical and simulation-derived dimensions and distance distributions.
 - **Molecular grammars** — a native NARDINI / NARDINI+ implementation (`sparrow.nardini`) for detecting non-random residue patterning, with user-buildable compositional backgrounds, assignment to the 30 human GIN grammars, clustering to derive your own, and parallel computation across a whole proteome.
-- **Scale-up tools** — fast batch prediction across whole sequence sets, and fixed-length feature vectors for machine learning.
+- **Scale-up tools** — every sequence parameter and profile for a whole batch of sequences at once (`sparrow.properties`), fast batch prediction across whole sequence sets, and fixed-length feature vectors for machine learning.
 - **Extensible** — a simple plugin system for adding new sequence analyses.
 
 ## Installation
@@ -89,6 +89,22 @@ proteins = read_fasta("my_fasta_file.fasta")   # {header: Protein}
 ```
 
 `read_fasta()` accepts the same keyword arguments as [`protfasta.read_fasta`](https://protfasta.readthedocs.io/en/latest/read_fasta.html).
+
+### Many sequences at once
+
+Every `Protein` property is calculated by a batch function in `sparrow.properties`, which takes a list of sequences and returns one value per sequence. `compute()` gives any of them by their `Protein` name — the same values, to the last bit, without making a `Protein` for each sequence:
+
+```python
+from sparrow.properties import compute, fraction_in_set, window_profile, composition
+
+sequences = ["MEEEKKKKSSSTTTDDD", "GRGRGGYGGRGGYGGSRGGYGG"]
+
+table = compute(sequences, ["FCR", "NCPR", "kappa", "SCD"])   # {name: numpy array}
+qn = fraction_in_set(sequences, ["Q", "N"])
+fcr_profiles = window_profile(sequences, composition.fraction_charged, window_size=8)
+```
+
+For the 24,508 human IDRs, all 20 `Protein` properties take 0.28 s this way. See [the guide](https://idptools-sparrow.readthedocs.io/en/latest/api_guides/sequence_properties.html).
 
 ## ALBATROSS predictions
 
