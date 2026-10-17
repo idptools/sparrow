@@ -8,13 +8,43 @@ human-readable description - ``'D/E-tracts'``, ``'S patches'``,
 This module assigns *new* sequences to clusters: it computes each sequence's
 NARDINI+ vector and finds the nearest centroid. It does not derive clusters -
 :mod:`sparrow.nardini.clustering` does that, and produces a :class:`GINReference`
-that :func:`assign_gin_clusters` accepts in place of the published one.
+that :func:`assign_gin_clusters` accepts in place of the bundled ones.
 
-So there are two ways to use this module: against the 30 published human grammars
+So there are two ways to use this module: against the 30 human GIN grammars
 (the default, and what you want for human IDRs), or against centroids you built
 yourself with :func:`~sparrow.nardini.clustering.build_gin_reference` (which is
 what you want for anything else). :meth:`GINReference.save` and
 :meth:`GINReference.load` persist the latter.
+
+Which human centroids?
+----------------------
+sparrow bundles two sets of the 30 human GIN centroids, listed in
+:data:`GIN_REFERENCES`:
+
+``'corrected'`` (the default)
+    The published clusters refit to vectors computed the way sparrow computes
+    them. The published GIN vectors were built with the ``nardini`` package's
+    patterning windows, which include one trailing window of ``b - 1`` residues
+    normalized as if it held ``b`` - an off-by-one that sparrow does not
+    reproduce (see :mod:`sparrow.nardini.patterning`). These centroids were
+    obtained by starting k-means from the published centroids and running it to
+    convergence on corrected vectors of the same 4,529 IDRs, so each cluster keeps
+    its published number and description, and no centroid moves by more than
+    about 0.1% of the (squared) spacing between clusters. 99% of those IDRs, and
+    97% of the 24,508 in the human IDRome, keep their published cluster. Almost
+    every IDR that moves sat on a boundary to begin with: their median published
+    separation is 0.3, against 5.0 for all IDRs, and 92% move to the cluster that
+    was already their runner-up.
+
+``'published'``
+    The centroids exactly as published by Ruff et al. (2025). Assigning sparrow's
+    vectors to these is what the NARDINI+ Colab notebook does - its own patterning
+    code also uses the complete windows - and it reproduces 97.5% of the published
+    cluster calls. Use it when you want to compare against the paper's
+    assignments directly.
+
+``devtools/scripts/build_corrected_gin_reference.py`` rebuilds the corrected set,
+and ``sparrow/data/nardini/SOURCES.md`` records where both come from.
 
 Whichever reference is used, the vectors and the centroids must live in the same
 space. A reference records the patterning backend it was built from, and
@@ -30,7 +60,8 @@ those are different statistics on different scales.
     background = load_reference_background("human")
     result = nardini_vectors("my_idrs.fasta", background=background,
                              num_scrambles=10000, seed=42)
-    assign_gin_clusters(result)
+    assign_gin_clusters(result)                          # corrected centroids
+    assign_gin_clusters(result, reference="published")   # or the published ones
 
 The assignment procedure, following the reference implementation:
 
@@ -76,8 +107,8 @@ including one that looks nothing like a human IDR. Three numbers on
 ``n_saturated``
     How many of the 90 features were pinned at the +/-3 clip. A clipped feature
     contributes a fixed amount to every centroid distance, so it carries no
-    information about *which* cluster is nearest - it has been flattened. All 30
-    published centroids lie within -2.32 to 2.99, so a sequence with many
+    information about *which* cluster is nearest - it has been flattened. Every
+    bundled centroid lies within about -2.3 to 3.0, so a sequence with many
     saturated features is outside the range any centroid describes.
 
 ``composition_rms_z``
@@ -121,6 +152,8 @@ from sparrow.sparrow_exceptions import SparrowException
 
 __all__ = [
     "GIN_CLIP",
+    "GIN_REFERENCES",
+    "DEFAULT_GIN_REFERENCE",
     "GINReference",
     "GINAssignment",
     "load_gin_reference",
@@ -144,17 +177,39 @@ TYPICAL_COMPOSITION_RMS_Z = 2.0
 #: vector has stopped carrying information.
 TYPICAL_MAX_SATURATED = 5
 
+#: The bundled human GIN references, mapping the name you pass to
+#: :func:`load_gin_reference` onto a one-line summary. See the module docstring
+#: for how the two differ.
+GIN_REFERENCES = {
+    "corrected": "published clusters refit to n - b + 1 patterning windows (default)",
+    "published": "the centroids as published by Ruff et al. (2025), fit to n - b + 2 windows",
+}
+
+#: The human reference used unless another is requested.
+DEFAULT_GIN_REFERENCE = "corrected"
+
 #: On-disk format version for GINReference.save / .load
 _REFERENCE_FORMAT_VERSION = 1
 
-_CENTROID_FILE = "nardini/gin_centroids_human_v1.npz"
-_DEFINITION_FILE = "nardini/gin_cluster_definitions_human_v1.csv"
+#: Bundled ``(centroid file, cluster definition file)`` for each reference.
+_REFERENCE_FILES = {
+    "corrected": (
+        "nardini/gin_centroids_human_corrected_v1.npz",
+        "nardini/gin_cluster_definitions_human_corrected_v1.csv",
+    ),
+    "published": (
+        "nardini/gin_centroids_human_v1.npz",
+        "nardini/gin_cluster_definitions_human_v1.csv",
+    ),
+}
 
 
 class GINReference:
-    """The published GIN cluster centroids and their descriptions.
+    """A set of GIN cluster centroids and their descriptions.
 
-    Load with :func:`load_gin_reference` rather than constructing directly.
+    Load the bundled human ones with :func:`load_gin_reference`, or build your own
+    with :func:`~sparrow.nardini.clustering.build_gin_reference`, rather than
+    constructing one directly.
 
     Attributes
     ----------
@@ -165,15 +220,15 @@ class GINReference:
     centroids : numpy.ndarray
         Array of shape ``(30, 90)`` of centroid coordinates.
     descriptions : dict
-        Mapping from cluster number to its published description.
+        Mapping from cluster number to its description.
     num_idrs : dict
-        Mapping from cluster number to the number of human IDRs assigned to it in
-        the published analysis.
+        Mapping from cluster number to the number of IDRs assigned to it - for the
+        bundled references, out of the 24,508 human IDRs.
     metadata : dict
         Provenance and citation information.
     backend : str
         The patterning statistic the centroids live in. ``'nardini'`` for the
-        published reference. A reference built with :func:`build_gin_reference`
+        bundled references. A reference built with :func:`build_gin_reference`
         records whichever backend produced its vectors, and
         :func:`assign_gin_clusters` refuses to mix the two.
     """
@@ -302,7 +357,7 @@ class GINReference:
     # .................................................................
     #
     def describe(self, cluster):
-        """Return the published description of one cluster.
+        """Return the description of one cluster.
 
         Parameters
         ----------
@@ -345,7 +400,7 @@ class GINReference:
 
         Squared Euclidean, so it is directly comparable to the distances reported
         by :func:`assign_gin_clusters` and :func:`compare_gin_references`, which
-        use the same convention. About 17.8 for the published reference.
+        use the same convention. About 17.8 for both bundled human references.
 
         Describes how tightly packed the cluster structure is.
 
@@ -383,28 +438,37 @@ class GINReference:
         return frame.set_index("cluster")
 
 
-_REFERENCE_CACHE = {}
+_REFERENCE_CACHE: dict[str, GINReference] = {}
 
 
-def load_gin_reference():
-    """Load the bundled human GIN cluster centroids and descriptions.
+def load_gin_reference(name=DEFAULT_GIN_REFERENCE):
+    """Load one of the bundled human GIN references.
+
+    Parameters
+    ----------
+    name : str, optional
+        Which centroids, one of :data:`GIN_REFERENCES`: ``'corrected'`` (default),
+        the published clusters refit to sparrow's patterning windows, or
+        ``'published'``, the centroids exactly as published. See the module
+        docstring for how they differ.
 
     Returns
     -------
     GINReference
-        The 30 published centroids, with their descriptions and IDR counts.
+        The 30 centroids, with their descriptions and IDR counts.
 
     Raises
     ------
     sparrow.sparrow_exceptions.SparrowException
-        If the bundled data files are missing or their feature order does not
-        match sparrow's NARDINI+ feature definitions.
+        If ``name`` is not a bundled reference, if the bundled data files are
+        missing, or if their feature order does not match sparrow's NARDINI+
+        feature definitions.
 
     Notes
     -----
-    These data are redistributed from the GIN resource under the MIT licence.
-    Please cite Ruff et al. (2025) if you use them - see
-    ``sparrow/data/nardini/SOURCES.md``.
+    The published data are redistributed from the GIN resource under the MIT
+    licence, and the corrected centroids are derived from them. Please cite Ruff
+    et al. (2025) if you use either - see ``sparrow/data/nardini/SOURCES.md``.
 
     Examples
     --------
@@ -413,29 +477,31 @@ def load_gin_reference():
     30
     >>> reference.describe(7)
     'D/E-tracts'
+    >>> load_gin_reference("published").describe(7)
+    'D/E-tracts'
     """
     import sparrow
 
-    if "human" in _REFERENCE_CACHE:
-        return _REFERENCE_CACHE["human"]
+    key = str(name).strip().lower()
+    if key not in GIN_REFERENCES:
+        raise SparrowException(f"No bundled GIN reference called '{name}'. Available: {sorted(GIN_REFERENCES)}.")
 
-    centroid_path = sparrow.get_data(_CENTROID_FILE)
+    if key in _REFERENCE_CACHE:
+        return _REFERENCE_CACHE[key]
+
+    centroid_file, definition_file = _REFERENCE_FILES[key]
+    centroid_path = sparrow.get_data(centroid_file)
     if not os.path.isfile(centroid_path):
         raise SparrowException(
-            f"Bundled GIN centroid file is missing: {centroid_path}. "
-            "Reinstall sparrow, or regenerate it with "
-            "devtools/scripts/build_nardini_reference_data.py"
+            f"Bundled GIN centroid file is missing: {centroid_path}. Reinstall sparrow, "
+            "or regenerate it with the scripts in devtools/scripts/."
         )
-
-    import json
 
     with np.load(centroid_path, allow_pickle=False) as data:
         feature_names = [str(x) for x in data["feature_names"].tolist()]
         clusters = np.asarray(data["clusters"], dtype=int)
         centroids = np.asarray(data["centroids"], dtype=np.float64)
-        metadata = {}
-        if "metadata_json" in data:
-            metadata = json.loads(str(data["metadata_json"]))
+        metadata = json.loads(str(data["metadata_json"])) if "metadata_json" in data else {}
 
     # the centroids are only meaningful if our feature order still matches theirs
     expected = list(patterning_feature_names("8")) + list(COMPOSITION_FEATURE_NAMES)
@@ -447,13 +513,11 @@ def load_gin_reference():
         )
 
     descriptions, num_idrs = {}, {}
-    definition_path = sparrow.get_data(_DEFINITION_FILE)
-    if os.path.isfile(definition_path):
-        with open(definition_path, newline="") as handle:
-            for row in csv.DictReader(handle):
-                cluster = int(row["cluster"])
-                descriptions[cluster] = row["description"]
-                num_idrs[cluster] = int(row["num_idrs"])
+    with open(sparrow.get_data(definition_file), newline="") as handle:
+        for row in csv.DictReader(handle):
+            cluster = int(row["cluster"])
+            descriptions[cluster] = row["description"]
+            num_idrs[cluster] = int(row["num_idrs"])
 
     reference = GINReference(
         feature_names=feature_names,
@@ -463,18 +527,42 @@ def load_gin_reference():
         num_idrs=num_idrs,
         metadata=metadata,
     )
-    _REFERENCE_CACHE["human"] = reference
+    _REFERENCE_CACHE[key] = reference
     return reference
 
 
-def gin_cluster_definitions(as_dataframe=False):
-    """Return the 30 published GIN cluster definitions.
+def _resolve_reference(reference):
+    """Turn a ``reference`` argument into a GINReference.
+
+    Parameters
+    ----------
+    reference : GINReference, str or None
+        A reference object, the name of a bundled one, or None for the default.
+
+    Returns
+    -------
+    GINReference
+    """
+    if reference is None:
+        return load_gin_reference()
+    if isinstance(reference, str):
+        return load_gin_reference(reference)
+    return reference
+
+
+def gin_cluster_definitions(as_dataframe=False, reference=None):
+    """Return the 30 human GIN cluster definitions.
 
     Parameters
     ----------
     as_dataframe : bool, optional
         If True, return a pandas DataFrame indexed by cluster number. Default
         False, which returns plain dictionaries and needs no pandas.
+    reference : GINReference or str, optional
+        Whose definitions: a reference object, or the name of a bundled one.
+        Default the corrected human reference. The descriptions are the
+        published ones either way; ``num_idrs`` counts the human IDRs assigned to
+        each cluster by that reference's centroids.
 
     Returns
     -------
@@ -486,13 +574,13 @@ def gin_cluster_definitions(as_dataframe=False):
     >>> definitions = gin_cluster_definitions()
     >>> definitions[7]["description"]
     'D/E-tracts'
-    >>> definitions[7]["num_idrs"]
+    >>> gin_cluster_definitions(reference="published")[7]["num_idrs"]
     763
     """
-    reference = load_gin_reference()
+    resolved = _resolve_reference(reference)
     if as_dataframe:
-        return reference.to_dataframe()
-    return reference.definitions()
+        return resolved.to_dataframe()
+    return resolved.definitions()
 
 
 class GINAssignment:
@@ -500,7 +588,7 @@ class GINAssignment:
 
     Returned by :func:`assign_gin_clusters`.
 
-    The published description of each assigned cluster is available as the
+    The description of each assigned cluster is available as the
     :attr:`descriptions` property documented below.
 
     Attributes
@@ -548,7 +636,7 @@ class GINAssignment:
 
     @property
     def descriptions(self):
-        """Published description of each assigned cluster."""
+        """Description of each assigned cluster."""
         return tuple(self.reference.describe(c) for c in self.clusters)
 
     def __len__(self):
@@ -673,7 +761,7 @@ class GINAssignment:
 
 
 def assign_gin_clusters(result, reference=None, clip=GIN_CLIP):
-    """Assign sequences to their nearest published GIN cluster.
+    """Assign sequences to their nearest GIN cluster.
 
     Parameters
     ----------
@@ -681,8 +769,10 @@ def assign_gin_clusters(result, reference=None, clip=GIN_CLIP):
         Either a :class:`~sparrow.nardini.vectors.NardiniResult` computed *with* a
         compositional background, or a raw array of shape ``(n_sequences, 90)`` /
         ``(90,)`` of NARDINI+ z-scores in canonical feature order.
-    reference : GINReference, optional
-        Reference centroids. Defaults to the bundled human GIN reference.
+    reference : GINReference or str, optional
+        Reference centroids: a :class:`GINReference`, or the name of a bundled
+        one (see :data:`GIN_REFERENCES`). Defaults to the corrected human GIN
+        reference; pass ``'published'`` for the centroids exactly as published.
     clip : float, optional
         Clip z-scores to ``[-clip, +clip]`` before computing distances. Default
         3.0, matching how the centroids were built. Pass None to disable, though
@@ -716,8 +806,7 @@ def assign_gin_clusters(result, reference=None, clip=GIN_CLIP):
     ...                          num_scrambles=10000, seed=42)   # doctest: +SKIP
     >>> assign_gin_clusters(result).to_dataframe()               # doctest: +SKIP
     """
-    if reference is None:
-        reference = load_gin_reference()
+    reference = _resolve_reference(reference)
 
     # accept either a NardiniResult or a bare array
     if hasattr(result, "zscores"):
@@ -732,12 +821,12 @@ def assign_gin_clusters(result, reference=None, clip=GIN_CLIP):
         # Centroids live in the space of whatever statistic produced them.
         # Assigning a vector from a different backend would compare quantities on
         # entirely different scales and return meaningless-but-plausible labels,
-        # so the two must agree. The published reference is 'nardini', which is
-        # why assigning a 'kappa' vector against it is refused - but a reference
+        # so the two must agree. The bundled references are 'nardini', which is
+        # why assigning a 'kappa' vector against them is refused - but a reference
         # you built yourself from 'kappa' vectors accepts them happily.
         backend = getattr(result, "backend", DEFAULT_BACKEND)
         if backend != reference.backend:
-            published = reference.metadata.get("derived_from") is None
+            bundled = reference.metadata.get("derived_from") is None
             hint = (
                 "Recompute with nardini_vectors(..., "
                 f"backend='{reference.backend}'), or build a reference in "
@@ -747,7 +836,7 @@ def assign_gin_clusters(result, reference=None, clip=GIN_CLIP):
                 f"Cannot assign a '{backend}' vector against centroids defined in "
                 f"'{reference.backend}' space - the two statistics are on "
                 f"different scales, so the labels would be meaningless. "
-                + ("The bundled GIN reference is 'nardini'. " if published else "")
+                + ("The bundled GIN references are 'nardini'. " if bundled else "")
                 + hint
             )
 
@@ -769,11 +858,13 @@ def assign_gin_clusters(result, reference=None, clip=GIN_CLIP):
     # The 54 compositional features are standardized against that population, so
     # a member of it has z ~ N(0, 1) per feature and an RMS near 1. Computed on
     # the UNCLIPPED vector, since clipping would cap exactly the signal we want.
-    n_composition = 54
+    # A reference you built from patterning-only vectors has no compositional
+    # block to measure, hence the width check.
+    n_composition = len(COMPOSITION_FEATURE_NAMES)
     if vectors.shape[1] >= n_composition:
         composition_block = vectors[:, -n_composition:]
         composition_rms_z = np.sqrt(np.nanmean(composition_block**2, axis=1))
-    else:  # pragma: no cover - width is validated above
+    else:
         composition_rms_z = np.full(vectors.shape[0], np.nan)
 
     # count how many features are extreme enough to be pinned at the clip bound.

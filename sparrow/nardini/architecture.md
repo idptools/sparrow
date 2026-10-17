@@ -45,7 +45,7 @@ Arrows point from a module to the modules it imports. Nothing points upwards, so
 
 **`groups.py`** defines the residue typesets — the 8-type default and the 9-type variant — and derives the patterning feature names from them. Both are exact partitions of the 20 standard amino acids, asserted at import. That property is load-bearing: it is what lets `patterning.py` reduce a sequence to a compact integer label array instead of working with strings.
 
-**`patterning.py`** computes the patterning half. It implements the NARDINI omega/kappa window asymmetry directly, because nothing else in sparrow computes that statistic. The other two backends do *not* have their own implementations here — `'kappa'` and `'iwd'` call `sparrow.patterning.vectorized`, the same code behind `Protein.kappa` and the IWD methods. This module also owns the scramble machinery and the gamma fitting that turns raw asymmetries into z-scores.
+**`patterning.py`** computes the patterning half. It implements the NARDINI omega/kappa window asymmetry directly, because nothing else in sparrow computes that statistic. The other two backends do *not* have their own implementations here — `'kappa'` and `'iwd'` call `sparrow.patterning.vectorized`, the same code behind `Protein.kappa` and the IWD methods. This module also owns the scramble machinery and the gamma fitting that turns raw asymmetries into z-scores. One function, `_score_arrangements`, scores a block of arrangements for every backend, and it is used for the observed sequence (a block of one) and for its scrambles alike, so a value and its null distribution cannot come from different code.
 
 **`composition.py`** assembles the compositional half but implements almost none of it. The amino acid fractions come from `sparrow.calculate_parameters`, the grouped fractions and whole-sequence properties from `sparrow.sequence_analysis.physical_properties`, and the patch features from `sparrow.sequence_analysis.patching` — in every case the same functions behind the corresponding `Protein` property. It is deliberately a thin assembler: a feature and its `Protein` counterpart are then the same number by construction rather than by coincidence.
 
@@ -67,7 +67,7 @@ Two things it owns are relied upon elsewhere. It derives each sequence's random 
 
 ### Off to the side: clusters
 
-**`gin.py`** assigns vectors to cluster centroids and holds `GINReference` (the centroids) and `GINAssignment` (the answer, with its typicality diagnostics). It consumes vectors; it does not produce them.
+**`gin.py`** assigns vectors to cluster centroids and holds `GINReference` (the centroids) and `GINAssignment` (the answer, with its typicality diagnostics). It consumes vectors; it does not produce them. It also loads the two bundled human references: `'corrected'`, the default, which is the published clusters refit to sparrow's complete-window patterning by `devtools/scripts/build_corrected_gin_reference.py`, and `'published'`, the centroids as published. Anything that takes a `reference` accepts either name.
 
 **`clustering.py`** goes the other way: it takes vectors and *derives* centroids, producing a `GINReference` that `gin.py` can then assign against. It is the only module that depends on `scipy.cluster` and `scipy.optimize`.
 
@@ -87,6 +87,8 @@ The practical consequence is that `Protein(seq).FCR` and `composition_values(seq
 
 ## Invariants worth not breaking
 
+**The patterning windows are the complete ones.** The omega/kappa statistics average over the `n - b + 1` complete windows. The `nardini` package adds a trailing window of `b - 1` residues divided by `b`; that is an off-by-one, and `test_windows_are_the_complete_windows_only` pins that sparrow does not reproduce it. The default GIN centroids were refit to this convention, so changing it means rebuilding them.
+
 **The compositional feature values are frozen.** The bundled per-species backgrounds and the GIN centroids in `sparrow/data/nardini/` were computed against these exact numbers. Changing how a feature is summed — even in a way that looks algebraically identical — shifts every compositional z-score and every centroid distance. `fraction_in_set()` in `physical_properties` documents one place where the obvious simplification would do exactly that. Verify changes against a before/after snapshot with `array_equal`, not `allclose`.
 
 **Seeds derive from sequence content, not batch position.** Break this and `batch.py` silently returns different numbers depending on how work was divided, and `Protein.nardini` stops agreeing with `nardini_vectors`.
@@ -100,7 +102,7 @@ The practical consequence is that `Protein(seq).FCR` and `composition_values(seq
 | Test file | Covers |
 |---|---|
 | `test_nardini.py` | patterning, composition, backgrounds, and a transcribed reference implementation used as an oracle |
-| `test_nardini_gin.py` | cluster assignment and the typicality diagnostics |
+| `test_nardini_gin.py` | cluster assignment, the typicality diagnostics, and the two bundled references |
 | `test_nardini_table.py` | the containers and the `Protein.nardini` accessor, including its cache |
 | `test_nardini_batch.py` | parallel computation, and that it changes no numbers |
 | `test_nardini_clustering.py` | deriving clusters, and comparing them to the published ones |

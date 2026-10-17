@@ -35,6 +35,19 @@ The two underlying statistics, both evaluated over sliding windows ("blobs") of
       sigma_window = (c1/b - c2/b)^2 / (c1/b + c2/b)      [0 if c1 + c2 == 0]
       kappa        = mean over windows of (sigma_window - sigma_all)^2
 
+The windows are the ``n - b + 1`` complete windows of ``b`` consecutive residues
+in a sequence of length ``n``, as in Das & Pappu's kappa and in the NARDINI+
+notebooks (Ruff et al. 2025). The ``nardini`` package (v1.1.1, ``core.py``) loops
+one step further, to ``n - b + 2``, which adds a window holding only the last
+``b - 1`` residues but still divides its counts by ``b``. That window is an
+off-by-one rather than a modelling choice - its fractions are understated by
+construction - so sparrow does not reproduce it.
+
+It matters for GIN because the published GIN vectors were computed with that
+extra window: they agree with an ``n - b + 2`` recomputation to within Monte Carlo
+noise, and not with ``n - b + 1``. sparrow therefore ships GIN centroids refit to
+the corrected windows and uses them by default - see :mod:`sparrow.nardini.gin`.
+
 A feature is only evaluated when the type is abundant enough to be meaningful:
 the whole-sequence fraction must *exceed* ``min_fraction`` (both fractions must,
 for a pair). Features that fail this test are reported as a raw value of 0.0 and
@@ -57,6 +70,10 @@ the published protocol uses 100,000 scrambles per sequence.
 The ``'kappa'`` and ``'iwd'`` backends get the same treatment through
 :mod:`sparrow.patterning.vectorized`, which scores a whole block of scrambles per
 call, so all three backends cost about the same.
+
+Whatever the backend, the observed sequence is scored as a block of one by the
+same function that scores its scrambles, so the value and its null distribution
+cannot drift apart.
 """
 
 import numpy as np
@@ -90,13 +107,13 @@ DEFAULT_BACKEND = "nardini"
 #: * ``'nardini'`` - the published NARDINI omega/kappa window asymmetry. This is
 #:   the only backend whose z-scores live in the space the GIN centroids were
 #:   defined in, so it is required for GIN cluster assignment.
-#: * ``'kappa'`` - sparrow's own generalized kappa (``kappa_x``): the same
-#:   asymmetry as above, divided by the delta of the most segregated arrangement
-#:   of the same composition, and bounded 0-1. Because that divisor depends only
-#:   on composition - which scrambling preserves - it cancels out of the z-score,
-#:   so this measures the same thing as ``'nardini'`` and is offered for
-#:   completeness and for continuity with the deprecated
-#:   :mod:`sparrow.sequence_analysis.grammar`. See the NARDINI guide.
+#: * ``'kappa'`` - sparrow's own generalized kappa (``kappa_x``): a closely
+#:   related asymmetry, divided by the delta of the most segregated arrangement
+#:   of the same composition, and bounded 0-1. That divisor depends only on
+#:   composition - which scrambling preserves - so it cancels out of the
+#:   z-score; what remains different is that ``kappa_x`` pads the sequence ends
+#:   (so its windows differ) and caps values at 1. Its z-scores therefore track
+#:   ``'nardini'`` closely without matching it. See the NARDINI guide.
 #: * ``'iwd'`` - sparrow's inverse-weighted distance, a clustering metric that
 #:   ignores ``blob_size`` entirely.
 PATTERNING_BACKENDS = {
@@ -105,19 +122,12 @@ PATTERNING_BACKENDS = {
     "iwd": "sparrow inverse-weighted distance (window-size independent)",
 }
 
-# names used by the older sparrow.sequence_analysis.grammar module
-_BACKEND_ALIASES = {
-    "kappa_cython": "kappa",
-    "iwd_combined": "iwd",
-}
-
 
 def resolve_backend(backend):
     """Normalize a patterning backend name.
 
-    Accepts the canonical names in :data:`PATTERNING_BACKENDS` as well as the
-    legacy names used by :mod:`sparrow.sequence_analysis.grammar`
-    (``'kappa_cython'`` -> ``'kappa'``, ``'iwd_combined'`` -> ``'iwd'``).
+    Case and surrounding whitespace are ignored, so ``' Kappa '`` resolves to
+    ``'kappa'``.
 
     Parameters
     ----------
@@ -135,7 +145,6 @@ def resolve_backend(backend):
         If the name is not recognized.
     """
     key = str(backend).strip().lower()
-    key = _BACKEND_ALIASES.get(key, key)
 
     if key not in PATTERNING_BACKENDS:
         raise SparrowException(
@@ -243,8 +252,9 @@ def _window_counts(labels_2d, num_types, blob_size, types=None):
     numpy.ndarray
         Array of shape ``(n_sequences, n_types, n_windows)`` of counts, where
         ``n_types`` is ``num_types`` (or ``len(types)``) and ``n_windows`` is
-        ``length - blob_size + 2``. The final window contains the trailing
-        ``blob_size - 1`` residues, matching the published NARDINI protocol.
+        ``length - blob_size + 1``: one window per run of ``blob_size``
+        consecutive residues, and no partial window at the end (see the module
+        docstring for why).
     """
     n_seqs, length = labels_2d.shape
     wanted = range(num_types) if types is None else list(types)
@@ -255,15 +265,12 @@ def _window_counts(labels_2d, num_types, blob_size, types=None):
     # of allocating an (n_seqs, num_types, length) cube, and it lets the caller
     # skip types no evaluated feature refers to. int16 is ample - a count cannot
     # exceed the sequence length - and halves the memory traffic of int32.
-    out = np.empty((n_seqs, len(wanted), length - blob_size + 2), dtype=np.int16)
+    out = np.empty((n_seqs, len(wanted), length - blob_size + 1), dtype=np.int16)
     prefix = np.zeros((n_seqs, length + 1), dtype=np.int16)
 
     for slot, residue_type in enumerate(wanted):
         np.cumsum(labels_2d == residue_type, axis=1, out=prefix[:, 1:])
-        np.subtract(prefix[:, blob_size:], prefix[:, :-blob_size], out=out[:, slot, :-1])
-        # NARDINI also scores the final partial window, but still normalizes
-        # its counts by blob_size in _asymmetries_from_counts.
-        np.subtract(prefix[:, -1], prefix[:, -blob_size], out=out[:, slot, -1])
+        np.subtract(prefix[:, blob_size:], prefix[:, :-blob_size], out=out[:, slot, :])
 
     return out
 
@@ -350,95 +357,6 @@ def _pair_index(num_types):
     return [(i, j) for i in range(num_types) for j in range(i, num_types)]
 
 
-def _alt_backend_argsets(groups, pairs, backend, mask):
-    """Precompute the per-feature residue lists for a non-NARDINI backend.
-
-    The underlying routines take Python lists of residues, and those lists are
-    the same for every scramble. Building them once here rather than inside the
-    scramble loop removes ~36 list/set constructions per scramble.
-
-    Parameters
-    ----------
-    groups : collections.OrderedDict
-        The residue grouping.
-    pairs : list of tuple
-        ``(i, j)`` type-index pairs in canonical order.
-    backend : {'kappa', 'iwd'}
-        Which statistic the arguments are for.
-    mask : numpy.ndarray
-        Boolean mask of features that clear the abundance threshold.
-
-    Returns
-    -------
-    list of tuple
-        ``(feature_index, args)`` for each evaluated feature, where ``args`` is
-        the residue-list argument tuple that routine takes.
-    """
-    group_lists = [sorted(residues) for residues in groups.values()]
-
-    argsets = []
-    for feature, (i, j) in enumerate(pairs):
-        if not mask[feature]:
-            continue
-
-        group1, group2 = group_lists[i], group_lists[j]
-
-        if backend == "kappa":
-            # an empty group2 makes kappa_x a binary (group1 vs rest) statistic
-            argsets.append((feature, (group1, [] if i == j else group2)))
-        else:  # iwd
-            residues = group1 if i == j else sorted(set(group1) | set(group2))
-            argsets.append((feature, (residues,)))
-
-    return argsets
-
-
-def _alt_backend_values(sequence, argsets, n_features, backend, blob_size):
-    """Patterning values for the non-NARDINI backends.
-
-    Uses the vectorized NumPy reimplementations in
-    :mod:`sparrow.patterning.vectorized` rather than the Cython extensions, so
-    that a sequence's observed value and its scramble null are produced by the
-    same code path and are directly comparable. The NumPy versions carry these
-    quantities in double precision where the Cython ones use single, so they
-    agree with the compiled routines to ~1e-6 and are the more accurate of the
-    two.
-
-    Parameters
-    ----------
-    sequence : str
-        Amino acid sequence.
-    argsets : list of tuple
-        Precomputed ``(feature_index, args)`` pairs from
-        :func:`_alt_backend_argsets`.
-    n_features : int
-        Total number of features (the returned array's length).
-    backend : {'kappa', 'iwd'}
-        Which statistic to compute.
-    blob_size : int
-        Window size (ignored by the ``'iwd'`` backend).
-
-    Returns
-    -------
-    numpy.ndarray
-        Raw values in canonical feature order; unevaluated features are 0.0.
-    """
-    from sparrow.patterning import vectorized as vec
-
-    values = np.zeros(n_features, dtype=np.float64)
-
-    if backend == "kappa":
-        for feature, (group1, group2) in argsets:
-            value = vec.kappa_x(sequence, group1, group2, blob_size, 1)
-            # kappa_x reports -1 when undefined; that means "not scored"
-            values[feature] = 0.0 if value < 0 else value
-    else:
-        for feature, (residues,) in argsets:
-            values[feature] = vec.calculate_average_inverse_distance_from_sequence(sequence, residues)
-
-    return values
-
-
 def _evaluated_mask(fractions, pair_index, min_fraction):
     """Boolean mask of which features clear the abundance threshold."""
     mask = np.zeros(len(pair_index), dtype=bool)
@@ -448,6 +366,202 @@ def _evaluated_mask(fractions, pair_index, min_fraction):
         else:
             mask[feature] = fractions[i] > min_fraction and fractions[j] > min_fraction
     return mask
+
+
+def _prepare_sequence(sequence, typeset, blob_size, min_fraction):
+    """Validate a sequence and work out which of its features are evaluated.
+
+    Everything here depends only on the sequence's composition, so it is shared
+    by the observed sequence and every one of its scrambles.
+
+    Parameters
+    ----------
+    sequence : str
+        Amino acid sequence.
+    typeset : {'8', '9'} or dict
+        Residue grouping, see :func:`sparrow.nardini.groups.get_typeset`.
+    blob_size : int
+        Sliding-window size.
+    min_fraction : float
+        Abundance threshold a type's fraction must exceed to be evaluated.
+
+    Returns
+    -------
+    tuple
+        ``(groups, labels, fractions, pairs, evaluated)``: the residue grouping,
+        the integer type label of each residue, each type's whole-sequence
+        fraction, the canonical ``(i, j)`` feature pairs, and the boolean mask of
+        features that clear ``min_fraction``.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If ``blob_size`` is below 2, the sequence is shorter than ``blob_size``,
+        or it contains a non-standard residue.
+    """
+    groups = get_typeset(typeset)
+
+    if blob_size < 2:
+        raise SparrowException(f"blob_size must be >= 2 (got {blob_size})")
+    if len(sequence) < blob_size:
+        raise SparrowException(
+            f"Sequence of length {len(sequence)} is shorter than blob_size {blob_size}; patterning cannot be computed."
+        )
+
+    labels = encode_types(sequence, typeset)
+    fractions = type_fractions(labels, len(groups))
+    pairs = _pair_index(len(groups))
+    evaluated = _evaluated_mask(fractions, pairs, min_fraction)
+    return groups, labels, fractions, pairs, evaluated
+
+
+def _encode_arrangement(sequence, labels, backend):
+    """The array that gets scrambled: type labels for NARDINI, residue codes otherwise.
+
+    The ``'nardini'`` statistic depends only on which *type* sits at each
+    position, so permuting the type labels is equivalent to permuting the
+    residues. The ``'kappa'`` and ``'iwd'`` routines take residue codes.
+
+    Parameters
+    ----------
+    sequence : str
+        Amino acid sequence, already validated.
+    labels : numpy.ndarray
+        Its type labels, from :func:`encode_types`.
+    backend : str
+        Canonical backend name.
+
+    Returns
+    -------
+    numpy.ndarray
+        1D ``int8`` type labels, or ``uint8`` ASCII codes.
+    """
+    if backend == "nardini":
+        return labels
+    return np.frombuffer(sequence.encode("ascii"), dtype=np.uint8)
+
+
+def _nardini_values(labels_2d, num_types, fractions, pairs, evaluated, blob_size):
+    """NARDINI omega/kappa asymmetries for a block of type-label arrays.
+
+    Only the evaluated features are ever looked at, so only the residue types
+    they refer to are counted. On a typical IDR that is around a third of the
+    features and half the types, and this is the inner loop of the whole
+    calculation - the published protocol runs it 100,000 times per sequence.
+
+    Parameters
+    ----------
+    labels_2d : numpy.ndarray
+        Integer type labels of shape ``(n_arrangements, length)``.
+    num_types : int
+        Number of residue types in the grouping.
+    fractions : numpy.ndarray
+        Whole-sequence type fractions, shared by every arrangement.
+    pairs : list of tuple
+        ``(i, j)`` type-index pairs in canonical feature order.
+    evaluated : numpy.ndarray
+        Boolean mask of features to compute.
+    blob_size : int
+        Window size.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``(n_arrangements, len(pairs))`` raw asymmetries; features excluded by
+        ``evaluated`` are 0.0.
+    """
+    needed_types = sorted({t for feature, pair in enumerate(pairs) if evaluated[feature] for t in pair})
+    slot_of = np.full(num_types, -1, dtype=np.intp)
+    for slot, residue_type in enumerate(needed_types):
+        slot_of[residue_type] = slot
+
+    counts = _window_counts(labels_2d, num_types, blob_size, types=needed_types)
+    return _asymmetries_from_counts(counts, fractions, pairs, blob_size, mask=evaluated, slot_of=slot_of)
+
+
+def _alternative_values(codes, groups, pairs, evaluated, backend, blob_size):
+    """``'kappa'`` or ``'iwd'`` values for a block of residue-code arrays.
+
+    Uses the vectorized NumPy implementations in
+    :mod:`sparrow.patterning.vectorized` - the same code behind
+    ``Protein.kappa`` and the IWD methods - which score a whole block per call.
+
+    Parameters
+    ----------
+    codes : numpy.ndarray
+        ``uint8`` ASCII codes of shape ``(n_arrangements, length)``.
+    groups : collections.OrderedDict
+        The residue grouping.
+    pairs : list of tuple
+        ``(i, j)`` type-index pairs in canonical feature order.
+    evaluated : numpy.ndarray
+        Boolean mask of features to compute.
+    backend : {'kappa', 'iwd'}
+        Which statistic to compute.
+    blob_size : int
+        Window size (ignored by ``'iwd'``).
+
+    Returns
+    -------
+    numpy.ndarray
+        ``(n_arrangements, len(pairs))`` raw values; features excluded by
+        ``evaluated`` are 0.0.
+    """
+    from sparrow.patterning import vectorized as vec
+
+    group_lists = [sorted(residues) for residues in groups.values()]
+    values = np.zeros((codes.shape[0], len(pairs)), dtype=np.float64)
+
+    for feature, (i, j) in enumerate(pairs):
+        if not evaluated[feature]:
+            continue
+
+        if backend == "kappa":
+            # an empty group2 makes kappa_x a binary (group i vs rest) statistic
+            group2 = [] if i == j else group_lists[j]
+            ternary = vec.ternarize_winged_batch(codes, group_lists[i], group2, blob_size)
+            kappa = vec.kappa_from_ternary_batch(ternary, blob_size, 1, group2_present=len(group2) > 0)
+            # kappa_x reports -1 when undefined; that means "not scored"
+            values[:, feature] = np.where(kappa < 0, 0.0, kappa)
+        else:
+            targets = group_lists[i] if i == j else sorted(set(group_lists[i]) | set(group_lists[j]))
+            values[:, feature] = vec.iwd_batch(vec._membership_lookup(targets)[codes])
+
+    return values
+
+
+def _score_arrangements(arrangements, groups, fractions, pairs, evaluated, backend, blob_size):
+    """Raw patterning values for a block of arrangements of one sequence.
+
+    Scores the observed sequence (as a block of one) and its scrambles alike, so
+    a value and its null distribution always come from the same code.
+
+    Parameters
+    ----------
+    arrangements : numpy.ndarray
+        Array of shape ``(n_arrangements, length)``, encoded as by
+        :func:`_encode_arrangement`.
+    groups : collections.OrderedDict
+        The residue grouping.
+    fractions : numpy.ndarray
+        Whole-sequence type fractions.
+    pairs : list of tuple
+        ``(i, j)`` type-index pairs in canonical feature order.
+    evaluated : numpy.ndarray
+        Boolean mask of features to compute.
+    backend : str
+        Canonical backend name.
+    blob_size : int
+        Window size.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``(n_arrangements, len(pairs))`` raw values; unevaluated features are 0.0.
+    """
+    if backend == "nardini":
+        return _nardini_values(arrangements, len(groups), fractions, pairs, evaluated, blob_size)
+    return _alternative_values(arrangements, groups, pairs, evaluated, backend, blob_size)
 
 
 def patterning_values(
@@ -495,32 +609,10 @@ def patterning_values(
     36
     """
     backend = resolve_backend(backend)
-    groups = get_typeset(typeset)
-    num_types = len(groups)
+    groups, labels, fractions, pairs, evaluated = _prepare_sequence(sequence, typeset, blob_size, min_fraction)
 
-    if blob_size < 2:
-        raise SparrowException(f"blob_size must be >= 2 (got {blob_size})")
-    if len(sequence) < blob_size:
-        raise SparrowException(
-            f"Sequence of length {len(sequence)} is shorter than blob_size {blob_size}; patterning cannot be computed."
-        )
-
-    labels = encode_types(sequence, typeset)
-    fractions = type_fractions(labels, num_types)
-    pairs = _pair_index(num_types)
-    mask = _evaluated_mask(fractions, pairs, min_fraction)
-
-    if backend != "nardini":
-        argsets = _alt_backend_argsets(groups, pairs, backend, mask)
-        return _alt_backend_values(sequence, argsets, len(pairs), backend, blob_size)
-
-    counts = _window_counts(labels[None, :], num_types, blob_size)
-    values = _asymmetries_from_counts(counts, fractions, pairs, blob_size)[0]
-
-    # zero out features whose types are too rare to be meaningful
-    values[~mask] = 0.0
-
-    return values
+    observed = _encode_arrangement(sequence, labels, backend)[None, :]
+    return _score_arrangements(observed, groups, fractions, pairs, evaluated, backend, blob_size)[0]
 
 
 #: A null distribution whose standard deviation is below this fraction of its own
@@ -684,127 +776,52 @@ def patterning_zscores(
         raise SparrowException(f"num_scrambles must be >= 1 (got {num_scrambles})")
 
     backend = resolve_backend(backend)
-    groups = get_typeset(typeset)
-    num_types = len(groups)
-    pairs = _pair_index(num_types)
+    groups, labels, fractions, pairs, evaluated = _prepare_sequence(sequence, typeset, blob_size, min_fraction)
     n_features = len(pairs)
 
-    raw = patterning_values(
-        sequence,
-        typeset=typeset,
-        blob_size=blob_size,
-        min_fraction=min_fraction,
-        backend=backend,
-    )
-
-    labels = encode_types(sequence, typeset)
-    fractions = type_fractions(labels, num_types)
-    evaluated = _evaluated_mask(fractions, pairs, min_fraction)
+    arrangement = _encode_arrangement(sequence, labels, backend)
+    raw = _score_arrangements(arrangement[None, :], groups, fractions, pairs, evaluated, backend, blob_size)[0]
 
     # build the null distribution from scrambles, in memory-bounded blocks
     rng = np.random.default_rng(seed)
     scramble_values = np.zeros((num_scrambles, n_features), dtype=np.float64)
 
-    if backend == "nardini":
-        # Only the evaluated features are ever looked at, so only the residue
-        # types they refer to need counting. On a typical IDR that is around a
-        # third of the features and half the types, and this is the inner loop of
-        # the whole calculation - the published protocol runs it 100,000 times per
-        # sequence.
-        needed_types = sorted({t for feature, pair in enumerate(pairs) if evaluated[feature] for t in pair})
-        slot_of = np.full(num_types, -1, dtype=np.intp)
-        for slot, residue_type in enumerate(needed_types):
-            slot_of[residue_type] = slot
+    # Permuting into a preallocated C-ordered buffer, rather than letting
+    # rng.permuted allocate: it returns an F-contiguous array when handed a
+    # broadcast view, and downstream row-wise cumsums and FFTs are both slower
+    # and - for the FFT - not bit-reproducible across row counts on a
+    # non-C-contiguous input.
+    scramble_buffer = np.empty((_SCRAMBLE_BLOCK, arrangement.size), dtype=arrangement.dtype)
 
-        # Permuting into a preallocated C-ordered buffer, rather than letting
-        # rng.permuted allocate: it returns an F-contiguous array when handed a
-        # broadcast view, and downstream row-wise cumsums and FFTs are both
-        # slower and - for the FFT - not bit-reproducible across row counts on a
-        # non-C-contiguous input.
-        scramble_buffer = np.empty((_SCRAMBLE_BLOCK, labels.size), dtype=labels.dtype)
+    done = 0
+    while done < num_scrambles:
+        block = min(_SCRAMBLE_BLOCK, num_scrambles - done)
 
-        done = 0
-        while done < num_scrambles:
-            block = min(_SCRAMBLE_BLOCK, num_scrambles - done)
+        # rng.permuted shuffles each row independently by Fisher-Yates, which is
+        # O(n) per row and allocates once. The previous approach - argsort of a
+        # block of uniform randoms - was O(n log n) and allocated two large
+        # temporaries, and was the single largest cost here.
+        permuted = rng.permuted(
+            np.broadcast_to(arrangement, (block, arrangement.size)),
+            axis=1,
+            out=scramble_buffer[:block],
+        )
 
-            # Permute the type labels; equivalent to shuffling the residues, since
-            # the asymmetries depend only on which type sits at each position.
-            # rng.permuted shuffles each row independently by Fisher-Yates, which
-            # is O(n) per row and allocates once. The previous approach - argsort
-            # of a block of uniform randoms - was O(n log n) and allocated two
-            # large temporaries, and was the single largest cost here.
-            permuted = rng.permuted(
-                np.broadcast_to(labels, (block, labels.size)),
-                axis=1,
-                out=scramble_buffer[:block],
-            )
-
-            counts = _window_counts(permuted, num_types, blob_size, types=needed_types)
-            scramble_values[done : done + block] = _asymmetries_from_counts(
-                counts,
-                fractions,
-                pairs,
-                blob_size,
-                mask=evaluated,
-                slot_of=slot_of,
-            )
-            done += block
-    else:
-        # The kappa and iwd backends use the vectorized NumPy reimplementations
-        # in sparrow.patterning.vectorized, which score a whole block of
-        # scrambles per call rather than one sequence at a time.
-        from sparrow.patterning import vectorized as vec
-
-        group_lists = [sorted(residues) for residues in groups.values()]
-        residues = np.frombuffer(sequence.encode("ascii"), dtype=np.uint8)
-        code_buffer = np.empty((_SCRAMBLE_BLOCK, residues.size), dtype=np.uint8)
-
-        done = 0
-        while done < num_scrambles:
-            block = min(_SCRAMBLE_BLOCK, num_scrambles - done)
-
-            # same Fisher-Yates shuffle, into a C-ordered buffer, as above
-            codes = rng.permuted(
-                np.broadcast_to(residues, (block, residues.size)),
-                axis=1,
-                out=code_buffer[:block],
-            )
-
-            for feature, (i, j) in enumerate(pairs):
-                if not evaluated[feature]:
-                    continue
-
-                group1 = group_lists[i]
-                group2 = [] if i == j else group_lists[j]
-
-                if backend == "kappa":
-                    ternary = vec.ternarize_winged_batch(codes, group1, group2, blob_size)
-                    values = vec.kappa_from_ternary_batch(ternary, blob_size, 1, group2_present=len(group2) > 0)
-                    # kappa_x reports -1 when undefined; that means "not scored"
-                    values = np.where(values < 0, 0.0, values)
-                else:
-                    targets = group1 if i == j else sorted(set(group1) | set(group_lists[j]))
-                    mask = vec._membership_lookup(targets)[codes]
-                    values = vec.iwd_batch(mask)
-
-                scramble_values[done : done + block, feature] = values
-
-            done += block
-
-    # features that were not evaluated stay at zero in the null too
-    scramble_values[:, ~evaluated] = 0.0
+        scramble_values[done : done + block] = _score_arrangements(
+            permuted, groups, fractions, pairs, evaluated, backend, blob_size
+        )
+        done += block
 
     null_mean = np.full(n_features, np.nan)
     null_var = np.full(n_features, np.nan)
-    for feature in range(n_features):
-        if evaluated[feature]:
-            null_mean[feature], null_var[feature] = _fit_gamma_moments(scramble_values[:, feature])
-
     zscores = np.zeros(n_features, dtype=np.float64)
-    for feature in range(n_features):
-        # a raw value of exactly zero means "not scored" (either gated out, or a
-        # genuinely perfectly-uniform arrangement); report 0 rather than a
-        # spurious z-score, matching the reference implementation
+
+    for feature in np.flatnonzero(evaluated):
+        null_mean[feature], null_var[feature] = _fit_gamma_moments(scramble_values[:, feature])
+
+        # a raw value of exactly zero means a perfectly uniform arrangement;
+        # report 0 rather than a spurious z-score, matching the reference
+        # implementation
         if raw[feature] == 0:
             continue
         variance = null_var[feature]

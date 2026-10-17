@@ -40,7 +40,7 @@ scrambles) plus 54 compositional z-scores (against the background). The
 patterning half needs no background, so ``background`` may be omitted to get just
 those 36 features.
 
-**3. Optionally assign each IDR to a published GIN cluster**
+**3. Optionally assign each IDR to a human GIN cluster**
 
 .. code-block:: python
 
@@ -48,10 +48,16 @@ those 36 features.
     # [{'name': 'IDR1', 'cluster': 7, 'description': 'D/E-tracts',
     #   'distance': 41.2, 'separation': 6.31, 'is_typical': True, ...}, ...]
 
-This maps each sequence onto one of the 30 published human GIN grammars. It needs
-the full 90-feature vector, so a background is required - and because the
-centroids live in human NARDINI+ z-score space, ``load_reference_background(
-'human')`` is the background to use for results comparable to the published ones.
+This maps each sequence onto one of the 30 human GIN grammars. It needs the full
+90-feature vector, so a background is required - and because the centroids live
+in human NARDINI+ z-score space, ``load_reference_background('human')`` is the
+background to use for results comparable to the published ones.
+
+The default centroids are the published clusters refit to sparrow's patterning
+windows, which drop a trailing partial window that the published vectors
+included (see :mod:`sparrow.nardini.patterning`). Pass ``reference='published'``
+for the centroids exactly as published; :mod:`sparrow.nardini.gin` explains the
+difference, which changes about 3% of cluster calls.
 
 **4. For a whole proteome, compute in parallel**
 
@@ -78,7 +84,7 @@ in a batch, so a vector is unaffected by how the input was chunked.
 
     reference = build_gin_reference(result, k=30, seed=0)
     reference.save("my_grammars.npz")
-    compare_gin_references(reference)      # how close is this to published GIN?
+    compare_gin_references(reference)      # how close is this to human GIN?
 
 :func:`~sparrow.nardini.clustering.build_gin_reference` runs the same clustering
 procedure over your own vectors, which is what you want for a non-human proteome
@@ -116,10 +122,6 @@ Only the patterning block changes; the compositional block is identical across
 backends. The choice is recorded as ``result.backend``, because values from
 different backends are not comparable and must not be mixed.
 
-The last two supersede the ``'kappa_cython'`` and ``'iwd_combined'`` backends of
-the deprecated :mod:`sparrow.sequence_analysis.grammar`, whose values they
-reproduce exactly; those legacy names are accepted as aliases.
-
 References
 ----------
 Cohan, M. C., Shinn, M. K., Lalmansingh, J. M. & Pappu, R. V. Uncovering
@@ -155,7 +157,9 @@ from sparrow.nardini.clustering import (
     describe_centroid,
 )
 from sparrow.nardini.gin import (
+    DEFAULT_GIN_REFERENCE,
     GIN_CLIP,
+    GIN_REFERENCES,
     TYPICAL_COMPOSITION_RMS_Z,
     TYPICAL_MAX_SATURATED,
     GINAssignment,
@@ -200,6 +204,8 @@ __all__ = [
     "GINAssignment",
     "GINReference",
     "GIN_CLIP",
+    "GIN_REFERENCES",
+    "DEFAULT_GIN_REFERENCE",
     # whole-proteome computation
     "nardini_proteins",
     # building your own clusters

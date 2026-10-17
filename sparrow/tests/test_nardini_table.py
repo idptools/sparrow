@@ -334,6 +334,29 @@ def test_gin_report_is_clean_for_typical_sequences():
     assert "nearest alternatives" in report
 
 
+def test_protein_gin_methods_use_the_requested_reference():
+    """gin_cluster and gin_report must both honour `reference`, by name or object."""
+    from sparrow.nardini import assign_gin_clusters, load_gin_reference
+
+    p = Protein(HUMAN_IDR)
+    vector = p.nardini.vector(seed=42, num_scrambles=500).to_numpy()
+
+    for name in ("corrected", "published"):
+        expected = assign_gin_clusters(vector, reference=name).records()[0]
+        by_name = p.nardini.gin_cluster(seed=42, num_scrambles=500, reference=name)
+        by_object = p.nardini.gin_cluster(seed=42, num_scrambles=500, reference=load_gin_reference(name))
+
+        assert by_name["distance"] == by_object["distance"] == expected["distance"]
+        assert f"distance to centroid   {expected['distance']:.2f}" in p.nardini.gin_report(
+            seed=42, num_scrambles=500, reference=name
+        )
+
+
+def test_protein_gin_report_requires_a_background():
+    with pytest.raises(SparrowException, match="background is required"):
+        Protein(HUMAN_IDR).nardini.gin_report(background=None)
+
+
 # =====================================================================
 # the Protein.nardini memoization key
 # =====================================================================

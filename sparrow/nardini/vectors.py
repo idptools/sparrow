@@ -268,7 +268,7 @@ class NardiniResult:
     # .................................................................
     #
     def gin_clusters(self, reference=None, clip=None):
-        """Assign these sequences to their nearest published GIN cluster.
+        """Assign these sequences to their nearest GIN cluster.
 
         Convenience wrapper over
         :func:`sparrow.nardini.gin.assign_gin_clusters`. Requires that this result
@@ -277,8 +277,10 @@ class NardiniResult:
 
         Parameters
         ----------
-        reference : sparrow.nardini.gin.GINReference, optional
-            Reference centroids. Defaults to the bundled human GIN reference.
+        reference : sparrow.nardini.gin.GINReference or str, optional
+            Reference centroids, or the name of a bundled set. Defaults to the
+            corrected human GIN reference; pass ``'published'`` for the
+            centroids exactly as published.
         clip : float, optional
             Clip applied to the z-scores before computing distances. Defaults to
             :data:`sparrow.nardini.gin.GIN_CLIP` (3.0).
@@ -542,8 +544,6 @@ def nardini_vectors(
         * ``'iwd'`` - sparrow's inverse-weighted distance, which measures
           clustering and ignores ``blob_size``.
 
-        The legacy names ``'kappa_cython'`` and ``'iwd_combined'`` from
-        :mod:`sparrow.sequence_analysis.grammar` are accepted as aliases.
         Only the patterning block changes; the compositional block is identical
         across backends.
     n_processes : int, optional

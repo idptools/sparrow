@@ -47,7 +47,7 @@ What can it do?
   pure-Python PLAAC implementation), ELM annotations, and phosphoisoforms.
 * **Molecular grammars** -- a native :doc:`NARDINI / NARDINI+ <api_guides/nardini>`
   implementation for detecting non-random residue patterning, with user-buildable
-  compositional backgrounds, assignment to the 30 published human GIN grammars,
+  compositional backgrounds, assignment to the 30 human GIN grammars,
   clustering to derive your own, and parallel computation across a whole proteome.
 * **Scale-up tools** -- batch prediction over whole sequence sets, and
   fixed-length feature vectors for machine learning.

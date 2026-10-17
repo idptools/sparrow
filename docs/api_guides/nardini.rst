@@ -14,8 +14,8 @@ against a reference set of IDRs. On top of that, the **GIN** resource groups the
 human IDRome into 30 clusters of shared molecular grammar, and this module can
 assign new sequences to them.
 
-This module supersedes sparrow's older ``sequence_analysis.grammar`` -- see
-:ref:`nardini-migration`.
+It replaces sparrow's older ``sequence_analysis.grammar`` module, which has now
+been removed -- see :ref:`nardini-migration`.
 
 .. tip::
    Two worked example notebooks live in ``examples/`` in the repository, both
@@ -51,7 +51,7 @@ For a single sequence, everything is reachable from the
    p.nardini.vector(seed=42)        # 90-feature NARDINI+ vector
    p.nardini.patterning(seed=42)    # just the 36 patterning z-scores
    p.nardini.composition()          # just the 54 compositional z-scores
-   p.nardini.gin_cluster(seed=42)   # nearest published human GIN grammar
+   p.nardini.gin_cluster(seed=42)   # nearest human GIN grammar
    print(p.nardini.gin_report(seed=42))
 
 Compositional z-scores need a reference IDR set, and for one protein there is
@@ -84,7 +84,7 @@ The batch workflow
    result.to_table()                    # 90 columns, one row per IDR
    result.top_features("IDR1", n=5)     # the most non-random features
 
-   # 3. optionally, assign each IDR to a published GIN cluster
+   # 3. optionally, assign each IDR to a human GIN cluster
    result.gin_clusters().records()
 
 .. important::
@@ -291,8 +291,7 @@ are computed identically regardless.
        maximally-segregated sequence.
      - Bounded 0-1, so raw values are comparable between sequences before
        z-scoring.
-     - You want a normalized, interpretable raw patterning value, or you are
-       continuing work that used ``Protein.extract_feature_vector``.
+     - You want a normalized, interpretable raw patterning value.
    * - ``'iwd'``
      - sparrow's inverse-weighted distance -- a clustering metric over residue
        positions.
@@ -310,15 +309,10 @@ The backend used is recorded on the result as ``result.backend``, because the
 numbers are **not comparable across backends** -- do not mix them in one analysis
 or feed one backend's vectors into a model trained on another's.
 
-The legacy names from the deprecated ``sparrow.sequence_analysis.grammar`` module
-are accepted as aliases: ``'kappa_cython'`` → ``'kappa'`` and ``'iwd_combined'``
-→ ``'iwd'``. Those two backends reproduce that module's values *exactly*, so
-migrating changes no numbers.
-
 .. _nardini-delta-vs-kappa:
 
-``'nardini'`` and ``'kappa'`` measure the same thing
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+``'nardini'`` and ``'kappa'`` are close relatives
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Worth being explicit about, because the naming invites confusion. Both are built
 on the same Das & Pappu window asymmetry, but they stop at different points:
@@ -331,25 +325,23 @@ on the same Das & Pappu window asymmetry, but they stop at different points:
   composition. This is sparrow's :func:`~sparrow.patterning.kappa.kappa_x`,
   bounded 0-1.
 
-**The two z-scores are the same quantity.** ``delta_max`` depends only on
+**The normalization itself changes nothing.** ``delta_max`` depends only on
 composition, and scrambling preserves composition exactly, so ``delta_max`` is the
 *same constant* for a sequence and for every member of its null distribution. A
-constant factor cancels out of a z-score, so normalizing changes nothing once the
-value has been referenced against its own scrambles.
+constant factor cancels out of a z-score.
 
-In practice they are very close but not bit-identical, for two reasons that have
-nothing to do with the normalization: ``kappa_x`` scores a *winged* (end-padded)
-array, which changes slightly which windows exist, and it caps values at 1, which
-is a nonlinear step. Measured over a range of sequences at 4,000 scrambles, the
-per-feature z-scores correlate at 0.97-1.00, differ by at most ~0.2, and agree in
-sign for 31 of 32 evaluated features.
+The two still differ, for two reasons that have nothing to do with the
+normalization. ``kappa_x`` scores a *winged* (end-padded) array, so it has
+partial windows at both ends where ``'nardini'`` has only the complete windows;
+and it caps values at 1, which is a nonlinear step. Measured over 63 IDR-like
+sequences at 4,000 scrambles, the per-feature z-scores correlate at 0.88-1.00
+(median 0.99), typically differ by 0.07, and occasionally by as much as 1 for a
+sequence where a type is concentrated at a terminus.
 
-So **``'kappa'`` is offered for completeness, not because it tells you something
-different**: it exists so that results from the deprecated
-``sequence_analysis.grammar`` module can be reproduced, and so the normalized form
-is available if you want it. Use ``'nardini'`` -- the default -- unless you have a
-specific reason not to. It is also the fastest of the three, and the only one GIN
-cluster assignment accepts.
+So **``'kappa'`` is offered for its bounded raw value, not because it tells you
+something different** about patterning. Use ``'nardini'`` -- the default -- unless
+you have a specific reason not to. It is also the fastest of the three, and the
+only one GIN cluster assignment accepts.
 
 What the choice looks like in practice, on a blocky vs. a well-mixed E/K
 sequence (``pos-neg`` z-score, 500 scrambles):
@@ -357,8 +349,8 @@ sequence (``pos-neg`` z-score, 500 scrambles):
 .. code-block:: text
 
    backend     blocky EK    mixed EK
-   nardini        +12.81       -1.26
-   kappa          +11.45       -0.93
+   nardini        +11.62       -1.27
+   kappa          +11.45       -1.41
    iwd              0.00        0.00
 
 The two window-based statistics agree on the qualitative answer. ``iwd`` returns
@@ -412,8 +404,8 @@ Step 3 -- GIN cluster assignment
 The GIN resource partitions the human IDRome into **30 clusters of shared
 molecular grammar** -- ``'D/E-tracts'``, ``'S patches'``, ``'Well-mixed P and G'``
 and so on -- obtained by k-means on NARDINI+ z-score vectors of human IDRs of
-length 100-300. sparrow bundles those published centroids and can assign new
-sequences to them:
+length 100-300. sparrow bundles the centroids and can assign new sequences to
+them:
 
 .. code-block:: python
 
@@ -432,18 +424,56 @@ sequences to them:
 
                  cluster                              description  distance  separation
    Name
-   de_tract            7                               D/E-tracts     19.72       24.90
-   s_patch             6                                S patches     28.41       17.24
-   q_tract            11                                 Q-tracts     14.06       36.41
-   notebook_idr       17                     Weak positive charge     33.11        6.00
+   de_tract            7                               D/E-tracts     70.67       24.38
+   s_patch             6                                S patches     77.12       17.03
+   q_tract            11                                 Q-tracts     71.38       36.36
+   notebook_idr       17                     Weak positive charge     33.08        6.13
 
-This is *assignment*, not clustering: your sequences are matched to the published
+This is *assignment*, not clustering: your sequences are matched to the existing
 grammars, nothing is re-clustered. The procedure is the published one --
 
 1. take the full 90-feature NARDINI+ z-score vector;
 2. clip it to ±3 (the centroids were built from clipped vectors);
 3. compute the squared Euclidean distance to each of the 30 centroids;
 4. assign to the nearest.
+
+.. _nardini-gin-references:
+
+Which centroids?
+^^^^^^^^^^^^^^^^
+
+sparrow bundles two sets of the 30 human centroids, and assigns against the first
+unless told otherwise:
+
+* ``'corrected'`` (default) -- the published clusters refit to vectors computed
+  the way sparrow computes them. The published GIN vectors came from the
+  ``nardini`` package, whose patterning windows include one trailing window of
+  ``b - 1`` residues normalized as if it held ``b``. That is an off-by-one, and
+  sparrow scores only the ``n - b + 1`` complete windows -- as the NARDINI+
+  notebooks themselves do. Starting k-means from the published centroids and
+  running it to convergence on corrected vectors of the same 4,529 IDRs keeps
+  every cluster's number and description, and moves no centroid by more than
+  about 0.1% of the (squared) spacing between clusters. 99% of those IDRs, and
+  97% of all 24,508 human IDRs, keep their published cluster. Almost every IDR
+  that moves sat on a boundary to begin with: their median published separation
+  is 0.3, against 5.0 for all IDRs.
+* ``'published'`` -- the centroids exactly as published by Ruff et al. (2025).
+  Assigning sparrow's vectors to these is what the NARDINI+ Colab notebook does,
+  and it reproduces 97.5% of the published cluster calls. Use it to compare
+  directly against the paper's assignments.
+
+.. code-block:: python
+
+   result.gin_clusters()                        # corrected centroids
+   result.gin_clusters(reference="published")   # the published ones
+
+   from sparrow.nardini import load_gin_reference
+   load_gin_reference("published")              # either, as a GINReference
+
+Every function that takes a ``reference`` accepts the name of a bundled set in
+place of a :class:`~sparrow.nardini.gin.GINReference`. The corrected set is rebuilt
+by ``devtools/scripts/build_corrected_gin_reference.py``, and its provenance is
+recorded in ``load_gin_reference().metadata``.
 
 Interpreting ``separation``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -456,16 +486,16 @@ is worth believing.
 **A small separation means the sequence sits between two grammars** and should not
 be treated as firmly belonging to either. There is no universal cutoff; compare
 within your own dataset. In the table above, ``q_tract`` (36.4) is unambiguous
-while ``notebook_idr`` (6.0) is genuinely borderline. When that happens, look at
+while ``notebook_idr`` (6.1) is genuinely borderline. When that happens, look at
 the runners-up rather than trusting the single label:
 
 .. code-block:: python
 
    assignment = result.gin_clusters()
    assignment.ranked_clusters("notebook_idr", n=5)
-   # [(17, 'Weak positive charge', 33.11),
-   #  (29, 'High R fraction', 39.17),
-   #  (10, 'Well-mixed hydrophobics, enriched in M', 44.33), ...]
+   # [(17, 'Weak positive charge', 33.08),
+   #  (29, 'High R fraction', 39.22),
+   #  (10, 'Well-mixed hydrophobics, enriched in M', 44.31), ...]
 
 Here the top three are all positive-charge-flavoured grammars, so the *family* is
 solid even though the exact cluster is not -- a much more honest summary than
@@ -480,22 +510,24 @@ What the clusters mean
 
    gin_cluster_definitions()
 
-Returns all 30 published clusters with a description and the number of human IDRs
-assigned to each in the original analysis (24,508 in total). A few examples:
+Returns all 30 clusters with their published description and the number of
+human IDRs (of 24,508) assigned to each by the corrected centroids. Pass
+``reference="published"`` for the counts from the original analysis, which differ
+by a few percent at most. A few examples:
 
 .. code-block:: text
 
    cluster  description                                    num_idrs
-         6  S patches                                          1833
-         7  D/E-tracts                                          763
-        11  Q-tracts                                            338
-        20  A blocks                                            803
-        23  K blocks                                           1043
-        27  P patches                                          1386
-        29  High R fraction                                    1482
+         6  S patches                                          1829
+         7  D/E-tracts                                          751
+        11  Q-tracts                                            335
+        20  A blocks                                            793
+        23  K blocks                                           1036
+        27  P patches                                          1382
+        29  High R fraction                                    1474
 
-The counts are useful context: an assignment to cluster 2 (163 IDRs) is a much
-more specific statement than one to cluster 6 (1,833).
+The counts are useful context: an assignment to cluster 2 (164 IDRs) is a much
+more specific statement than one to cluster 6 (1,829).
 
 Everything else on the result
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -503,7 +535,7 @@ Everything else on the result
 .. code-block:: python
 
    assignment.clusters           # (n,) assigned cluster number
-   assignment.descriptions       # (n,) published description of each
+   assignment.descriptions       # (n,) description of each
    assignment.distances          # (n,) distance to the assigned centroid
    assignment.separations        # (n,) gap to the runner-up
    assignment.n_saturated        # (n,) features pinned at the +/-3 clip
@@ -527,16 +559,16 @@ wrong produces plausible-looking but meaningless labels rather than an error:
 1. **It needs the full 90-feature vector.** A result computed without a
    ``background`` has only the 36 patterning features and raises.
 2. **It needs the** ``'nardini'`` **backend.** The centroids were fit to vectors
-   built with the published NARDINI statistic, so a ``'kappa'`` or ``'iwd'``
-   vector is on an entirely different scale. sparrow refuses rather than
-   assigning:
+   built with the NARDINI statistic, so a ``'kappa'`` or ``'iwd'`` vector is on
+   an entirely different scale. sparrow refuses rather than assigning:
 
    .. code-block:: python
 
       result = nardini_vectors(seqs, background=bg, backend="kappa")
       result.gin_clusters()
-      # SparrowException: GIN cluster assignment requires the 'nardini'
-      # patterning backend, but this result was computed with 'kappa'. ...
+      # SparrowException: Cannot assign a 'kappa' vector against centroids
+      # defined in 'nardini' space - the two statistics are on different
+      # scales, so the labels would be meaningless. ...
 
 .. important::
    The centroids live in **human** NARDINI+ z-score space. Pass
@@ -686,7 +718,7 @@ every process -- so this is worth it for hundreds of sequences, not for five. Be
 Building your own clusters
 --------------------------
 
-Everything above *assigns* sequences to the 30 published human grammars.
+Everything above *assigns* sequences to the 30 human grammars.
 :func:`~sparrow.nardini.clustering.build_gin_reference` does the other half: it
 runs the same procedure over your own vectors and hands back a
 :class:`~sparrow.nardini.gin.GINReference` that ``assign_gin_clusters`` accepts in
@@ -872,7 +904,7 @@ records its backend and ``assign_gin_clusters`` refuses to mix spaces:
 
    kappa = nardini_vectors(seqs, background=bg, backend="kappa")
 
-   assign_gin_clusters(kappa)                      # refused: published centroids are 'nardini'
+   assign_gin_clusters(kappa)                      # refused: the bundled centroids are 'nardini'
    reference = build_gin_reference(kappa, k=10, seed=0)
    assign_gin_clusters(kappa, reference=reference)  # fine: both in 'kappa' space
 
@@ -886,10 +918,10 @@ Hungarian algorithm) and reports the distances:
 
 .. code-block:: python
 
-   report = compare_gin_references(reference)      # against the published human GIN
+   report = compare_gin_references(reference)      # against the human GIN centroids
 
    report["mean_distance"]                # typical squared distance to its match
-   report["separation_scale"]             # spacing of the published centroids
+   report["separation_scale"]             # spacing of the human centroids
    report["reference_separation_scale"]   # spacing of yours
    report["pairs"][0]["matched_description"]
 
@@ -897,12 +929,12 @@ Read those three together. A mean distance well below ``separation_scale`` means
 the two clusterings largely agree; comparable or above means they do not. But check
 your own separation scale as well: **a clustering that found no structure puts all
 its centroids near the origin, which makes them close to everything and produces a
-flatteringly small match distance.** If your spacing is far below the published
-one, your clusters are not comparable structure however well they appear to match.
+flatteringly small match distance.** If your spacing is far below the human one,
+your clusters are not comparable structure however well they appear to match.
 
 Note that a poor distance does not mean a meaningless pairing. Clustering four
 designed grammars (D/E tracts, poly-Q, S-rich, K blocks) and matching them against
-the published reference pairs them with ``'D/E-tracts'``, ``'Q-tracts'`` and
+the human reference pairs them with ``'D/E-tracts'``, ``'Q-tracts'`` and
 ``'K blocks'`` respectively -- purely from centroid geometry, with nothing told to
 it -- while the distances stay well above the published spacing, because designed
 sequences are compositionally extreme and sit far from anything in the human
@@ -920,13 +952,14 @@ All distances here are squared Euclidean, matching ``assign_gin_clusters`` and
      sequences**. You supply those, and "the human IDRome" is itself a definition -
      which disorder predictor, which thresholds, which boundary rules. Different
      IDR boundaries give different vectors and so different clusters.
-   * k-means depends on its initialization, so two runs agree only up to a
-     permutation of labels at best.
-   * Not every hyperparameter is documented upstream.
-     ``sparrow/data/nardini/SOURCES.md`` records what could be verified: k=30,
-     human IDRs of 100-300 residues, z clipped to +/-3. The restart count,
-     iteration limit, any feature weighting and the ``num_scrambles`` behind the
-     published vectors are not.
+   * The published procedure is known -- the 4,529 human IDRs of 100-300
+     residues, z clipped to +/-3, 100,000 scrambles, and
+     ``sklearn.cluster.KMeans(init="random", n_clusters=30, n_init=10, random_state=1)``
+     -- but it does not pin down the answer. Rerunning that call on the
+     published vectors, with the published ``random_state`` or another, finds
+     partitions whose inertia is within 0.2% of the published one but which agree
+     with it at an adjusted Rand index of only 0.37-0.51. The published clusters
+     are one of many equally good optima, so no fresh clustering gives them back.
    * The published descriptions are human-authored and cannot be regenerated.
 
    The realistic goal is "build my own clusters and measure how far they are from
@@ -1152,6 +1185,13 @@ in sparrow. Differences worth knowing about:
      the two definitions are kept side by side rather than reconciled -- see
      :ref:`protein-shared-with-nardini`. They share an implementation and differ
      only in the residue set.
+* **Complete windows only.** The omega/kappa statistics average over the
+  ``n - b + 1`` complete windows of ``b`` residues, as the NARDINI+ notebooks do.
+  The ``nardini`` package (v1.1.1) loops one window further, adding a window of
+  the last ``b - 1`` residues that it still divides by ``b``. That is an
+  off-by-one, so sparrow does not copy it -- but the published GIN vectors were
+  computed with it, which is why sparrow's default GIN centroids are refit to the
+  complete windows. See :ref:`nardini-gin-references`.
 * **Much faster.** The patterning calculation is vectorized over scrambles, and
   skips the features and residue types the abundance gate has already excluded.
   Measured against a direct transcription of the reference loop, it is about
@@ -1166,32 +1206,34 @@ in sparrow. Differences worth knowing about:
   sometimes converges to a local optimum whose moments do not describe the data,
   silently producing a z-score wrong by more than an order of magnitude. sparrow
   sanity-checks each fit against the sample moments and falls back to them when
-  the fit is bad. Where the reference fit is sound, sparrow's z-scores match it
-  bit for bit.
-* **Cluster assignments match.** The GIN assignment path reproduces the notebook's
-  cluster calls and centroid distances exactly. The one deliberate difference is
-  cosmetic: the notebook computes ``separation`` using ``100`` as a sentinel, so a
-  true gap above 100 would be reported as exactly 100. sparrow reports the true
-  gap; in practice no clipped z-vector reaches a separation that large, so the
-  numbers agree.
+  the fit is bad. Where the reference fit is sound, sparrow's fitted moments are
+  the reference's exactly, so given the same scrambles the z-scores agree; with
+  independent scrambles, as between any two runs, they agree to Monte Carlo
+  precision.
+* **Cluster assignments match.** Given the same vector and centroids, the GIN
+  assignment path reproduces the notebook's cluster calls and centroid distances
+  exactly; on the published vectors and centroids it reproduces all 24,508
+  published calls. The one deliberate difference is cosmetic: the notebook
+  computes ``separation`` using ``100`` as a sentinel, so a true gap above 100
+  would be reported as exactly 100. sparrow reports the true gap; in practice no
+  clipped z-vector reaches a separation that large, so the numbers agree.
 * **GIN reference data is bundled**, rather than downloaded from Google Sheets at
   runtime as the notebook does, so analyses are reproducible offline and pinned to
-  a known version. See ``sparrow/data/nardini/SOURCES.md`` for provenance, and
-  ``devtools/scripts/build_nardini_reference_data.py`` to rebuild it -- that
-  script verifies the upstream feature ordering before writing anything.
+  a known version. See ``sparrow/data/nardini/SOURCES.md`` for provenance.
+  ``devtools/scripts/build_nardini_reference_data.py`` rebuilds the published
+  data, verifying the upstream feature ordering before writing anything, and
+  ``devtools/scripts/build_corrected_gin_reference.py`` rebuilds the corrected
+  centroids from them.
 
 .. _nardini-migration:
 
 Migrating from ``sparrow.sequence_analysis.grammar``
 -----------------------------------------------------
 
-sparrow's older grammar module -- reachable as
-:meth:`~sparrow.protein.Protein.extract_feature_vector` and
-:func:`~sparrow.sequence_analysis.grammar.compute_feature_vector` -- is
-**deprecated in favour of this one** and will be removed in a future release.
-Both now emit a ``DeprecationWarning``.
-
-``sparrow.nardini`` computes a superset of what that module offered:
+sparrow's older grammar module -- ``sequence_analysis.grammar.compute_feature_vector``,
+``Protein.extract_feature_vector`` and ``sparrow.build_grammar_background_from_fasta``
+-- has been **removed**, after a release cycle of deprecation warnings.
+``sparrow.nardini`` computes a superset of what it offered:
 
 .. list-table::
    :header-rows: 1
@@ -1202,11 +1244,11 @@ Both now emit a ``DeprecationWarning``.
    * - ``compute_feature_vector(seq, ...)``
      - ``nardini_vectors({"name": seq}, ...)``
    * - ``Protein.extract_feature_vector()``
-     - ``nardini_vectors({"name": p.sequence}, ...)``
+     - ``Protein.nardini.vector()``
    * - ``backend='kappa_cython'``
      - ``backend='kappa'`` *(identical values)*
    * - ``backend='iwd_combined'``
-     - ``backend='iwd'`` *(identical values)*
+     - ``backend='iwd'`` *(identical to rounding, ~1e-15)*
    * - *no equivalent*
      - ``backend='nardini'`` -- the published statistic, and the only one that
        supports GIN
@@ -1225,14 +1267,17 @@ Both now emit a ``DeprecationWarning``.
 Two things to know when you migrate:
 
 * **The patterning numbers do not change** if you keep the same statistic --
-  ``backend='kappa'`` and ``backend='iwd'`` reproduce the old values exactly. Only
-  switching to ``backend='nardini'`` changes them, because that is a different
+  ``backend='kappa'`` and ``backend='iwd'`` reproduce the old values. The old
+  backend names are not accepted as aliases. Only switching to
+  ``backend='nardini'`` changes the numbers, because that is a different
   statistic.
-* **The compositional z-scores will shift.** The two modules bundle *different*
-  human IDR datasets (for example mean ``Hydrophobicity`` 3.81 vs. the published
-  3.41, ``FCR`` 0.24 vs. 0.27). If you need continuity with previous results,
-  rebuild your own background with :func:`~sparrow.nardini.build_background`
-  rather than switching to ``load_reference_background('human')``.
+* **The compositional z-scores will shift.** The old module bundled its own human
+  IDR background, which was a *different* dataset from the published one (for
+  example mean ``Hydrophobicity`` 3.81 vs. the published 3.41, ``FCR`` 0.24 vs.
+  0.27). It is gone with the module; if you need continuity with previous
+  results, rebuild a background from the same IDRs with
+  :func:`~sparrow.nardini.build_background` rather than switching to
+  ``load_reference_background('human')``.
 
 The old module's feature vector also merged raw and z-score blocks with
 ``raw::``/``z::`` name prefixes. ``sparrow.nardini`` keeps them separate --
@@ -1247,7 +1292,9 @@ Citations
 If you use this module, please cite the original work -- not sparrow alone. This
 applies with particular force to the bundled reference data (the per-species
 compositional backgrounds and the GIN centroids), which are redistributed from
-the GIN resource under the MIT licence and were not generated by sparrow:
+the GIN resource under the MIT licence -- the corrected centroids are refit from
+the published ones, starting from them and keeping their clusters, so they are
+that work too:
 
 * **NARDINI** -- M.C. Cohan, M.K. Shinn, J.M. Lalmansingh, R.V. Pappu (2022).
   Uncovering non-random binary patterns within sequences of intrinsically
@@ -1297,6 +1344,8 @@ GIN cluster assignment
 .. autofunction:: sparrow.nardini.gin.gin_cluster_definitions
 
 .. autofunction:: sparrow.nardini.gin.load_gin_reference
+
+.. autodata:: sparrow.nardini.gin.GIN_REFERENCES
 
 .. autoclass:: sparrow.nardini.gin.GINAssignment
    :members:

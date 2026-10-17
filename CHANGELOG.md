@@ -4,6 +4,32 @@ All notable changes to SPARROW are documented here.
 
 ## Unreleased
 
+### Fixed — NARDINI scores the complete windows only, and the GIN centroids are refit to match
+
+**The omega/kappa patterning statistics now average over the `n - b + 1` complete windows of `b` residues**, as Das & Pappu's kappa and the NARDINI+ notebooks do. Earlier in this cycle sparrow had switched to the `nardini` package's `n - b + 2` windows (`core.py`, v1.1.1), which add one window holding only the last `b - 1` residues but still divide its counts by `b`. That window is an off-by-one — its fractions are understated by construction — so sparrow no longer reproduces it. `test_windows_are_the_complete_windows_only` pins the convention with a hand-worked example, and the transcribed-notebook oracle in `test_nardini.py` uses the complete windows again.
+
+**This matters for GIN, because the published GIN vectors were computed with the extra window**: they agree with an `n - b + 2` recomputation to within Monte Carlo noise (RMS difference 0.013, against a noise floor of 0.012) and not with `n - b + 1` (RMS 0.085). Ruff et al.'s own NARDINI+ Colab notebook therefore assigns complete-window vectors to centroids fit to the other convention. sparrow now bundles **corrected centroids** and uses them by default:
+
+* `load_gin_reference()` returns the corrected reference; `load_gin_reference("published")` returns the centroids exactly as published. `GIN_REFERENCES` lists both, and every function that takes a `reference` — `assign_gin_clusters`, `NardiniResult.gin_clusters`, `Protein.nardini.gin_cluster` / `gin_report`, `gin_cluster_definitions`, `compare_gin_references` — accepts either name in place of a `GINReference`.
+* The corrected centroids were made by `devtools/scripts/build_corrected_gin_reference.py`: corrected vectors for the 4,529 human IDRs of 100–300 residues at 100,000 scrambles, then k-means started from the published centroids and run to convergence (4 iterations). Starting from the published centroids keeps every cluster's number and description. A fresh clustering would not: rerunning the published k-means call on the published vectors gives partitions within 0.2% of the published inertia that agree with it at an adjusted Rand index of only 0.37–0.51.
+* No centroid moves by more than 0.12% of the published centroid spacing. 47 of the 4,529 clustering IDRs (1.0%) and 679 of all 24,508 human IDRs (2.8%) change cluster; every cluster keeps at least 94% of its IDRs; and the movers sat on a boundary to begin with — median published separation 0.31, against 5.0 for all IDRs, and 92% of them move to their published runner-up. `num_idrs` is recounted over the same 24,508 IDRs.
+* Against the published centroids, sparrow's vectors reproduce 97.5% of the published cluster calls.
+
+**Any NARDINI patterning z-score computed with this cycle's earlier `n - b + 2` code will change** — typically by a few hundredths, by more for short IDRs, where one window is a larger share of the total.
+
+### Changed — `sparrow.nardini` does each thing once
+
+* **One scoring path for every backend.** `patterning_zscores` used to validate, encode and gate each sequence twice (once itself, once through `patterning_values`), and the `'kappa'` / `'iwd'` backends scored the observed sequence with the single-sequence functions but its scrambles with the batch ones. A single `_score_arrangements` now scores a block of arrangements, and the observed sequence is a block of one, so a value and its null distribution always come from the same code; the scramble loop is shared by all three backends. The random stream is unchanged, so `'kappa'` results are bit-identical to before and `'iwd'` ones move by ~1e-15 (the batch IWD sums by FFT where the single-sequence one loops over pairs).
+* `Protein.nardini.gin_cluster()` and `gin_report()` share one assignment helper. `gin_report()` now accepts `reference=` — it previously ignored any reference and always used the default — and raises the same clear error as `gin_cluster()` for `background=None`.
+* Dropped `ProteinNardini._resolve_background`, a one-line wrapper over `resolve_background`.
+
+### Documentation — NARDINI claims checked against measurement
+
+* The k-means hyperparameters behind GIN are documented upstream after all (`KMeans(init="random", n_clusters=30, n_init=10, random_state=1)` on the 4,529 IDRs of 100–300 residues, 100,000 scrambles); the clustering docs said otherwise, and now say what they are and why they still do not reproduce the published clusters.
+* `'nardini'` and `'kappa'` were described as measuring "the same thing", with z-scores correlating at 0.97–1.00 and differing by at most ~0.2. Re-measured over 63 IDR-like sequences at 4,000 scrambles, the per-feature correlation is 0.88–1.00 (median 0.99), the typical difference 0.07 and the largest about 1. The guide, README and `PATTERNING_BACKENDS` now call them close relatives.
+* "Where the reference fit is sound, sparrow's z-scores match it bit for bit" now says what is actually true: identical given the same scrambles, Monte Carlo precision otherwise.
+* The example numbers in the NARDINI guide (backend comparison, GIN assignments, cluster sizes) were regenerated with the corrected windows and centroids.
+
 ### Added — ruff, ty and a pinned CI environment
 
 * **`ruff check` and `ruff format` gate commits** via pre-commit, and `ty` is available as a manual-stage hook (`pre-commit run ty --hook-stage manual`). Library code is type-clean. Configuration is in `pyproject.toml`; the superseded `[flake8]` and `[yapf]` sections are gone from `setup.cfg`. The tree was reformatted in a single commit, recorded in `.git-blame-ignore-revs`.

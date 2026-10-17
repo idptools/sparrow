@@ -10,7 +10,7 @@ directly::
     p.nardini.vector()             # 90-feature NARDINI+ z-score vector
     p.nardini.patterning()         # just the 36 patterning z-scores
     p.nardini.composition()        # just the 54 compositional z-scores
-    p.nardini.gin_cluster()        # nearest published human GIN grammar
+    p.nardini.gin_cluster()        # nearest human GIN grammar
     print(p.nardini.gin_report())  # the same, in prose, with the caveats
 
 Everything returns a :class:`~sparrow.nardini.table.FeatureVector` - a labelled
@@ -179,10 +179,6 @@ class ProteinNardini:
     def __repr__(self):
         return f"ProteinNardini|L = {len(self.__protein)}"
 
-    def _resolve_background(self, background):
-        """Turn the ``background`` argument into a NardiniBackground, or None."""
-        return resolve_background(background)
-
     @staticmethod
     def _cache_key(background, num_scrambles, seed, typeset, blob_size, min_fraction, backend):
         """The memoization key for one set of options.
@@ -257,7 +253,7 @@ class ProteinNardini:
         if key not in self.__cache:
             self.__cache[key] = nardini_vectors(
                 {"sequence": self.__protein.sequence},
-                background=self._resolve_background(background),
+                background=resolve_background(background),
                 num_scrambles=num_scrambles,
                 seed=seed,
                 typeset=typeset,
@@ -405,11 +401,59 @@ class ProteinNardini:
         if raw or background is None:
             return FeatureVector(raw_array, COMPOSITION_FEATURE_NAMES, label="composition (raw)")
 
-        resolved = self._resolve_background(background)
+        resolved = resolve_background(background)
         return FeatureVector(resolved.zscores(values), COMPOSITION_FEATURE_NAMES, label="composition")
 
     # .................................................................
     #
+    def _gin_assignment(self, background, num_scrambles, seed, reference):
+        """Assign this protein to a GIN reference, shared by the two GIN methods.
+
+        The centroids live in the space of the default NARDINI+ vector - the
+        8-type grouping, 5-residue windows, the 0.10 abundance gate and the
+        ``'nardini'`` statistic - so those settings are fixed here rather than
+        offered as options.
+
+        Parameters
+        ----------
+        background : str or NardiniBackground
+            Reference set for the compositional half.
+        num_scrambles : int
+            Scrambles for the patterning half.
+        seed : int or None
+            Seed for reproducibility.
+        reference : sparrow.nardini.gin.GINReference, str or None
+            Centroids, the name of a bundled set, or None for the default.
+
+        Returns
+        -------
+        sparrow.nardini.gin.GINAssignment
+
+        Raises
+        ------
+        sparrow.sparrow_exceptions.SparrowException
+            If ``background`` is None - GIN needs the full 90-feature vector.
+        """
+        if background is None:
+            raise SparrowException(
+                "GIN cluster assignment needs the compositional half of the "
+                "vector, so a background is required. Use the default "
+                "background='human' unless you have a specific reason not to."
+            )
+
+        from sparrow.nardini.gin import assign_gin_clusters
+
+        result = self._result(
+            background,
+            num_scrambles,
+            seed,
+            "8",
+            DEFAULT_BLOB_SIZE,
+            DEFAULT_MIN_FRACTION,
+            DEFAULT_BACKEND,
+        )
+        return assign_gin_clusters(result, reference=reference)
+
     def gin_cluster(
         self,
         background=DEFAULT_REFERENCE,
@@ -417,7 +461,7 @@ class ProteinNardini:
         seed=None,
         reference=None,
     ):
-        """Assign this protein to its nearest published human GIN cluster.
+        """Assign this protein to its nearest human GIN cluster.
 
         Returns the single-sequence view of
         :func:`sparrow.nardini.gin.assign_gin_clusters`.
@@ -439,14 +483,16 @@ class ProteinNardini:
             Scrambles for the patterning half. Default 10,000.
         seed : int or None, optional
             Seed for reproducibility.
-        reference : sparrow.nardini.gin.GINReference, optional
-            Alternative centroids. Defaults to the bundled human reference.
+        reference : sparrow.nardini.gin.GINReference or str, optional
+            Centroids to assign against, or the name of a bundled set. Defaults to
+            the corrected human reference; pass ``'published'`` for the centroids
+            exactly as published.
 
         Returns
         -------
         dict
             ``name``, ``cluster``, ``description``, ``distance``,
-            ``separation``, ``n_saturated``, ``within_cluster_scale`` and
+            ``separation``, ``n_saturated``, ``composition_rms_z`` and
             ``is_typical``.
 
         Raises
@@ -459,25 +505,7 @@ class ProteinNardini:
         >>> p.nardini.gin_cluster(seed=42)["description"]    # doctest: +SKIP
         'Weak positive charge'
         """
-        if background is None:
-            raise SparrowException(
-                "GIN cluster assignment needs the compositional half of the "
-                "vector, so a background is required. Use the default "
-                "background='human' unless you have a specific reason not to."
-            )
-
-        from sparrow.nardini.gin import assign_gin_clusters
-
-        result = self._result(
-            background,
-            num_scrambles,
-            seed,
-            "8",
-            DEFAULT_BLOB_SIZE,
-            DEFAULT_MIN_FRACTION,
-            "nardini",
-        )
-        assignment = assign_gin_clusters(result, reference=reference)
+        assignment = self._gin_assignment(background, num_scrambles, seed, reference)
         record = assignment.records()[0]
         record["name"] = getattr(self.__protein, "name", None) or "sequence"
         return record
@@ -488,6 +516,7 @@ class ProteinNardini:
         num_scrambles=DEFAULT_NUM_SCRAMBLES,
         seed=None,
         n_alternatives=3,
+        reference=None,
     ):
         """Return a readable summary of the GIN assignment and how much to trust it.
 
@@ -501,34 +530,30 @@ class ProteinNardini:
             Seed for reproducibility.
         n_alternatives : int, optional
             How many runner-up clusters to list. Default 3.
+        reference : sparrow.nardini.gin.GINReference or str, optional
+            As for :meth:`gin_cluster`.
 
         Returns
         -------
         str
             A short multi-line summary.
 
+        Raises
+        ------
+        sparrow.sparrow_exceptions.SparrowException
+            If ``background`` is None - GIN needs the full 90-feature vector.
+
         Examples
         --------
         >>> print(p.nardini.gin_report(seed=42))       # doctest: +SKIP
         """
-        from sparrow.nardini.gin import assign_gin_clusters
-
-        result = self._result(
-            background,
-            num_scrambles,
-            seed,
-            "8",
-            DEFAULT_BLOB_SIZE,
-            DEFAULT_MIN_FRACTION,
-            "nardini",
-        )
-        assignment = assign_gin_clusters(result)
-        record = assignment.records()[0]
-
         from sparrow.nardini.gin import (
             TYPICAL_COMPOSITION_RMS_Z,
             TYPICAL_MAX_SATURATED,
         )
+
+        assignment = self._gin_assignment(background, num_scrambles, seed, reference)
+        record = assignment.records()[0]
 
         lines = [
             f"GIN cluster {record['cluster']}: {record['description']}",

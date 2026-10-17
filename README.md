@@ -36,7 +36,7 @@ SPARROW integrates direct sequence calculations with per-residue predictions fro
 - **Linear profiles** — per-residue windowed tracks for any of the above, plus **500+ published amino-acid property scales** (AAindex).
 - **Deep-learning predictions** via `Protein.predictor` — disorder and pLDDT, DSSP secondary structure, polymer dimensions (Rg, Re, scaling exponent, asphericity, prefactor), phosphorylation, localization signals, transactivation domains, transmembrane regions, and phase-separation propensity. Built on the [ALBATROSS](https://www.nature.com/articles/s41592-023-02159-5) networks.
 - **Polymer-model properties** via `Protein.polymeric` — analytical and simulation-derived dimensions and distance distributions.
-- **Molecular grammars** — a native NARDINI / NARDINI+ implementation (`sparrow.nardini`) for detecting non-random residue patterning, with user-buildable compositional backgrounds, assignment to the 30 published human GIN grammars, clustering to derive your own, and parallel computation across a whole proteome.
+- **Molecular grammars** — a native NARDINI / NARDINI+ implementation (`sparrow.nardini`) for detecting non-random residue patterning, with user-buildable compositional backgrounds, assignment to the 30 human GIN grammars, clustering to derive your own, and parallel computation across a whole proteome.
 - **Scale-up tools** — fast batch prediction across whole sequence sets, and fixed-length feature vectors for machine learning.
 - **Extensible** — a simple plugin system for adding new sequence analyses.
 
@@ -149,7 +149,7 @@ p = Protein("MENDPRVRKFASDGAQWAIKWQKK...")
 p.nardini.vector(seed=42)        # 90-feature NARDINI+ vector
 p.nardini.patterning(seed=42)    # just the 36 patterning z-scores
 p.nardini.composition()          # just the 54 compositional z-scores
-p.nardini.gin_cluster(seed=42)   # nearest published human GIN grammar
+p.nardini.gin_cluster(seed=42)   # nearest human GIN grammar
 print(p.nardini.gin_report(seed=42))
 ```
 
@@ -169,7 +169,7 @@ result = nardini_vectors("my_idrs.fasta", background=background,
 result.to_table()                   # 90 columns, one row per IDR
 result.top_features("IDR1", n=5)    # the most non-random features
 
-# 3. assign each IDR to one of the 30 published human GIN clusters
+# 3. assign each IDR to one of the 30 human GIN clusters
 result.gin_clusters().records()
 ```
 
@@ -211,13 +211,19 @@ Three patterning statistics are selectable via `backend`:
 | `backend` | statistic | notes |
 |---|---|---|
 | `'nardini'` (default) | published NARDINI omega/kappa window asymmetry | **required for GIN** |
-| `'kappa'` | the same asymmetry, normalized by `delta_max` | bounded 0–1; equivalent once z-scored |
+| `'kappa'` | a closely related asymmetry, normalized by `delta_max` | bounded 0–1 |
 | `'iwd'` | sparrow's inverse-weighted distance | ignores `blob_size` |
 
-`'nardini'` z-scores the raw asymmetry (**delta**); `'kappa'` z-scores delta divided by `delta_max`. Since `delta_max` depends only on composition and every scramble preserves it, that divisor cancels out of the z-score — the two measure the same thing (correlation 0.97–1.00 in practice, differing only because `kappa_x` pads the ends and caps at 1). **`'kappa'` is provided for completeness**, and for continuity with the deprecated `sparrow.sequence_analysis.grammar`, whose values it reproduces to ~1e-6 (sparrow computes them in double precision where `grammar` used single). All three are vectorized over scrambles and all are fast enough to choose between on scientific grounds — at L=1000 and 10,000 scrambles, 0.81 s / 1.50 s / 1.45 s for `nardini` / `kappa` / `iwd`. Values are **not** comparable across backends, though; `result.backend` records which one produced them.
+`'nardini'` z-scores the raw asymmetry (**delta**); `'kappa'` z-scores delta divided by `delta_max`. Since `delta_max` depends only on composition and every scramble preserves it, that divisor cancels out of the z-score, and the two track each other closely (per-feature correlation 0.88–1.00, median 0.99). They are not identical, because `kappa_x` pads the ends — adding partial windows at both termini — and caps at 1. **`'kappa'` is provided for its bounded raw value**, not because it says something different about patterning. All three are vectorized over scrambles and all are fast enough to choose between on scientific grounds — at L=1000 and 10,000 scrambles, 0.81 s / 1.50 s / 1.45 s for `nardini` / `kappa` / `iwd`. Values are **not** comparable across backends, though; `result.backend` records which one produced them.
 
-GIN cluster assignment maps sequences onto the published human grammars
-(`'D/E-tracts'`, `'S patches'`, ...). Nearest-centroid assignment never abstains,
+GIN cluster assignment maps sequences onto the human GIN grammars
+(`'D/E-tracts'`, `'S patches'`, ...). By default it uses the published clusters
+refit to sparrow's patterning windows: the published GIN vectors came from the
+`nardini` package, whose windows include an off-by-one trailing window of `b - 1`
+residues, and sparrow scores only the `n - b + 1` complete windows. The refit
+keeps every cluster's number and description, and 97% of human IDRs keep their
+published cluster; pass `reference="published"` for the centroids exactly as
+published. Nearest-centroid assignment never abstains,
 so three diagnostics tell you when not to believe a label: `separation` (gap to the
 runner-up — small means the IDR sits *between* grammars), `composition_rms_z` (how
 far the sequence is from the reference IDRome — ~1 is typical, >2 is not), and

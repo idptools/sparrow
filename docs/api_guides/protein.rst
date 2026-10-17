@@ -326,7 +326,7 @@ Molecular grammar (NARDINI / NARDINI+)
    p.nardini.vector(seed=42)        # 90-feature NARDINI+ z-score vector
    p.nardini.patterning(seed=42)    # just the 36 patterning z-scores
    p.nardini.composition()          # just the 54 compositional z-scores
-   p.nardini.gin_cluster(seed=42)   # nearest published human GIN grammar
+   p.nardini.gin_cluster(seed=42)   # nearest human GIN grammar
    print(p.nardini.gin_report(seed=42))
 
 Results are labelled NumPy containers -- ``v["Frac K+R"]``, ``v.values``,

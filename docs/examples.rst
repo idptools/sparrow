@@ -182,7 +182,7 @@ the options match the ones you computed with.
    vector["Frac K+R"]                 # one feature by name
    vector.values                      # the underlying (90,) array
 
-   # nearest published human GIN grammar, plus whether to believe it
+   # nearest human GIN grammar, plus whether to believe it
    record = protein.nardini.gin_cluster(seed=42, num_scrambles=10000)
    print(record["description"], record["is_typical"])
 
@@ -205,7 +205,7 @@ Variations
   using the bundled human one, with
   :func:`~sparrow.nardini.background.build_background`, and pass it as
   ``background=``.
-* **Your own grammars:** rather than assigning to the 30 published human clusters,
+* **Your own grammars:** rather than assigning to the 30 human GIN clusters,
   cluster your own vectors with
   :func:`~sparrow.nardini.clustering.build_gin_reference`.
 * **Patterning only:** pass ``background=None`` for the 36 composition-independent

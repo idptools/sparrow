@@ -198,4 +198,7 @@ if __name__ == "__main__":
     build_priors()
     build_centroids()
     build_cluster_definitions()
-    print("\nDone. Remember to update sparrow/data/nardini/SOURCES.md if the upstream data changed.")
+    print(
+        "\nDone. Remember to update sparrow/data/nardini/SOURCES.md if the upstream data changed, "
+        "and to rerun build_corrected_gin_reference.py if the published centroids did."
+    )

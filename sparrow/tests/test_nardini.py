@@ -5,6 +5,12 @@ transcribed from the NARDINI+ reference notebook (``_reference_*`` below). The
 production code is a vectorized rewrite, so keeping the slow version here and
 asserting bit-level agreement is what guarantees the rewrite did not change any
 numbers.
+
+The notebook scores the ``n - b + 1`` complete windows of a sequence, and so does
+the transcription. The ``nardini`` package scores one more, a trailing window of
+``b - 1`` residues normalized by ``b``; that is an off-by-one, and
+``test_windows_are_the_complete_windows_only`` pins that sparrow does not
+reproduce it.
 """
 
 import math
@@ -63,7 +69,7 @@ def _reference_omega(seq, type1, b=5):
     sigAll = ((count / len(seq)) - (1 - (count / len(seq)))) ** 2
 
     sigX = []
-    for x in range(0, len(seq) - b + 2):
+    for x in range(0, len(seq) - b + 1):
         subseq = seq[x : x + b]
         count = sum(subseq.count(res) for res in type1)
         sigX.append(((count / b) - (1 - (count / b))) ** 2)
@@ -77,7 +83,7 @@ def _reference_kappa(seq, type1, type2, b=5):
     sigAll = ((count1 / len(seq)) - (count2 / len(seq))) ** 2 / ((count1 / len(seq)) + (count2 / len(seq)))
 
     sigX = []
-    for x in range(0, len(seq) - b + 2):
+    for x in range(0, len(seq) - b + 1):
         subseq = seq[x : x + b]
         c1 = sum(subseq.count(res) for res in type1)
         c2 = sum(subseq.count(res) for res in type2)
@@ -207,6 +213,35 @@ def test_scramble_scoring_matches_reference():
 
     for row, scramble in enumerate(scrambles):
         assert np.allclose(got[row], _reference_patterning_values(scramble), rtol=1e-12, atol=1e-15)
+
+
+def test_windows_are_the_complete_windows_only():
+    """Only the n - b + 1 complete windows are scored, with no trailing partial window.
+
+    Worked by hand for EEEEEKKKKK with b = 5. E and K are each at fraction 0.5, so
+    sigma_all is 0 for both neg-neg and pos-neg, and the six complete windows hold
+    5, 4, 3, 2, 1 and 0 glutamates. A window holding c of them has asymmetry
+    ((2c - 5) / 5)^2 under either statistic - 1, 0.36, 0.04, 0.04, 0.36, 1 - and
+    the feature is the mean of their squares.
+
+    The nardini package's extra window ('KKKK', still divided by 5) would add a
+    seventh term, giving (2.2624 + 1) / 7 = 0.466 for neg-neg rather than 0.377.
+    """
+    from sparrow.nardini import patterning as P
+
+    sequence = "EEEEEKKKKK"
+    blob_size = 5
+
+    counts = P._window_counts(P.encode_types(sequence)[None, :], 8, blob_size)
+    assert counts.shape == (1, 8, len(sequence) - blob_size + 1)
+
+    window_asymmetries = np.array([1.0, 0.36, 0.04, 0.04, 0.36, 1.0])
+    expected = float(np.mean(window_asymmetries**2))
+
+    names = patterning_feature_names("8")
+    values = patterning_values(sequence, blob_size=blob_size)
+    assert values[names.index("neg-neg")] == pytest.approx(expected, rel=1e-12)
+    assert values[names.index("pos-neg")] == pytest.approx(expected, rel=1e-12)
 
 
 # =====================================================================
@@ -361,9 +396,6 @@ def test_backend_registry():
         ("nardini", "nardini"),
         ("kappa", "kappa"),
         ("iwd", "iwd"),
-        # the legacy sparrow.sequence_analysis.grammar names
-        ("kappa_cython", "kappa"),
-        ("iwd_combined", "iwd"),
         ("KAPPA", "kappa"),
         ("  Nardini ", "nardini"),
     ],
@@ -381,32 +413,43 @@ def test_resolve_backend_rejects_unknown():
         resolve_backend("not-a-backend")
 
 
-@pytest.mark.parametrize(
-    "grammar_backend,nardini_backend,prefix",
-    [("kappa_cython", "kappa", "kappa::"), ("iwd_combined", "iwd", "iwd::")],
-)
 @pytest.mark.parametrize("sequence", [SMARCC2_LIKE, RG_RICH, BLOCKY_EK, "QQQQNNNNSSSSTTTTGGGGPPPPAAAA"])
-def test_ported_backends_match_grammar(grammar_backend, nardini_backend, prefix, sequence):
-    """The ported backends must reproduce sparrow.sequence_analysis.grammar.
+def test_alternative_backends_are_the_sparrow_statistics(sequence):
+    """'kappa' and 'iwd' must be sparrow's own kappa_x and IWD, feature by feature.
 
-    Agreement is to single-precision tolerance rather than bit-for-bit: grammar
-    goes through the Cython extensions, which carry the kappa intermediates in C
-    ``float``, whereas these backends use the double-precision NumPy
-    reimplementations. Where the two differ, the NumPy value is the more accurate
-    one - see test_patterning_vectorized.py, which pins that claim.
+    The backends score whole blocks of arrangements with the batch routines in
+    sparrow.patterning.vectorized. This checks them against the single-sequence
+    functions behind Protein.kappa and the IWD methods. A diagonal feature is one
+    type against the rest (kappa_x with an empty second group, or the IWD of that
+    type); an off-diagonal one is one type against another (kappa_x of the pair,
+    or the IWD of their union). Unevaluated features must be exactly zero.
+
+    kappa goes through the same arithmetic either way and must match exactly. The
+    batch IWD sums inverse distances by FFT autocorrelation where the
+    single-sequence one loops over pairs, so the two agree to rounding only.
     """
-    from sparrow.sequence_analysis import grammar
+    from sparrow.patterning import vectorized as vec
 
-    config = grammar.GrammarPatterningConfig(backend=grammar_backend)
-    reference = grammar.compute_patterning_raw(sequence, config)
+    groups = [sorted(residues) for residues in TYPES_8.values()]
+    fractions = [sum(sequence.count(residue) for residue in group) / len(sequence) for group in groups]
 
-    names = patterning_feature_names("8")
-    expected = np.array([reference[prefix + name] for name in names])
-    got = patterning_values(sequence, backend=nardini_backend)
+    kappa = patterning_values(sequence, backend="kappa")
+    iwd = patterning_values(sequence, backend="iwd")
 
-    # iwd is double precision on both sides; kappa is the single-precision one
-    tolerance = 1e-12 if nardini_backend == "iwd" else 1e-5
-    assert np.allclose(expected, got, rtol=tolerance, atol=1e-12)
+    pairs = [(i, j) for i in range(len(groups)) for j in range(i, len(groups))]
+    for feature, (i, j) in enumerate(pairs):
+        if not (fractions[i] > 0.10 and fractions[j] > 0.10):
+            assert kappa[feature] == 0.0
+            assert iwd[feature] == 0.0
+            continue
+
+        expected_kappa = vec.kappa_x(sequence, groups[i], [] if i == j else groups[j], 5, 1)
+        targets = groups[i] if i == j else sorted(set(groups[i]) | set(groups[j]))
+        expected_iwd = vec.calculate_average_inverse_distance_from_sequence(sequence, targets)
+
+        # kappa_x reports -1 for "undefined", which the backend reports as 0
+        assert kappa[feature] == max(expected_kappa, 0.0)
+        assert iwd[feature] == pytest.approx(expected_iwd, rel=1e-12)
 
 
 @pytest.mark.parametrize("backend", ["nardini", "kappa", "iwd"])
@@ -508,8 +551,8 @@ def test_backend_recorded_on_result():
         result = nv({"a": SMARCC2_LIKE}, num_scrambles=100, seed=1, backend=backend)
         assert result.backend == backend
 
-    # legacy alias is normalized on the way in
-    assert nv({"a": SMARCC2_LIKE}, num_scrambles=100, seed=1, backend="iwd_combined").backend == "iwd"
+    # the name is normalized on the way in
+    assert nv({"a": SMARCC2_LIKE}, num_scrambles=100, seed=1, backend=" IWD").backend == "iwd"
 
 
 def test_backend_does_not_affect_composition_block(idr_set):

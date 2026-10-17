@@ -1,10 +1,10 @@
 """Build your own GIN-style clusters from your own IDRome.
 
-:mod:`sparrow.nardini.gin` *assigns* sequences to the 30 published human GIN
+:mod:`sparrow.nardini.gin` *assigns* sequences to the 30 human GIN
 clusters. This module does the other half: it runs the same clustering procedure
 over whatever set of NARDINI+ vectors you give it, producing a
 :class:`~sparrow.nardini.gin.GINReference` that ``assign_gin_clusters`` accepts
-in place of the published one.
+in place of the bundled ones.
 
 That is what you want for a non-human proteome, a filtered sub-proteome, a
 designed library, or to see the grammars of your own dataset rather than forcing
@@ -26,34 +26,43 @@ it onto human ones::
 
 Any backend works. The centroids record which statistic produced them, and
 ``assign_gin_clusters`` refuses to mix spaces - so ``'kappa'`` vectors against
-``'kappa'`` centroids is fine, while ``'kappa'`` vectors against the published
+``'kappa'`` centroids is fine, while ``'kappa'`` vectors against the bundled
 ``'nardini'`` centroids is not.
 
 Reproducing the published clusters
 ----------------------------------
-You can reproduce the *procedure*. Reproducing the published 30 centroids exactly
-is a different matter, and worth being honest about before you spend the compute:
+You can reproduce the *procedure*. Reproducing the published 30 centroids is a
+different matter, and worth being honest about before you spend the compute:
 
+* **The published procedure is known.** The GIN repository clusters the 4,529
+  human IDRs of 100-300 residues, with z-scores clipped to +/-3 and 100,000
+  scrambles per IDR, using
+  ``sklearn.cluster.KMeans(init="random", n_clusters=30, n_init=10, random_state=1)``.
+  sparrow uses scipy's k-means++ instead, which is the better initializer and
+  needs no new dependency.
+* **It does not pin down the answer.** The k-means landscape for these vectors is
+  flat. Rerunning that call on the published vectors - with the published
+  ``random_state`` or any other - finds partitions whose inertia is within 0.2%
+  of the published one, but which agree with it at an adjusted Rand index of
+  only 0.37-0.51. The published clusters are one of many equally good optima, so
+  a fresh clustering - with any seed, any initializer, even on identical
+  vectors - will not give them back.
+  Cluster *numbering* is arbitrary on top of that; use
+  :func:`compare_gin_references` rather than comparing cluster numbers.
 * **sparrow does not ship the IDRome sequences**, only the centroids and the
   compositional priors. You supply the sequences, and "the human IDRome" is itself
   a definition - which disorder predictor, which thresholds, which boundary rules.
   Different IDR boundaries give different vectors and therefore different clusters.
-* **k-means depends on its initialization**, and cluster *numbering* is arbitrary
-  in any case. Two runs on identical data with different seeds give the same
-  partition under a permutation of labels, at best. Use
-  :func:`compare_gin_references` rather than comparing cluster numbers.
-* **Not every hyperparameter is recorded.** ``sparrow/data/nardini/SOURCES.md``
-  captures what could be verified from the source: k=30, human IDRs of 100-300
-  residues, z-scores clipped to +/-3. The number of k-means restarts, the
-  iteration limit, any feature weighting, and the ``num_scrambles`` behind the
-  published vectors are not documented upstream.
 * **The published descriptions are human-authored prose** - ``'D/E-tracts'``,
   ``'S patches'``. Clustering cannot regenerate them. This module derives a
   description from each centroid's most extreme features instead, which is
   readable but is not the published label.
 
 So the realistic goal is "build my own clusters, and measure how close they are to
-the published ones", which is what :func:`compare_gin_references` reports.
+the published ones", which is what :func:`compare_gin_references` reports. (The
+corrected human reference sparrow bundles sidesteps the problem by refitting from
+the published centroids rather than clustering afresh - see
+``devtools/scripts/build_corrected_gin_reference.py``.)
 
 Cost
 ----
@@ -394,9 +403,9 @@ def compare_gin_references(reference, other=None, clip=GIN_CLIP):
     ----------
     reference : GINReference
         Your clusters, typically from :func:`build_gin_reference`.
-    other : GINReference, optional
-        What to compare against. Defaults to the bundled published human GIN
-        reference.
+    other : GINReference or str, optional
+        What to compare against: a reference, or the name of a bundled one.
+        Defaults to the corrected human GIN reference.
     clip : float, optional
         Unused in the distance itself - both sets of centroids already live in
         clipped space - but recorded in the summary for provenance. Default 3.0.
@@ -438,10 +447,9 @@ def compare_gin_references(reference, other=None, clip=GIN_CLIP):
     """
     from scipy.optimize import linear_sum_assignment
 
-    from sparrow.nardini.gin import load_gin_reference
+    from sparrow.nardini.gin import _resolve_reference
 
-    if other is None:
-        other = load_gin_reference()
+    other = _resolve_reference(other)
 
     if tuple(reference.feature_names) != tuple(other.feature_names):
         raise SparrowException(

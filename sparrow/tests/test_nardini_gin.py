@@ -11,7 +11,9 @@ import pandas as pd
 import pytest
 
 from sparrow.nardini import (
+    DEFAULT_GIN_REFERENCE,
     GIN_CLIP,
+    GIN_REFERENCES,
     REFERENCE_SPECIES,
     assign_gin_clusters,
     composition_feature_names,
@@ -133,8 +135,9 @@ def test_reference_background_works_end_to_end():
 # =====================================================================
 
 
-def test_gin_reference_shape_and_metadata():
-    reference = load_gin_reference()
+@pytest.mark.parametrize("name", sorted(GIN_REFERENCES))
+def test_gin_reference_shape_and_metadata(name):
+    reference = load_gin_reference(name)
 
     assert len(reference) == 30
     assert reference.centroids.shape == (30, 90)
@@ -144,15 +147,63 @@ def test_gin_reference_shape_and_metadata():
     assert "Ruff" in reference.metadata["citation"]
 
 
-def test_gin_reference_feature_order_matches_sparrow():
+@pytest.mark.parametrize("name", sorted(GIN_REFERENCES))
+def test_gin_reference_feature_order_matches_sparrow(name):
     """The centroids are only meaningful if our feature order matches theirs."""
-    reference = load_gin_reference()
+    reference = load_gin_reference(name)
     expected = list(patterning_feature_names("8")) + list(composition_feature_names())
     assert list(reference.feature_names) == expected
 
 
 def test_gin_reference_is_cached():
     assert load_gin_reference() is load_gin_reference()
+    assert load_gin_reference("published") is load_gin_reference(" Published ")
+
+
+def test_both_human_references_are_bundled():
+    assert set(GIN_REFERENCES) == {"corrected", "published"}
+    assert DEFAULT_GIN_REFERENCE == "corrected"
+    assert load_gin_reference() is load_gin_reference("corrected")
+    assert load_gin_reference() is not load_gin_reference("published")
+
+
+def test_unknown_gin_reference_raises():
+    with pytest.raises(SparrowException, match="No bundled GIN reference"):
+        load_gin_reference("mouse")
+
+
+def test_corrected_reference_keeps_the_published_clusters():
+    """The refit moves each centroid a little and keeps every cluster's identity.
+
+    Each corrected centroid must be nearest its own published counterpart, and
+    move by well under 1% of the spacing between published centroids. The
+    descriptions are the published ones, and the cluster sizes are recounts over
+    the same 24,508 human IDRs, so they total the same and barely change.
+    """
+    corrected = load_gin_reference("corrected")
+    published = load_gin_reference("published")
+
+    assert list(corrected.clusters) == list(published.clusters)
+    assert corrected.descriptions == published.descriptions
+
+    shifts = ((corrected.centroids[:, None, :] - published.centroids[None, :, :]) ** 2).sum(axis=2)
+    assert list(np.argmin(shifts, axis=1)) == list(published.clusters)
+    assert np.max(np.diag(shifts)) < 0.01 * published.separation_scale
+
+    assert sum(corrected.num_idrs.values()) == sum(published.num_idrs.values()) == 24508
+    for cluster in published.clusters:
+        assert abs(corrected.num_idrs[cluster] - published.num_idrs[cluster]) <= 0.05 * published.num_idrs[cluster]
+
+
+def test_corrected_reference_records_how_it_was_built():
+    metadata = load_gin_reference("corrected").metadata
+
+    assert metadata["window_convention"] == "n - b + 1 complete windows"
+    assert "gin_centroids_human_v1.npz" in metadata["initial_centroids"]
+    assert metadata["num_clustering_idrs"] == 4529
+    assert metadata["clustering_num_scrambles"] == 100000
+    assert metadata["seed"] == 42
+    assert metadata["build_script"] == "devtools/scripts/build_corrected_gin_reference.py"
 
 
 def test_gin_cluster_definitions():
@@ -175,6 +226,12 @@ def test_gin_cluster_definitions_as_dataframe():
     assert list(frame.index) == list(range(30))
     assert frame.loc[7, "description"] == "D/E-tracts"
     assert frame["num_idrs"].sum() == 24508
+
+
+def test_gin_cluster_definitions_follow_the_requested_reference():
+    """The published counts are the paper's; the default is the corrected recount."""
+    assert gin_cluster_definitions(reference="published")[7]["num_idrs"] == 763
+    assert gin_cluster_definitions() == load_gin_reference("corrected").definitions()
 
 
 def test_gin_reference_describe():
@@ -208,9 +265,10 @@ def gin_result():
     )
 
 
-def test_assignment_matches_reference_implementation(gin_result):
-    reference = load_gin_reference()
-    assignment = assign_gin_clusters(gin_result)
+@pytest.mark.parametrize("name", sorted(GIN_REFERENCES))
+def test_assignment_matches_reference_implementation(gin_result, name):
+    reference = load_gin_reference(name)
+    assignment = assign_gin_clusters(gin_result, reference=name)
 
     for index in range(len(gin_result)):
         expected_cluster, expected_sep, expected_distances = _reference_assign(
@@ -225,9 +283,10 @@ def test_assignment_matches_reference_implementation(gin_result):
             assert assignment.separations[index] == pytest.approx(expected_sep)
 
 
-def test_assignment_places_designed_sequences_in_matching_clusters(gin_result):
+@pytest.mark.parametrize("name", sorted(GIN_REFERENCES))
+def test_assignment_places_designed_sequences_in_matching_clusters(gin_result, name):
     """A D/E tract should land in 'D/E-tracts', a Q tract in 'Q-tracts', etc."""
-    frame = assign_gin_clusters(gin_result).to_dataframe()
+    frame = assign_gin_clusters(gin_result, reference=name).to_dataframe()
 
     assert frame.loc["de_tract", "description"] == "D/E-tracts"
     assert frame.loc["s_patch", "description"] == "S patches"
@@ -295,6 +354,18 @@ def test_assignment_via_result_convenience_method(gin_result):
     assert np.allclose(direct.separations, convenience.separations)
 
 
+def test_reference_can_be_given_by_name(gin_result):
+    """A bundled reference's name and the reference object must be interchangeable."""
+    by_name = assign_gin_clusters(gin_result, reference="published")
+    by_object = assign_gin_clusters(gin_result, reference=load_gin_reference("published"))
+    via_result = gin_result.gin_clusters(reference="published")
+
+    assert by_name.reference is load_gin_reference("published")
+    assert np.array_equal(by_name.all_distances, by_object.all_distances)
+    assert np.array_equal(by_name.all_distances, via_result.all_distances)
+    assert not np.array_equal(by_name.all_distances, assign_gin_clusters(gin_result).all_distances)
+
+
 def test_ranked_clusters(gin_result):
     assignment = assign_gin_clusters(gin_result)
     ranked = assignment.ranked_clusters("de_tract", n=5)
@@ -332,7 +403,7 @@ def test_assignment_rejects_wrong_width():
 
 @pytest.mark.parametrize("backend", ["kappa", "iwd"])
 def test_assignment_rejects_non_nardini_backend(backend):
-    """The published centroids live in NARDINI omega/kappa space and nothing else.
+    """The bundled centroids live in NARDINI omega/kappa space and nothing else.
 
     Assigning a kappa_x or IWD vector against them would silently return
     plausible-looking but meaningless cluster labels, so it must be refused.
@@ -357,6 +428,7 @@ def test_assignment_rejects_non_nardini_backend(backend):
         message = str(info.value)
         assert f"'{backend}' vector" in message
         assert "'nardini' space" in message
+        assert "bundled GIN references are 'nardini'" in message
         # and it says how to proceed, either way
         assert "build_gin_reference()" in message
 
