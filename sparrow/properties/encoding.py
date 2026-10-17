@@ -22,7 +22,7 @@ is a pure re-encoding of the sequence.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -33,6 +33,7 @@ from sparrow.sparrow_exceptions import SparrowException
 __all__ = [
     "RESIDUES",
     "NUM_RESIDUES",
+    "RESIDUE_INDEX",
     "ASCII_TABLE_SIZE",
     "NOT_A_RESIDUE",
     "validate_protein_sequence",
@@ -41,6 +42,10 @@ __all__ = [
     "ascii_codes",
     "membership_lookup",
     "residue_codes",
+    "as_batch",
+    "concatenated_residue_codes",
+    "scale_values",
+    "scale_vector",
     "ternarize_winged",
     "ternarize_winged_batch",
 ]
@@ -50,6 +55,9 @@ RESIDUES: tuple[str, ...] = tuple(amino_acids.VALID_AMINO_ACIDS)
 
 #: Number of standard amino acids.
 NUM_RESIDUES = len(RESIDUES)
+
+#: Residue code of each standard amino acid.
+RESIDUE_INDEX: dict[str, int] = {residue: index for index, residue in enumerate(RESIDUES)}
 
 #: Number of entries in an ASCII-indexed lookup table.
 ASCII_TABLE_SIZE = 256
@@ -300,6 +308,143 @@ def residue_codes(sequence: str) -> NDArray[np.int8]:
         )
 
     return codes
+
+
+def as_batch(sequences: str | Sequence[str]) -> list[str]:
+    """A batch of sequences as an upper-case list; a single string is a batch of one.
+
+    Parameters
+    ----------
+    sequences : str or sequence of str
+        One sequence, or many.
+
+    Returns
+    -------
+    list of str
+        The sequences, upper-cased, in their original order.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If any element is not a string.
+    """
+    if isinstance(sequences, str):
+        return [sequences.upper()]
+
+    batch = []
+    for index, sequence in enumerate(sequences):
+        if not isinstance(sequence, str):
+            raise SparrowException(
+                f"Expected amino acid sequences as strings, but item {index} is a {type(sequence).__name__}"
+            )
+        batch.append(sequence.upper())
+    return batch
+
+
+def concatenated_residue_codes(batch: Sequence[str]) -> tuple[NDArray[np.int8], NDArray[np.int64]]:
+    """Residue codes for a whole batch, end to end, plus each sequence's length.
+
+    Concatenating means a batch of thousands of sequences is validated and
+    encoded in one pass. Sequence ``i`` occupies
+    ``codes[offsets[i]:offsets[i + 1]]``, where ``offsets`` is the cumulative sum
+    of ``lengths`` with a leading zero.
+
+    Parameters
+    ----------
+    batch : sequence of str
+        Upper-case amino acid sequences, as returned by :func:`as_batch`.
+
+    Returns
+    -------
+    tuple of numpy.ndarray
+        ``(codes, lengths)``: ``int8`` residue codes of every sequence in turn,
+        and the ``int64`` length of each sequence.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If any sequence contains a non-standard residue. For a batch of more
+        than one, the message says which sequence.
+    """
+    lengths = np.fromiter((len(sequence) for sequence in batch), dtype=np.int64, count=len(batch))
+    try:
+        codes = residue_codes("".join(batch))
+    except SparrowException:
+        if len(batch) == 1:
+            raise
+        # find the first offending sequence, so the error can say which one it was
+        for index, sequence in enumerate(batch):
+            try:
+                residue_codes(sequence)
+            except SparrowException as error:
+                raise SparrowException(f"Sequence {index} of {len(batch)} in the batch: {error}") from error
+        raise
+    return codes, lengths
+
+
+def scale_values(sequence: str, scale: Mapping[str, float | None]) -> NDArray[np.float64]:
+    """The value of a per-residue scale at every position of a sequence.
+
+    Parameters
+    ----------
+    sequence : str
+        Amino acid sequence, upper case.
+    scale : mapping of str to float
+        Value of each residue, e.g. :data:`sparrow.data.amino_acids.AA_hydro_KD`.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``float64`` array of length ``len(sequence)``.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If the sequence contains a non-standard residue, or a residue the scale
+        has no value for.
+    """
+    values = scale_vector(scale, needed=set(sequence))
+    return values[residue_codes(sequence)]
+
+
+def scale_vector(scale: Mapping[str, float | None], needed: Iterable[str] | None = None) -> NDArray[np.float64]:
+    """A per-residue scale as a length-20 array indexed by residue code.
+
+    Residues the scale has no value for are NaN, so they cannot silently
+    contribute a number; ``needed`` turns that into an error for the residues a
+    calculation is actually going to use.
+
+    Parameters
+    ----------
+    scale : mapping of str to float
+        Value of each residue. A value of None counts as missing.
+    needed : iterable of str, optional
+        Residues that must have a value. Default None (no requirement).
+
+    Returns
+    -------
+    numpy.ndarray
+        ``float64`` array of length :data:`NUM_RESIDUES`.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If a residue in ``needed`` has no value in ``scale``.
+    """
+    values = np.full(NUM_RESIDUES, np.nan, dtype=np.float64)
+    for index, residue in enumerate(RESIDUES):
+        value = scale.get(residue)
+        if value is not None:
+            values[index] = float(value)
+
+    if needed is not None:
+        missing = sorted(
+            residue for residue in set(needed) if residue in RESIDUES and np.isnan(values[RESIDUES.index(residue)])
+        )
+        if missing:
+            raise SparrowException(f"The scale has no value for residue(s) {missing}")
+
+    return values
 
 
 def ternarize_winged(

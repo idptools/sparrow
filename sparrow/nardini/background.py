@@ -49,8 +49,9 @@ import numpy as np
 
 from sparrow.nardini.composition import (
     COMPOSITION_FEATURE_NAMES,
-    composition_values,
+    composition_matrix,
 )
+from sparrow.properties import encoding
 from sparrow.sparrow_exceptions import (
     BackgroundQualityWarning,
     SparrowException,
@@ -83,6 +84,11 @@ REFERENCE_SPECIES = {
 _NONSTANDARD_RESIDUES = ("X", "U", "Z", "J", "B", "O")
 
 _FORMAT_VERSION = 1
+
+#: Sequences scored per composition_matrix call while building a background:
+#: enough to get the benefit of computing a batch at once, few enough that memory
+#: stays flat however large the IDRome is.
+_BACKGROUND_CHUNK = 2048
 
 
 class NardiniBackground:
@@ -492,6 +498,38 @@ def _is_usable(sequence, min_length):
     return not any(residue in sequence for residue in _NONSTANDARD_RESIDUES)
 
 
+def _composition_rows(names, sequences):
+    """Compositional features for a chunk of sequences, naming any that cannot be scored."""
+    try:
+        return composition_matrix(sequences, validate=False)
+    except SparrowException:
+        for name, sequence in zip(names, sequences):
+            try:
+                encoding.residue_codes(sequence.upper())
+            except SparrowException as error:
+                raise SparrowException(f"Cannot build a NARDINI background from {name!r}: {error}") from error
+        raise
+
+
+def _welford_update(rows, count, mean, m2):
+    """Fold rows into a running mean and sum of squared deviations, in place.
+
+    Welford's online update, one row at a time, so memory stays flat over a
+    whole IDRome and the result does not depend on how the rows were chunked.
+
+    Returns
+    -------
+    int
+        The updated number of rows seen.
+    """
+    for row in rows:
+        count += 1
+        delta = row - mean
+        mean += delta / count
+        m2 += delta * (row - mean)
+    return count
+
+
 def build_background(
     source,
     min_length=1,
@@ -580,19 +618,20 @@ def build_background(
 
         iterator = tqdm(iterator, desc="building NARDINI background")
 
-    for _name, sequence in iterator:
+    pending_names, pending = [], []
+    for name, sequence in iterator:
         if not _is_usable(sequence, min_length):
             skipped += 1
             continue
 
-        values = composition_values(sequence, validate=False)
-        row = np.asarray([values[name] for name in COMPOSITION_FEATURE_NAMES], dtype=np.float64)
+        pending_names.append(name)
+        pending.append(sequence)
+        if len(pending) == _BACKGROUND_CHUNK:
+            count = _welford_update(_composition_rows(pending_names, pending), count, mean, m2)
+            pending_names, pending = [], []
 
-        # Welford's online update keeps memory flat over a whole IDRome
-        count += 1
-        delta = row - mean
-        mean += delta / count
-        m2 += delta * (row - mean)
+    if pending:
+        count = _welford_update(_composition_rows(pending_names, pending), count, mean, m2)
 
     if count == 0:
         raise SparrowException(

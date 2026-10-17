@@ -32,14 +32,28 @@ Minimal End-to-End Alignment Example
 Direct Parameter Calculations
 -----------------------------
 
+The calculations behind the ``Protein`` properties live in
+:mod:`sparrow.properties`, and every one of them works on a batch: pass a list of
+sequences and get back one value per sequence. A single string is a batch of one.
+
 .. code-block:: python
 
-   from sparrow import calculate_parameters
+   from sparrow.properties import charge, composition
 
-   seq = "MGSQSSRSSSQQQ"
-   aa = calculate_parameters.calculate_aa_fractions(seq)
-   complexity = calculate_parameters.calculate_seg_complexity(seq)
-   hydro = calculate_parameters.calculate_hydrophobicity(seq, mode="KD")
+   sequences = ["MGSQSSRSSSQQQ", "MEEEKKKKSSSTTTDDD"]
+   fractions = composition.amino_acid_fractions(sequences)   # (2, 20)
+   complexity = composition.seg_complexity(sequences)        # (2,)
+   hydro = composition.hydrophobicity(sequences)             # Kyte-Doolittle mean
+   pI = charge.isoelectric_point(sequences)
+
+When you need several properties of the same batch, count it once and pass the
+counts instead of the sequences:
+
+.. code-block:: python
+
+   counts = composition.count_residues(sequences)
+   fcr = composition.fraction_charged(counts)
+   ncpr = composition.net_charge_per_residue(counts)
 
 NARDINI+ Feature Vectors
 ------------------------
@@ -81,31 +95,31 @@ Reference: Parameter Functions
 
 Key function entry points:
 
-* :func:`sparrow.calculate_parameters.calculate_aa_fractions`
-* :func:`sparrow.calculate_parameters.calculate_seg_complexity`
-* :func:`sparrow.calculate_parameters.calculate_hydrophobicity`
-* :func:`sparrow.calculate_parameters.calculate_linear_hydrophobicity`
+* :func:`sparrow.properties.composition.amino_acid_fractions`
+* :func:`sparrow.properties.composition.seg_complexity`
+* :func:`sparrow.properties.composition.hydrophobicity`
+* :func:`sparrow.properties.encoding.scale_values`
 * :func:`sparrow.sequence_analysis.patching.patch_fraction`
 * :func:`sparrow.sequence_analysis.patching.rg_patch_fraction`
 
-Physical properties
+Sequence properties
 -------------------
 
-Stateless functions computing sequence-dependent physical properties. These are the
-single implementation behind the corresponding
+The single implementation behind the corresponding
 :class:`~sparrow.protein.Protein` properties *and* the matching NARDINI+
-compositional features, so the two cannot disagree.
+compositional features, so the two cannot disagree. Every function takes a batch.
 
-.. automodule:: sparrow.sequence_analysis.physical_properties
-   :members: calculate_molecular_weight, charge_at_pH, isoelectric_point,
-             fraction_chain_expanding, fraction_disorder_promoting,
-             polyproline_II_propensity, fraction_positive, fraction_negative,
-             fraction_charged, net_charge_per_residue, fraction_aromatic,
-             fraction_aliphatic, fraction_polar, log_residue_ratio,
-             fraction_in_set, mean_residue_scale
-
-.. automodule:: sparrow.calculate_parameters
+.. automodule:: sparrow.properties
    :no-index:
+
+.. automodule:: sparrow.properties.composition
+   :members:
+
+.. automodule:: sparrow.properties.charge
+   :members: charge_at_pH, isoelectric_point, DEFAULT_PH, PI_THRESHOLD
+
+.. automodule:: sparrow.properties.encoding
+   :members:
 
 .. automodule:: sparrow.sequence_analysis.patching
    :no-index:

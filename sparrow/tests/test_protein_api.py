@@ -3,9 +3,8 @@
 import pytest
 
 from sparrow import Protein
-from sparrow.calculate_parameters import calculate_seg_complexity
 from sparrow.patterning import kappa as kappa_module
-from sparrow.sequence_analysis import physical_properties
+from sparrow.properties import composition
 from sparrow.sparrow_exceptions import ProteinException, SparrowException
 
 SEQ = "MEEEKKKKSSSTTTDDDQQQQNNNNGGGGRRRRDDDD"
@@ -20,11 +19,11 @@ def protein():
 
 
 def test_molecular_weight_matches_function(protein):
-    assert protein.molecular_weight == pytest.approx(physical_properties.calculate_molecular_weight(SEQ))
+    assert protein.molecular_weight == composition.molecular_weight(SEQ)[0]
 
 
 def test_complexity_matches_function(protein):
-    assert protein.complexity == pytest.approx(calculate_seg_complexity(SEQ))
+    assert protein.complexity == composition.seg_complexity(SEQ)[0]
 
 
 def test_ncpr_is_pos_minus_neg(protein):

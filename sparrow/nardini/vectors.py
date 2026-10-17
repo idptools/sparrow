@@ -50,7 +50,7 @@ import numpy as np
 from sparrow.nardini.background import NardiniBackground
 from sparrow.nardini.composition import (
     COMPOSITION_FEATURE_NAMES,
-    composition_values,
+    composition_matrix,
 )
 from sparrow.nardini.groups import DEFAULT_TYPESET, patterning_feature_names
 from sparrow.nardini.patterning import (
@@ -712,10 +712,7 @@ def nardini_vectors(
         comp_raw = np.zeros((n_seqs, 0), dtype=np.float64)
     else:
         comp_names = COMPOSITION_FEATURE_NAMES
-        comp_raw = np.zeros((n_seqs, len(comp_names)), dtype=np.float64)
-        for index, sequence in enumerate(seqs):
-            values = composition_values(sequence)
-            comp_raw[index] = [values[name] for name in comp_names]
+        comp_raw = composition_matrix(seqs)
         comp_z = background.zscores(comp_raw)
 
     return NardiniResult(

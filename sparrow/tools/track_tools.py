@@ -1,6 +1,24 @@
 from sparrow import sparrow_exceptions, protein
+from sparrow.properties import composition, encoding
 from scipy.signal import savgol_filter
 import numpy as np
+
+# Profile modes that depend only on the composition of each window. Every window
+# is scored at once by the batch function in sparrow.properties - the same one
+# behind the Protein property of the same name - rather than by building a
+# Protein per window.
+_COMPOSITION_TRACKS = {
+    "FCR": composition.fraction_charged,
+    "NCPR": composition.net_charge_per_residue,
+    "aromatic": composition.fraction_aromatic,
+    "aliphatic": composition.fraction_aliphatic,
+    "polar": composition.fraction_polar,
+    "proline": composition.fraction_proline,
+    "positive": composition.fraction_positive,
+    "negative": composition.fraction_negative,
+    "hydrophobicity": composition.hydrophobicity,
+    "seg-complexity": composition.seg_complexity,
+}
 
 
 # .................................................................
@@ -75,73 +93,17 @@ def predefined_linear_track(seq, mode, window_size, end_mode, smooth=None):
 
     """
 
-    #
-    # If additional linear analysis are useful they should be added here as a n
-    # ew FX() function, and then added as allowed mode options in this function
-    # and in protein.build_linear_profile
-    #
-    #
+    if mode in _COMPOSITION_TRACKS:
+        return _build_track_from_batch(seq, _COMPOSITION_TRACKS[mode], window_size, end_mode, smooth)
 
-    if mode == "FCR":
-
-        def FX(s):
-            return protein.Protein(s).FCR
-
-    elif mode == "NCPR":
-
-        def FX(s):
-            return protein.Protein(s).NCPR
-
-    elif mode == "aromatic":
-
-        def FX(s):
-            return protein.Protein(s).fraction_aromatic
-
-    elif mode == "aliphatic":
-
-        def FX(s):
-            return protein.Protein(s).fraction_aliphatic
-
-    elif mode == "polar":
-
-        def FX(s):
-            return protein.Protein(s).fraction_polar
-
-    elif mode == "proline":
-
-        def FX(s):
-            return protein.Protein(s).fraction_proline
-
-    elif mode == "positive":
-
-        def FX(s):
-            return protein.Protein(s).fraction_positive
-
-    elif mode == "negative":
-
-        def FX(s):
-            return protein.Protein(s).fraction_negative
-
-    elif mode == "hydrophobicity":
-
-        def FX(s):
-            return protein.Protein(s).hydrophobicity
-
-    elif mode == "seg-complexity":
-
-        def FX(s):
-            return protein.Protein(s).complexity
-
-    elif mode == "kappa":
+    if mode == "kappa":
 
         def FX(s):
             return protein.Protein(s).kappa
 
-    else:
-        raise sparrow_exceptions.SparrowException("Invalid mode passed to linear track: %s" % (mode))
+        return build_track(seq, FX, window_size, end_mode, smooth)
 
-    # finally build track using the specific function
-    return build_track(seq, FX, window_size, end_mode, smooth)
+    raise sparrow_exceptions.SparrowException("Invalid mode passed to linear track: %s" % (mode))
 
 
 # .................................................................
@@ -188,10 +150,16 @@ def linear_track_composition(seq, composition_list, window_size, end_mode, smoot
 
     """
 
-    def FX(s):
-        return protein.Protein(s).compute_residue_fractions(composition_list)
+    # residues that are not standard amino acids are ignored, as
+    # Protein.compute_residue_fractions does
+    residues = [residue for residue in composition_list if residue in encoding.RESIDUE_INDEX]
 
-    return build_track(seq, FX, window_size, end_mode, smooth)
+    def fraction(windows):
+        if not residues:
+            return np.zeros(len(windows))
+        return composition.fraction_in_set(windows, residues)
+
+    return _build_track_from_batch(seq, fraction, window_size, end_mode, smooth)
 
 
 # .................................................................
@@ -227,10 +195,10 @@ def linear_track_property(seq, value_map, window_size, end_mode, smooth=None):
         Returns an array of the window-averaged property values.
     """
 
-    def FX(s):
-        return sum(value_map[r] for r in s) / len(s)
+    def mean(windows):
+        return composition.mean_scale(windows, value_map)
 
-    return build_track(seq, FX, window_size, end_mode, smooth)
+    return _build_track_from_batch(seq, mean, window_size, end_mode, smooth)
 
 
 # .................................................................
@@ -285,6 +253,32 @@ def build_track(seq, track_function, window_size=7, end_mode="extend-ends", smoo
 
     """
 
+    smooth = _check_track_arguments(seq, window_size, smooth)
+
+    # run through window_size fragments and compute params using the
+    # custom passed function
+    track_vals = [track_function(frag) for frag in _windows(seq, window_size)]
+
+    return _finish_track(track_vals, len(seq), window_size, end_mode, smooth)
+
+
+def _build_track_from_batch(seq, batch_function, window_size, end_mode, smooth):
+    """As :func:`build_track`, with a function that scores every window in one call.
+
+    ``batch_function`` takes the list of windows and returns one value per window.
+    """
+    smooth = _check_track_arguments(seq, window_size, smooth)
+    track_vals = batch_function(_windows(seq, window_size)).tolist()
+    return _finish_track(track_vals, len(seq), window_size, end_mode, smooth)
+
+
+def _windows(seq, window_size):
+    """Every run of ``window_size`` consecutive residues, with a step of 1."""
+    return [seq[i : i + window_size] for i in range((len(seq) - window_size) + 1)]
+
+
+def _check_track_arguments(seq, window_size, smooth):
+    """Validate the window and smoothing arguments; returns ``smooth`` as an int or None."""
     if len(seq) < window_size:
         raise sparrow_exceptions.SparrowException(
             "Windowsize [%i] is larger than sequence [%i]" % (window_size, len(seq))
@@ -304,30 +298,24 @@ def build_track(seq, track_function, window_size=7, end_mode="extend-ends", smoo
                 raise sparrow_exceptions.SparrowException(
                     f"Could not convert smooth parameter to an integer ({smooth})."
                 )
+    return smooth
 
-    slen = len(seq)
 
-    # run through window_size fragments and compute params using the
-    # custom passed function
-    end = (slen - window_size) + 1
-    track_vals = []
-    for i in range(end):
-        frag = seq[i : i + window_size]
-        track_vals.append(track_function(frag))
-
+def _finish_track(track_vals, sequence_length, window_size, end_mode, smooth):
+    """Pad a list of per-window values to the requested end mode, then smooth it."""
     # deal with ends
     if end_mode == "extend-ends":
         front = int(window_size / 2)
         track_vals = [track_vals[0]] * front + track_vals
 
-        end = len(seq) - len(track_vals)
+        end = sequence_length - len(track_vals)
         track_vals = track_vals + [track_vals[-1]] * end
 
     elif end_mode == "zero-ends":
         front = int(window_size / 2)
         track_vals = [0] * front + track_vals
 
-        end = len(seq) - len(track_vals)
+        end = sequence_length - len(track_vals)
         track_vals = track_vals + [0] * end
     elif end_mode == "":
         pass

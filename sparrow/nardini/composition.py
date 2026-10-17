@@ -26,41 +26,44 @@ IDRs - see :mod:`sparrow.nardini.background`.
 
 Where the numbers come from
 ---------------------------
-This module *assembles* the feature vector; it does not implement the individual
-quantities. Each one is computed by the same code behind the corresponding
+This module *assembles* the feature vector; it implements none of the quantities.
+Each one comes from the same function behind the corresponding
 :class:`~sparrow.protein.Protein` property:
 
-* the 20 amino acid fractions - :func:`sparrow.calculate_parameters.calculate_aa_fractions`;
-* the grouped fractions, ratios and whole-sequence properties -
-  :mod:`sparrow.sequence_analysis.physical_properties`;
+* the amino acid fractions, grouped fractions, ratios and whole-sequence
+  properties - :mod:`sparrow.properties.composition` and
+  :mod:`sparrow.properties.charge`;
 * the patch features - :mod:`sparrow.sequence_analysis.patching`.
 
-So ``composition_values(seq)['FCR']`` and ``Protein(seq).FCR`` are the same number
-by construction rather than by coincidence, and a test asserts that for every
-feature that has a counterpart.
+A batch is counted once and every compositional feature read off those counts, so
+``composition_matrix`` over a whole IDRome costs little more than reading it in.
+``composition_values(seq)['FCR']`` and ``Protein(seq).FCR`` are the same number by
+construction, and a test asserts that for every feature with a counterpart.
 
 .. warning::
    One definition deliberately differs. ``'Frac Polar'`` counts cysteine
-   (QNSTGCH); :attr:`sparrow.protein.Protein.fraction_polar` does not (GHNQST), so
-   the two differ by the cysteine content. Both conventions are used, and the
-   bundled backgrounds and GIN centroids are defined against this one, so they are
-   kept distinct. Only the residue set differs - the implementation is shared.
+   (:data:`sparrow.data.amino_acids.NARDINI_POLAR`, QNSTGCH);
+   :attr:`sparrow.protein.Protein.fraction_polar` does not (GHNQST), so the two
+   differ by the cysteine content. Both conventions are used, and the bundled
+   backgrounds and GIN centroids are defined against this one, so they are kept
+   distinct. Only the residue set differs - the implementation is shared.
 
 .. note::
-   These values feed the bundled per-species backgrounds and the GIN centroids, so
-   they must stay bit-identical. Changing how a feature is summed - even in a way
-   that looks equivalent - shifts every compositional z-score and every centroid
-   distance downstream.
+   These values feed the bundled per-species backgrounds and the GIN centroids.
+   The current arithmetic reproduces the values those were built from to within a
+   few units in the last place - the exact last bit of a floating-point sum
+   depends on the order it is added up in, and even Python's own ``sum`` changed
+   that in 3.12 - and leaves every GIN cluster call over the 24,508 human IDRs
+   unchanged. Changing what a feature *means* would move it far more than that,
+   and would mean rebuilding the bundled data.
 """
 
 from collections import OrderedDict
 
 import numpy as np
 
-from sparrow import calculate_parameters
 from sparrow.data import amino_acids
-from sparrow.properties import encoding
-from sparrow.sequence_analysis import physical_properties
+from sparrow.properties import charge, composition, encoding
 from sparrow.sequence_analysis.patching import patch_fraction, rg_patch_fraction
 from sparrow.sparrow_exceptions import SparrowException
 
@@ -71,8 +74,6 @@ __all__ = [
     "PATCH_RESIDUES",
     "COMPOSITION_FEATURE_NAMES",
     "composition_feature_names",
-    "charge_at_pH",
-    "isoelectric_point",
     "composition_values",
     "composition_matrix",
 ]
@@ -89,20 +90,13 @@ RG_MIN_ADJACENT_PAIRS = 2
 #: Residues that get a patch feature. Tryptophan is deliberately excluded.
 PATCH_RESIDUES = tuple(aa for aa in amino_acids.VALID_AMINO_ACIDS if aa != "W")
 
-#: NARDINI+ counts cysteine as polar; sparrow's own ``amino_acids.POLAR`` (behind
-#: :attr:`sparrow.protein.Protein.fraction_polar`) does not. Both conventions are in
-#: use, and the published per-species backgrounds and GIN centroids are defined
-#: against this one, so the two are kept distinct rather than silently reconciled.
-#: The *implementation* is shared - only the residue set differs.
-_NARDINI_POLAR = tuple("QNSTGCH")
-
 _GROUPED_FRACTIONS = OrderedDict(
     [
-        ("Frac K+R", tuple("KR")),
-        ("Frac D+E", tuple("DE")),
-        ("Frac Polar", _NARDINI_POLAR),
-        ("Frac Aliphatic", tuple("ALMIV")),
-        ("Frac Aromatic", tuple("FWY")),
+        ("Frac K+R", amino_acids.POS),
+        ("Frac D+E", amino_acids.NEG),
+        ("Frac Polar", amino_acids.NARDINI_POLAR),
+        ("Frac Aliphatic", amino_acids.ALI),
+        ("Frac Aromatic", amino_acids.ARO),
     ]
 )
 
@@ -126,6 +120,10 @@ COMPOSITION_FEATURE_NAMES = tuple(
     + ["RG Frac"]
 )
 
+# 'Frac A' ... 'Frac Y' are read straight off the amino acid fraction matrix,
+# whose columns are in encoding.RESIDUES order
+assert tuple(amino_acids.VALID_AMINO_ACIDS) == encoding.RESIDUES
+
 
 def composition_feature_names():
     """Return the ordered compositional feature names.
@@ -144,12 +142,94 @@ def composition_feature_names():
     return COMPOSITION_FEATURE_NAMES
 
 
-# These are general sequence properties, not NARDINI-specific ones, so they live in
-# sparrow.sequence_analysis.physical_properties and are exposed on Protein as
-# `p.charge_at_pH(...)` and `p.isoelectric_point`. Re-exported here because they are
-# part of this module's documented API and are what the 'Iso point' feature uses.
-charge_at_pH = physical_properties.charge_at_pH
-isoelectric_point = physical_properties.isoelectric_point
+def _patch_columns(sequence):
+    """The 19 single-residue patch fractions and the RG fraction of one sequence."""
+    patches = [
+        patch_fraction(
+            sequence,
+            residue_selector=aa,
+            interruption=PATCH_INTERRUPTION,
+            min_target_count=PATCH_MIN_TARGET_COUNT,
+        )
+        for aa in PATCH_RESIDUES
+    ]
+    patches.append(
+        rg_patch_fraction(
+            sequence,
+            interruption=PATCH_INTERRUPTION,
+            min_adjacent_rg_pairs=RG_MIN_ADJACENT_PAIRS,
+        )
+    )
+    return patches
+
+
+def composition_matrix(sequences, validate=True):
+    """Compute the 54 compositional features for many sequences.
+
+    Parameters
+    ----------
+    sequences : iterable of str
+        Amino acid sequences.
+    validate : bool, optional
+        If True (default), also reject empty sequences. Non-standard residues are
+        rejected either way, and lower-case residues are upper-cased.
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of shape ``(n_sequences, 54)`` in canonical feature order.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If ``validate`` is True and a sequence is empty, or if any sequence
+        contains a non-standard residue.
+
+    Examples
+    --------
+    >>> composition_matrix(["MEEEKKKK", "QQQQNNNN"]).shape
+    (2, 54)
+    """
+    batch = encoding.as_batch(list(sequences))
+    if validate:
+        batch = [
+            encoding.validate_protein_sequence(
+                sequence,
+                allow_empty=False,
+                uppercase=True,
+                exception_cls=SparrowException,
+                sequence_name="sequence",
+            )
+            for sequence in batch
+        ]
+
+    if not batch:
+        return np.zeros((0, len(COMPOSITION_FEATURE_NAMES)), dtype=np.float64)
+
+    # every feature below is read off one count of the batch, through the same
+    # functions behind the corresponding Protein properties. The one deliberate
+    # difference is 'Frac Polar' - see amino_acids.NARDINI_POLAR.
+    counts = composition.count_residues(batch)
+
+    columns = list(composition.amino_acid_fractions(counts).T)
+    columns += [composition.fraction_in_set(counts, residues) for residues in _GROUPED_FRACTIONS.values()]
+    columns += [
+        composition.log_residue_ratio(counts, "R", "K"),
+        composition.log_residue_ratio(counts, "E", "D"),
+        composition.fraction_chain_expanding(counts),
+        composition.fraction_charged(counts),
+        composition.net_charge_per_residue(counts),
+        composition.hydrophobicity(counts),
+        composition.fraction_disorder_promoting(counts),
+        charge.isoelectric_point(counts),
+        composition.polyproline_II_propensity(counts),
+    ]
+
+    patches = np.array([_patch_columns(sequence) for sequence in batch], dtype=np.float64)
+    matrix = np.column_stack(columns + list(patches.T))
+
+    assert matrix.shape == (len(batch), len(COMPOSITION_FEATURE_NAMES)), matrix.shape
+    return matrix
 
 
 def composition_values(sequence, validate=True):
@@ -180,93 +260,9 @@ def composition_values(sequence, validate=True):
     >>> len(values)
     54
     >>> round(values["FCR"], 4)
-    0.44
+    0.4
     """
-    if validate:
-        sequence = encoding.validate_protein_sequence(
-            sequence,
-            allow_empty=False,
-            uppercase=True,
-            exception_cls=SparrowException,
-            sequence_name="sequence",
-        )
-
-    # Everything below comes from sparrow.sequence_analysis.physical_properties, the
-    # same functions behind the corresponding Protein properties, so a NARDINI+
-    # feature and its Protein counterpart cannot drift apart. The one deliberate
-    # exception is 'Frac Polar' - see _NARDINI_POLAR.
-    features = OrderedDict()
-
-    # individual amino acid fractions
-    aa_fractions = calculate_parameters.calculate_aa_fractions(sequence)
-    for aa in amino_acids.VALID_AMINO_ACIDS:
-        features[f"Frac {aa}"] = aa_fractions[aa]
-
-    # grouped fractions
-    for name, residues in _GROUPED_FRACTIONS.items():
-        features[name] = physical_properties.fraction_in_set(sequence, residues)
-
-    features["R/K Ratio"] = physical_properties.log_residue_ratio(sequence, "R", "K")
-    features["E/D Ratio"] = physical_properties.log_residue_ratio(sequence, "E", "D")
-
-    # whole-sequence properties
-    features["Frac Chain Expanding"] = physical_properties.fraction_chain_expanding(sequence)
-    features["FCR"] = physical_properties.fraction_charged(sequence)
-    features["NCPR"] = physical_properties.net_charge_per_residue(sequence)
-    features["Hydrophobicity"] = physical_properties.mean_residue_scale(sequence, amino_acids.AA_hydro_KD)
-    features["Disorder Promoting"] = physical_properties.fraction_disorder_promoting(sequence)
-    features["Iso point"] = physical_properties.isoelectric_point(sequence)
-    features["PPII"] = physical_properties.polyproline_II_propensity(sequence)
-
-    # single-residue patch fractions
-    for aa in PATCH_RESIDUES:
-        features[f"{aa} Patch"] = float(
-            patch_fraction(
-                sequence,
-                residue_selector=aa,
-                interruption=PATCH_INTERRUPTION,
-                min_target_count=PATCH_MIN_TARGET_COUNT,
-            )
-        )
-
-    # RG-motif patch fraction
-    features["RG Frac"] = float(
-        rg_patch_fraction(
-            sequence,
-            interruption=PATCH_INTERRUPTION,
-            min_adjacent_rg_pairs=RG_MIN_ADJACENT_PAIRS,
-        )
-    )
-
-    return features
-
-
-def composition_matrix(sequences, validate=True):
-    """Compute compositional features for many sequences.
-
-    Parameters
-    ----------
-    sequences : iterable of str
-        Amino acid sequences.
-    validate : bool, optional
-        If True (default) validate each sequence.
-
-    Returns
-    -------
-    numpy.ndarray
-        Array of shape ``(n_sequences, 54)`` in canonical feature order.
-
-    Examples
-    --------
-    >>> composition_matrix(["MEEEKKKK", "QQQQNNNN"]).shape
-    (2, 54)
-    """
-    rows = []
-    for sequence in sequences:
-        values = composition_values(sequence, validate=validate)
-        rows.append([values[name] for name in COMPOSITION_FEATURE_NAMES])
-
-    if not rows:
-        return np.zeros((0, len(COMPOSITION_FEATURE_NAMES)), dtype=np.float64)
-
-    return np.asarray(rows, dtype=np.float64)
+    if not isinstance(sequence, str):
+        raise SparrowException("sequence must be a string")
+    row = composition_matrix([sequence], validate=validate)[0]
+    return OrderedDict(zip(COMPOSITION_FEATURE_NAMES, row.tolist()))

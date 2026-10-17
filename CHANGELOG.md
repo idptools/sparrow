@@ -4,6 +4,26 @@ All notable changes to SPARROW are documented here.
 
 ## Unreleased
 
+### Changed — sequence properties are calculated in one place, in batches (`sparrow.properties`)
+
+`Protein` and `sparrow.nardini` used to reach the same quantities through several modules, one sequence at a time. Those calculations are moving into a new package, `sparrow.properties`, where every function takes a batch of sequences and returns an array; `Protein` calls the same functions with a batch of one, and `sparrow.nardini` with the whole batch. So far:
+
+* `sparrow.properties.encoding` validates and encodes sequences, with one error message for a non-standard residue (non-ASCII characters included). The validators in `sparrow.tools.general_tools` moved here.
+* `sparrow.properties.composition` and `sparrow.properties.charge` compute every composition property — the amino acid and grouped fractions, FCR, NCPR, the R/K and E/D ratios, mean hydrophobicity and PPII propensity, molecular weight and SEG complexity — plus the pH-dependent charge and the isoelectric point. A batch is counted once into an `(n, 20)` matrix and every property read off it; the isoelectric point bisects every sequence in step. Over the 24,508 human IDRs, counting takes 13 ms and every pI 16 ms.
+* `sparrow.nardini.composition_matrix`, `nardini_vectors` and `build_background` compute the composition block a batch at a time (`build_background` in chunks of 2,048, with the same row-by-row Welford update, so memory stays flat).
+
+**The numbers.** A fraction is now one integer count divided by the length, rather than a sum of per-residue fractions, so it no longer depends on the order a residue set is written in — and `Protein` properties and their NARDINI+ features are now identical to the last bit, where the test used to allow 2 ULP. Against the previous code, over the 24,508 human IDRs: fractions move by at most 1 ULP and the mean scales by at most 5 ULP; NCPR of a charge-balanced sequence is now exactly 0 rather than ±1.1e-16; molecular weight moves by up to 3.4e-8 Da, because it used to be summed residue by residue; the isoelectric point, SEG complexity and the ratios are unchanged. The compositional z-scores move by at most 8e-15, and every GIN cluster call is unchanged against both bundled references.
+
+**Behaviour changes**
+
+* An empty sequence now has every fraction, its SEG complexity and its molecular weight equal to 0.0, and its mean hydrophobicity and PPII propensity NaN. `amino_acid_fractions`, `fraction_proline` and `complexity` used to raise `ZeroDivisionError`.
+* A `Protein` created with `validate=False` whose sequence contains a non-standard residue now raises `SparrowException`, naming the residue, from every composition property. Some of these used to return a number that counted the residue in the length but in no set (`FCR`, `NCPR`, the fractions, `isoelectric_point`); others raised `KeyError`. `Protein(seq, validate=True)` converts the common non-standard residues.
+* `Protein.compute_residue_fractions` counts a residue listed twice only once.
+* `sparrow.nardini`'s non-standard-residue error uses the shared wording.
+* The SHD default scale is now named for what it is: `sparrow.data.amino_acids.AA_hydro_HPS`, the HPS model's hydropathy (Dignon et al. 2018). It had been described as a normalized Kyte-Doolittle scale, which it is not — compare `AA_hydro_KD_normalized`. The values are unchanged.
+
+**Removed**, without the old import paths being kept: `sparrow.calculate_parameters` and `sparrow.sequence_analysis.physical_properties` (use `sparrow.properties.composition` and `sparrow.properties.charge`; `calculate_linear_hydrophobicity` becomes `sparrow.properties.encoding.scale_values`); `validate_protein_sequence`, `is_valid_protein_sequence` and `normalize_residue_selector` from `sparrow.tools.general_tools` (now in `sparrow.properties.encoding`); and the `charge_at_pH` / `isoelectric_point` re-exports in `sparrow.nardini.composition`.
+
 ### Fixed — NARDINI scores the complete windows only, and the GIN centroids are refit to match
 
 **The omega/kappa patterning statistics now average over the `n - b + 1` complete windows of `b` residues**, as Das & Pappu's kappa and the NARDINI+ notebooks do. Earlier in this cycle sparrow had switched to the `nardini` package's `n - b + 2` windows (`core.py`, v1.1.1), which add one window holding only the last `b - 1` residues but still divide its counts by `b`. That window is an off-by-one — its fractions are understated by construction — so sparrow no longer reproduces it. `test_windows_are_the_complete_windows_only` pins the convention with a hand-worked example, and the transcribed-notebook oracle in `test_nardini.py` uses the complete windows again.

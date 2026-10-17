@@ -52,6 +52,12 @@ VALID_AMINO_ACIDS_PHYS = [
 ARO = ["Y", "W", "F"]
 ALI = ["A", "L", "M", "I", "V"]
 POLAR = ["Q", "N", "S", "T", "H", "G"]
+
+# NARDINI+ counts cysteine as polar where POLAR above does not. Both conventions are
+# used in the literature, and the bundled NARDINI+ backgrounds and GIN centroids are
+# defined against this one, so the two sets are kept side by side.
+# Reference: Ruff KM, King MR, et al. (2025), the NARDINI+ / GIN resource.
+NARDINI_POLAR = ["Q", "N", "S", "T", "G", "C", "H"]
 CHARGE = ["E", "D", "R", "K"]
 POS = ["R", "K"]
 NEG = ["E", "D"]
@@ -214,6 +220,11 @@ AA_PPII_HILSER = {
 # charge and isoelectric-point calculations. These are the EMBOSS values, and
 # match those used by localCIDER.
 AA_PKA = {"C": 8.5, "Y": 10.1, "H": 6.5, "E": 4.1, "D": 3.9, "K": 10.0, "R": 12.5}
+
+# The titratable residues of AA_PKA, split by the charge they carry when ionized:
+# bases are +1 when protonated, acids -1 when deprotonated.
+TITRATABLE_BASES = ["K", "R", "H"]
+TITRATABLE_ACIDS = ["E", "D", "Y", "C"]
 
 AA_hydro_KD_normalized = {
     "A": 0.7,

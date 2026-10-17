@@ -4,15 +4,13 @@ Each test here pins behaviour that was once wrong. Grouped by the module the bug
 lived in.
 """
 
-import math
-
 import numpy as np
 import pytest
 
 from sparrow import Protein
 from sparrow.data.amino_acids import VALID_AMINO_ACIDS
 from sparrow.sequence_analysis import phospho_isoforms
-from sparrow.sequence_analysis.physical_properties import calculate_molecular_weight
+from sparrow.properties import composition as property_composition
 from sparrow.sparrow_exceptions import (
     CalculationException,
     PatterningException,
@@ -56,20 +54,29 @@ def test_all_exceptions_derive_from_sparrow_exception(exception_cls):
 
 
 # .................................................................
-# sparrow.sequence_analysis.physical_properties
+# sparrow.properties.composition
 
 
 def test_molecular_weight_empty_sequence_is_zero():
     """An empty sequence has no residues, so it must not pick up a water."""
-    assert calculate_molecular_weight("") == 0.0
+    assert property_composition.molecular_weight("")[0] == 0.0
     assert Protein("").molecular_weight == 0.0
 
 
 def test_molecular_weight_single_residue_and_peptide():
     # one residue = free amino acid weight, no peptide-bond correction
-    assert calculate_molecular_weight("A") == pytest.approx(89.1)
+    assert property_composition.molecular_weight("A")[0] == pytest.approx(89.1)
     # two residues = one peptide bond, so one water removed
-    assert calculate_molecular_weight("AA") == pytest.approx(89.1 * 2 - 18)
+    assert property_composition.molecular_weight("AA")[0] == pytest.approx(89.1 * 2 - 18)
+
+
+def test_empty_protein_has_defined_composition_properties():
+    """An empty sequence used to raise ZeroDivisionError for some of these."""
+    protein = Protein("")
+    assert protein.amino_acid_fractions["A"] == 0.0
+    assert protein.fraction_proline == 0.0
+    assert protein.complexity == 0.0
+    assert np.isnan(protein.hydrophobicity)
 
 
 # .................................................................
@@ -302,12 +309,6 @@ def test_linear_profiles_return_arrays():
 # physical properties shared between Protein and sparrow.nardini
 
 
-#: Allowed drift between the Protein property and the NARDINI+ feature, in units
-#: of the last bit of the expected value. Measured across this test's corpus,
-#: 12 of the 13 pairs agree bit-for-bit and "Frac Aromatic" differs by exactly
-#: 1 ULP; 2 leaves headroom without admitting anything meaningful.
-MAX_ULP_DRIFT = 2
-
 PHYSICAL_PROPERTY_PAIRS = {
     "Frac Chain Expanding": "fraction_chain_expanding",
     "Disorder Promoting": "fraction_disorder_promoting",
@@ -325,69 +326,65 @@ PHYSICAL_PROPERTY_PAIRS = {
 }
 
 
+def _shared_property_corpus():
+    import random
+
+    rng = random.Random(99)
+    sequences = ["".join(rng.choice(VALID_AMINO_ACIDS) for _ in range(rng.randint(12, 200))) for _ in range(25)]
+    return sequences + ["Q" * 40, "E" * 40, "K" * 40, "GRGRGGYGG" * 5, "MEEEKKKSSSTTT"]
+
+
 @pytest.mark.parametrize("feature,attribute", sorted(PHYSICAL_PROPERTY_PAIRS.items()))
 def test_protein_property_matches_nardini_feature(feature, attribute):
     """These are general sequence properties, computed in exactly one place.
 
-    They used to be implemented inside sparrow.nardini.composition. They now live
-    in sequence_analysis.physical_properties, are exposed on Protein, and NARDINI
-    reads them from there. The two must not be allowed to drift: the bundled
-    per-species backgrounds and GIN centroids are defined against these values, so
-    a real change would shift every compositional z-score and cluster distance.
+    Both Protein and sparrow.nardini read them from sparrow.properties, so they
+    are the same number to the last bit. They must stay that way: the bundled
+    per-species backgrounds and GIN centroids are defined against these values,
+    so a real change would shift every compositional z-score and cluster distance.
 
-    Agreement is asserted to within MAX_ULP_DRIFT units in the last place rather
-    than bit-for-bit. ``physical_properties.fraction_in_set`` deliberately sums
-    per-residue fractions (``a/n + b/n``, not ``(a + b)/n``) to preserve the exact
-    floats the bundled data was built against, and floating-point addition is not
-    associative -- so the *order* of a residue set changes its last bit.
-    ``amino_acids.ARO`` is ``['Y', 'W', 'F']`` where NARDINI+ uses ``tuple("FWY")``,
-    which puts "Frac Aromatic" 1 ULP apart. That is a summation-order artefact, not
-    a drift in definition; a redefined residue set moves the value far more than a
-    couple of ULP and still fails here.
+    This used to allow a couple of ULP, because the old implementation summed one
+    per-residue fraction at a time and so depended on the order a residue set was
+    written in ("Frac Aromatic" used FWY where Protein used YWF). A fraction is
+    now one integer count over the length, which does not.
     """
-    import random
-
     from sparrow.nardini import composition_values
 
-    rng = random.Random(99)
-    sequences = ["".join(rng.choice(VALID_AMINO_ACIDS) for _ in range(rng.randint(12, 200))) for _ in range(25)]
-    sequences += ["Q" * 40, "E" * 40, "K" * 40, "GRGRGGYGG" * 5, "MEEEKKKSSSTTT"]
-
-    for sequence in sequences:
+    for sequence in _shared_property_corpus():
         expected = composition_values(sequence)[feature]
         actual = getattr(Protein(sequence), attribute)
-        # scale by the expected value's own last bit; fall back to ulp(1.0) so an
-        # expected 0.0 gets a sane absolute floor rather than demanding exactness
-        tolerance = MAX_ULP_DRIFT * math.ulp(expected if expected else 1.0)
-        assert abs(actual - expected) <= tolerance, (
-            f"{feature} / {attribute} on {sequence[:30]}: {actual!r} vs {expected!r} "
-            f"(off by {abs(actual - expected) / math.ulp(expected if expected else 1.0):.2f} ULP)"
-        )
+        assert actual == expected, f"{feature} / {attribute} on {sequence[:30]}: {actual!r} vs {expected!r}"
 
 
-def test_no_duplicate_implementation_remains_in_nardini():
-    """nardini must delegate, not carry its own copy.
+def test_nardini_composition_reads_sparrow_properties():
+    """nardini must delegate to sparrow.properties, not carry its own copy.
 
-    Guards against the obvious regression: someone re-inlines one of these into
-    the composition module and the two drift apart.
+    Guards against the obvious regression: someone re-inlines a formula into
+    sparrow.nardini.composition and it drifts away from the Protein property.
     """
     import inspect
 
-    from sparrow.nardini import composition
-    from sparrow.sequence_analysis import physical_properties
+    from sparrow.nardini import composition, composition_matrix
+    from sparrow.properties import charge
 
-    assert composition.charge_at_pH is physical_properties.charge_at_pH
-    assert composition.isoelectric_point is physical_properties.isoelectric_point
+    sequences = _shared_property_corpus()
+    matrix = composition_matrix(sequences)
+    column = {name: index for index, name in enumerate(composition.COMPOSITION_FEATURE_NAMES)}
+    counts = property_composition.count_residues(sequences)
+    for feature, expected in {
+        "Iso point": charge.isoelectric_point(counts),
+        "PPII": property_composition.polyproline_II_propensity(counts),
+        "Hydrophobicity": property_composition.hydrophobicity(counts),
+        "Frac Chain Expanding": property_composition.fraction_chain_expanding(counts),
+        "Disorder Promoting": property_composition.fraction_disorder_promoting(counts),
+        "E/D Ratio": property_composition.log_residue_ratio(counts, "E", "D"),
+    }.items():
+        assert np.array_equal(matrix[:, column[feature]], expected), feature
 
-    source = inspect.getsource(composition)
-    for helper in (
-        "fraction_chain_expanding",
-        "fraction_disorder_promoting",
-        "polyproline_II_propensity",
-    ):
-        assert f"physical_properties.{helper}" in source, (
-            f"composition_values should call physical_properties.{helper}"
-        )
+    # and no arithmetic of its own left in the assembler
+    source = inspect.getsource(composition.composition_matrix)
+    assert "np.log10" not in source
+    assert ".count(" not in source
 
 
 def test_charge_at_ph_and_isoelectric_point_are_consistent():
@@ -505,35 +502,3 @@ def test_polar_definitions_differ_only_by_cysteine():
         saw_cysteine = saw_cysteine or features["Frac C"] > 0
 
     assert saw_cysteine, "this test proves nothing without a cysteine-containing case"
-
-
-def test_nardini_composition_has_no_arithmetic_of_its_own():
-    """Every compositional feature must be delegated, not computed in place.
-
-    The failure this guards against is someone re-inlining a formula for speed or
-    convenience, after which the NARDINI feature and its Protein property drift
-    apart silently - and the bundled reference data quietly stops matching.
-    """
-    import inspect
-
-    from sparrow.nardini import composition
-
-    source = inspect.getsource(composition.composition_values)
-
-    for helper in (
-        "calculate_aa_fractions",
-        "fraction_in_set",
-        "log_residue_ratio",
-        "fraction_chain_expanding",
-        "fraction_charged",
-        "net_charge_per_residue",
-        "mean_residue_scale",
-        "fraction_disorder_promoting",
-        "isoelectric_point",
-        "polyproline_II_propensity",
-    ):
-        assert helper in source, f"composition_values should delegate to {helper}"
-
-    # no residue-set arithmetic left inline
-    assert "sum(fractions[" not in source
-    assert "np.log10" not in source

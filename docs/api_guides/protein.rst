@@ -137,10 +137,11 @@ Shared with NARDINI+
 ^^^^^^^^^^^^^^^^^^^^
 
 Most of these properties are *also* NARDINI+ compositional features. There is one
-implementation of each, in
-:mod:`sparrow.sequence_analysis.physical_properties`, read by both -- so a
+implementation of each, in :mod:`sparrow.properties`, read by both -- so a
 ``Protein`` property and its corresponding feature are bit-identical by
-construction, and a test pins that for every one of them.
+construction, and a test pins that for every one of them. The same functions
+compute any of these properties for a whole list of sequences at once -- see
+:mod:`sparrow.properties.composition`.
 
 .. warning::
    The single exception is **polar**. NARDINI+ counts cysteine as polar

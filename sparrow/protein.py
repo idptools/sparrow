@@ -8,7 +8,7 @@ predictors, polymeric properties, plugins, and sequence analysis utilities.
 
 from protfasta import utilities as protfasta_utilities
 
-from sparrow import calculate_parameters, sparrow_exceptions
+from sparrow import sparrow_exceptions
 from sparrow.data import amino_acids
 
 # The patterning metrics come from the vectorized NumPy implementations rather
@@ -16,12 +16,11 @@ from sparrow.data import amino_acids
 # compiled code's single-precision arithmetic, and more accurate where they
 # differ - see sparrow.patterning.vectorized and its test module.
 from sparrow.patterning import vectorized as patterning_metrics
-from sparrow.properties import encoding
+from sparrow.properties import charge, composition, encoding
 from sparrow.sequence_analysis import (
     elm,
     patching,
     phospho_isoforms,
-    physical_properties,
     sequence_complexity,
 )
 from sparrow.sequence_analysis.plaac.plaac import score_sequence as plaac_score_sequence
@@ -87,6 +86,7 @@ class Protein:
             self.__seq = s.upper()
 
         # all sequence parameters are initialized as unset class variables
+        self.__residue_counts = None
         self.__aa_fracts = None
         self.__FCR = None
         self.__NCPR = None
@@ -118,6 +118,15 @@ class Protein:
 
     # .................................................................
     #
+    def __counts(self):
+        """Residue counts of this sequence, computed once and shared by every
+        composition property."""
+        if self.__residue_counts is None:
+            self.__residue_counts = composition.count_residues(self.__seq)
+        return self.__residue_counts
+
+    # .................................................................
+    #
     @property
     def molecular_weight(self):
         """
@@ -133,7 +142,7 @@ class Protein:
         """
 
         if self.__molecular_weight is None:
-            self.__molecular_weight = physical_properties.calculate_molecular_weight(self.sequence)
+            self.__molecular_weight = float(composition.molecular_weight(self.__counts())[0])
 
         return self.__molecular_weight
 
@@ -155,7 +164,9 @@ class Protein:
         """
 
         if self.__aa_fracts is None:
-            self.__aa_fracts = calculate_parameters.calculate_aa_fractions(self.__seq)
+            self.__aa_fracts = dict(
+                zip(encoding.RESIDUES, composition.amino_acid_fractions(self.__counts())[0].tolist())
+            )
 
         return self.__aa_fracts
 
@@ -174,7 +185,7 @@ class Protein:
 
         """
         if self.__FCR is None:
-            self.__FCR = physical_properties.fraction_charged(self.__seq)
+            self.__FCR = float(composition.fraction_charged(self.__counts())[0])
         return self.__FCR
 
     # .................................................................
@@ -192,7 +203,7 @@ class Protein:
 
         """
         if self.__f_positive is None:
-            self.__f_positive = physical_properties.fraction_positive(self.__seq)
+            self.__f_positive = float(composition.fraction_positive(self.__counts())[0])
 
         return self.__f_positive
 
@@ -210,7 +221,7 @@ class Protein:
             Float between 0 and 1
         """
         if self.__f_negative is None:
-            self.__f_negative = physical_properties.fraction_negative(self.__seq)
+            self.__f_negative = float(composition.fraction_negative(self.__counts())[0])
 
         return self.__f_negative
 
@@ -229,7 +240,7 @@ class Protein:
         """
 
         if self.__NCPR is None:
-            self.__NCPR = self.fraction_positive - self.fraction_negative
+            self.__NCPR = float(composition.net_charge_per_residue(self.__counts())[0])
 
         return self.__NCPR
 
@@ -338,7 +349,7 @@ class Protein:
         """
 
         if self.__aro is None:
-            self.__aro = physical_properties.fraction_aromatic(self.__seq)
+            self.__aro = float(composition.fraction_aromatic(self.__counts())[0])
 
         return self.__aro
 
@@ -357,7 +368,7 @@ class Protein:
         """
 
         if self.__ali is None:
-            self.__ali = physical_properties.fraction_aliphatic(self.__seq)
+            self.__ali = float(composition.fraction_aliphatic(self.__counts())[0])
 
         return self.__ali
 
@@ -376,7 +387,7 @@ class Protein:
         """
 
         if self.__polar is None:
-            self.__polar = physical_properties.fraction_polar(self.__seq)
+            self.__polar = float(composition.fraction_polar(self.__counts())[0])
 
         return self.__polar
 
@@ -412,7 +423,7 @@ class Protein:
             Mean per-residue Kyte-Doolittle hydrophobicity.
         """
         if self.__hydrophobicity is None:
-            self.__hydrophobicity = calculate_parameters.calculate_hydrophobicity(self.__seq)
+            self.__hydrophobicity = float(composition.hydrophobicity(self.__counts())[0])
 
         return self.__hydrophobicity
 
@@ -433,7 +444,7 @@ class Protein:
             Fraction between 0 and 1.
         """
         if self.__fraction_chain_expanding is None:
-            self.__fraction_chain_expanding = physical_properties.fraction_chain_expanding(self.__seq)
+            self.__fraction_chain_expanding = float(composition.fraction_chain_expanding(self.__counts())[0])
 
         return self.__fraction_chain_expanding
 
@@ -454,7 +465,7 @@ class Protein:
             Fraction between 0 and 1.
         """
         if self.__fraction_disorder_promoting is None:
-            self.__fraction_disorder_promoting = physical_properties.fraction_disorder_promoting(self.__seq)
+            self.__fraction_disorder_promoting = float(composition.fraction_disorder_promoting(self.__counts())[0])
 
         return self.__fraction_disorder_promoting
 
@@ -481,7 +492,7 @@ class Protein:
         charge_at_pH : The charge this bisects on, at a pH of your choosing.
         """
         if self.__isoelectric_point is None:
-            self.__isoelectric_point = physical_properties.isoelectric_point(self.__seq)
+            self.__isoelectric_point = float(charge.isoelectric_point(self.__counts())[0])
 
         return self.__isoelectric_point
 
@@ -503,7 +514,7 @@ class Protein:
             (:data:`sparrow.data.amino_acids.AA_PPII_HILSER`).
         """
         if self.__PPII_propensity is None:
-            self.__PPII_propensity = physical_properties.polyproline_II_propensity(self.__seq)
+            self.__PPII_propensity = float(composition.polyproline_II_propensity(self.__counts())[0])
 
         return self.__PPII_propensity
 
@@ -529,7 +540,7 @@ class Protein:
             ``log10((count(R) + 1) / (count(K) + 1))``.
         """
         if self.__RK_ratio is None:
-            self.__RK_ratio = physical_properties.log_residue_ratio(self.__seq, "R", "K")
+            self.__RK_ratio = float(composition.log_residue_ratio(self.__counts(), "R", "K")[0])
 
         return self.__RK_ratio
 
@@ -551,7 +562,7 @@ class Protein:
             ``log10((count(E) + 1) / (count(D) + 1))``.
         """
         if self.__ED_ratio is None:
-            self.__ED_ratio = physical_properties.log_residue_ratio(self.__seq, "E", "D")
+            self.__ED_ratio = float(composition.log_residue_ratio(self.__counts(), "E", "D")[0])
 
         return self.__ED_ratio
 
@@ -586,7 +597,7 @@ class Protein:
         isoelectric_point : The pH at which this reaches zero.
         NCPR : Net charge per residue from formal charges.
         """
-        return physical_properties.charge_at_pH(self.__seq, pH=pH, normalize=normalize)
+        return float(charge.charge_at_pH(self.__counts(), pH=pH, normalize=normalize)[0])
 
     # .................................................................
     #
@@ -605,7 +616,7 @@ class Protein:
             Compositional complexity of the sequence (>= 0).
         """
         if self.__complexity is None:
-            self.__complexity = calculate_parameters.calculate_seg_complexity(self.__seq)
+            self.__complexity = float(composition.seg_complexity(self.__counts())[0])
 
         return self.__complexity
 
@@ -635,13 +646,12 @@ class Protein:
         0.0
         """
 
-        f = 0.0
-
-        for i in residue_selector:
-            if i in self.amino_acid_fractions:
-                f = f + self.amino_acid_fractions[i]
-
-        return f
+        # residues that are not standard amino acids are ignored rather than
+        # rejected, as this method has always done
+        residues = [residue for residue in residue_selector if residue in encoding.RESIDUES]
+        if not residues:
+            return 0.0
+        return float(composition.fraction_in_set(self.__counts(), residues)[0])
 
     # .................................................................
     #

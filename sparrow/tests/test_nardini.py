@@ -30,7 +30,6 @@ from sparrow.nardini import (
     patterning_values,
     patterning_zscores,
 )
-from sparrow.nardini.composition import charge_at_pH, isoelectric_point
 from sparrow.nardini.groups import TYPES_8, TYPES_9, get_typeset, type_names
 from sparrow.sparrow_exceptions import (
     BackgroundQualityWarning,
@@ -627,27 +626,21 @@ def test_composition_rejects_empty_and_nonstandard():
         composition_values("ACDEFX")
 
 
-def test_charge_at_ph_extremes():
-    # at very low pH the acidic groups are protonated and bases are charged
-    assert charge_at_pH("KKKKEEEE", pH=0.0) > 0
-    # at very high pH the reverse
-    assert charge_at_pH("KKKKEEEE", pH=14.0) < 0
-    # no titratable residues -> zero
-    assert charge_at_pH("AAAAGGGG", pH=7.4) == 0.0
-
-
-def test_isoelectric_point_sanity():
-    # a strongly basic sequence has a high pI, an acidic one a low pI
-    assert isoelectric_point("KKKKKKRRRRRR") > 10
-    assert isoelectric_point("EEEEEEDDDDDD") < 5
-    # a sequence with no titratable residues has no defined pI; 7.0 by convention
-    assert isoelectric_point("AAAAGGGG") == pytest.approx(7.0)
-
-
 def test_composition_matrix_shape():
     from sparrow.nardini import composition_matrix
 
     assert composition_matrix([SMARCC2_LIKE, RG_RICH]).shape == (2, 54)
+
+
+def test_composition_matrix_rows_are_composition_values():
+    """A sequence's features must not depend on what else is in the batch."""
+    from sparrow.nardini import COMPOSITION_FEATURE_NAMES, composition_matrix
+
+    sequences = [SMARCC2_LIKE, RG_RICH, "MEEEKKKKSSSTTTDDDQQQQNNNN", "GSGSGSGSGSGS"]
+    matrix = composition_matrix(sequences)
+    for row, sequence in zip(matrix, sequences):
+        values = composition_values(sequence)
+        assert row.tolist() == [values[name] for name in COMPOSITION_FEATURE_NAMES]
     assert composition_matrix([]).shape == (0, 54)
 
 

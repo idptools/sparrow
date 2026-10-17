@@ -1152,9 +1152,8 @@ in sparrow. Differences worth knowing about:
   localCIDER (``'Frac Chain Expanding'``, ``'Disorder Promoting'``,
   ``'Iso point'``, ``'PPII'``) are implemented natively and agree with localCIDER
   to within floating-point noise. They are general sequence properties rather than
-  NARDINI-specific ones, so they live in
-  :mod:`sparrow.sequence_analysis.physical_properties` and are also available
-  directly on a ``Protein``:
+  NARDINI-specific ones, so they live in :mod:`sparrow.properties` and are
+  also available directly on a ``Protein``:
 
   .. code-block:: python
 
@@ -1166,14 +1165,14 @@ in sparrow. Differences worth knowing about:
   NARDINI reads those same functions, so a ``Protein`` property and its
   corresponding compositional feature are bit-identical by construction -- pinned
   by a test, because the bundled backgrounds and GIN centroids are defined against
-  these exact values.
+  these values.
 * **Nothing compositional is computed twice.** The same applies to every other
   feature that has a ``Protein`` counterpart: the amino acid fractions, the grouped
   fractions, FCR, NCPR, hydrophobicity, the R/K and E/D ratios and all 20 patch
-  features come from :mod:`sparrow.sequence_analysis.physical_properties`,
-  :mod:`sparrow.calculate_parameters` and
+  features come from :mod:`sparrow.properties` and
   :mod:`sparrow.sequence_analysis.patching` -- the same code paths ``Protein``
-  uses. The patterning half likewise: the ``'kappa'`` and ``'iwd'`` backends call
+  uses. A whole batch is counted once and every compositional feature read off
+  those counts. The patterning half likewise: the ``'kappa'`` and ``'iwd'`` backends call
   :mod:`sparrow.patterning.vectorized`, and only the NARDINI omega/kappa window
   asymmetry itself is implemented in this module, because nothing else in sparrow
   computes it.
@@ -1372,8 +1371,7 @@ Composition
 ^^^^^^^^^^^
 
 .. automodule:: sparrow.nardini.composition
-   :members: composition_values, composition_matrix, composition_feature_names,
-             isoelectric_point, charge_at_pH
+   :members: composition_values, composition_matrix, composition_feature_names
 
 Clustering
 ^^^^^^^^^^
