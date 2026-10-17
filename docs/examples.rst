@@ -152,7 +152,8 @@ Step 2 -- compute every vector in parallel
 :func:`~sparrow.nardini.batch.nardini_proteins` accepts sequences or ``Protein``
 objects, as a dict or a list, and returns the same shape back. The expensive part
 is the scramble-based patterning null, which is why this is worth parallelizing:
-on 160 IDRs at 1,000 scrambles it takes 18.7 s on one core and 2.7 s on eight.
+on 160 human IDRs at 1,000 scrambles it takes 10.0 s on one core and 1.5 s on
+eight.
 
 .. code-block:: python
 

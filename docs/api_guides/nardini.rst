@@ -255,8 +255,8 @@ Key options:
 * ``n_processes`` -- compute across this many processes. Default 1. The result is
   bit-identical to the serial one however the work is divided, since each
   sequence's seed comes from its own text rather than its position. Measured on 64
-  IDRs at 10,000 scrambles: 22.1 s serial, 5.9 s on four processes, 3.3 s on eight
-  (6.8x). Use :func:`~sparrow.nardini.batch.nardini_proteins` instead if you want
+  human IDRs (a random sample, median length 59) at 10,000 scrambles: 14.2 s
+  serial, 3.9 s on four processes, 2.3 s on eight (6.1x). Use :func:`~sparrow.nardini.batch.nardini_proteins` instead if you want
   ``Protein`` objects back, or need to skip unscoreable sequences.
 * ``min_fraction`` -- abundance threshold, default 0.10; see below.
 * ``backend`` -- which patterning statistic to use; see the next section.
@@ -664,8 +664,9 @@ can keep whatever references you already had.
    nardini_proteins(my_proteins)                                    # Protein objects
    nardini_proteins({"a": "MEEE...", "b": Protein("QQQQ...")})      # or a mix
 
-Measured scaling on 160 IDRs at 1,000 scrambles: 18.7 s serially, 9.8 s on two
-processes, 5.1 s on four, 2.7 s on eight (6.9x). ``n_processes`` defaults to
+Measured scaling on 160 human IDRs (a random sample, median length 57) at 1,000
+scrambles: 10.0 s serially, 5.2 s on two processes, 2.8 s on four, 1.5 s on eight
+(6.7x). ``n_processes`` defaults to
 ``os.cpu_count()``.
 
 .. important::

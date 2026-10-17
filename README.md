@@ -201,7 +201,7 @@ proteins["IDR1"].nardini.vector(seed=42, num_scrambles=10000)   # cached, instan
 proteins["IDR1"].nardini.gin_cluster(seed=42, num_scrambles=10000)
 ```
 
-It takes sequences or `Protein` objects, as a dict or a list, and returns the same shape back — `Protein` objects are populated in place. On 160 IDRs at 1,000 scrambles: 18.7 s on one core, 2.7 s on eight. Parallelism does not change the numbers; per-sequence seeds derive from the sequence rather than its position in the batch, so the result is identical however it was chunked.
+It takes sequences or `Protein` objects, as a dict or a list, and returns the same shape back — `Protein` objects are populated in place. On 160 human IDRs at 1,000 scrambles: 10.0 s on one core, 1.5 s on eight. Parallelism does not change the numbers; per-sequence seeds derive from the sequence rather than its position in the batch, so the result is identical however it was chunked.
 
 You can also **derive your own grammars** instead of assigning to the human ones, which is what you want for a non-human proteome or a designed library:
 

@@ -21,22 +21,22 @@ The published [GIN resource](https://github.com/kierstenruff/RUFF_KING_Grammars_
 5. **Looks inside the clusters** — which genes are in each grammar, and what their IDRs look like.
 6. **Compares to the published human GIN**, pairing centroids one-to-one to see which grammars are analogous.
 
-Runtime is around five minutes: about 40 s for disorder prediction and about 3 minutes for the vectors on 16 processes.
+Runtime is under ten minutes on a 16-core laptop: a few seconds for disorder prediction, and nearly all the rest for the vectors on 16 processes.
 
 ## What it finds
 
-8,199 IDRs across 4,775 of the 6,067 proteins, sorted into 30 grammars. The largest are broad charge and polarity classes; the distinctive ones are the compositionally extreme tracts. A few spot-checks suggest the clustering is picking up real biology rather than noise:
+8,199 IDRs across 4,775 of the 6,067 proteins, sorted into 30 grammars. The largest are broad patterning and charge classes (well-mixed hydrophobic and acidic residues, blocks of opposite charge); the most distinctive are blocks of opposite charge, short hydrophobic stretches and Q-rich patches. A few spot-checks show what the clusters pick up:
 
 | protein | IDR | assigned grammar |
 |---|---|---|
-| **SUP35** | N-terminal, 254 aa | `Q patches, high Frac Q, blocky pol-pol` |
+| **SUP35** | N-terminal, 254 aa | `blocky pol-neg, blocky pol-pol, blocky neg-neg` |
 | **PAB1** | second IDR, 79 aa | `Q patches, high Frac Q, blocky pol-pol` |
 | **NPL3** | first IDR, 133 aa | `P patches, high Frac P, blocky pol-pro` |
-| **NPL3** | second IDR, 145 aa | `high Frac G, high Frac Polar, low PPII` |
+| **NPL3** | second IDR, 145 aa | `high Frac G, G patches, low PPII` |
 
-Sup35 is the canonical yeast prion and its N-terminal domain is Q/N-rich; Pab1's second IDR is its proline-rich P domain, the region implicated in its stress-induced condensation; Npl3 carries an RGG region, which lands in the glycine-rich grammar. None of that was given to the clustering — it works from the 90-dimensional vectors alone.
+Pab1's second IDR is its proline-rich P domain, the region implicated in its stress-induced condensation, and lands in the Q-patch grammar; Npl3 carries an RGG region, which lands in the glycine-rich grammar. Sup35, the canonical yeast prion, is less clear-cut: its 254-residue IDR spans both the Q/N-rich N domain and the highly charged M domain, and it lands in a grammar of polar and acidic blocks rather than the Q-patch one. None of that was given to the clustering — it works from the 90-dimensional vectors alone.
 
-Comparing the yeast centroids against the published human ones (`compare_gin_references()`) pairs them sensibly: the yeast "low Iso point, well-mixed hyd-neg, low NCPR" grammar matches human `'Weak negative charge'` at a distance of 1.8, "high Frac K, high Frac K+R" matches `'Weak positive charge'`, and so on. Mean match distance is 16.4 against a published centroid spacing of 17.8, with our own spacing at 15.2 — comparable structure, described in comparable terms.
+Comparing the yeast centroids against the bundled human ones (`compare_gin_references()`, which uses the corrected centroids by default) pairs the closest grammars sensibly: the yeast "well-mixed pos-pos, high Iso point, high NCPR" grammar matches human `'Weak positive charge'` at a distance of 1.5, "blocky pos-neg, blocky neg-neg, blocky pol-neg" matches `'Large negative blocks with positive blocks'` at 2.4, and the yeast Q-, S-, T- and K-patch grammars find `'Q-tracts'`, `'S patches'`, `'T patches'` and `'K blocks'`. Overall, though, the mean match distance is 18.2 against a human centroid spacing of 17.8 (our own spacing is 14.7), so by the yardstick the notebook explains, the two clusterings do not coincide: individual grammars are analogous, the partitions as a whole are not.
 
 That comparison is suggestive rather than quantitative: the yeast vectors are z-scored against a yeast background and the human centroids live in human z-score space, so the axes are not strictly commensurate.
 
