@@ -17,6 +17,10 @@ All notable changes to SPARROW are documented here.
 
 **Any NARDINI patterning z-score computed with this cycle's earlier `n - b + 2` code will change** — typically by a few hundredths, by more for short IDRs, where one window is a larger share of the total.
 
+### Removed — `sparrow.sequence_analysis.grammar`
+
+Deprecated earlier in this cycle in favour of `sparrow.nardini`, and now gone: `sparrow/sequence_analysis/grammar.py`, `Protein.extract_feature_vector()`, `sparrow.build_grammar_background_from_fasta()` and the grammar module's own bundled human background (`human_idrs_new_grammar_composition_background_f32.npz`). The `'kappa'` and `'iwd'` backends of `sparrow.nardini` give the old patterning values (kappa bit-identically, IWD to ~1e-15), and the migration table in the NARDINI guide maps every old entry point onto its replacement. The legacy backend names `'kappa_cython'` and `'iwd_combined'` existed only for that migration and are no longer accepted.
+
 ### Changed — `sparrow.nardini` does each thing once
 
 * **One scoring path for every backend.** `patterning_zscores` used to validate, encode and gate each sequence twice (once itself, once through `patterning_values`), and the `'kappa'` / `'iwd'` backends scored the observed sequence with the single-sequence functions but its scrambles with the batch ones. A single `_score_arrangements` now scores a block of arrangements, and the observed sequence is a block of one, so a value and its null distribution always come from the same code; the scramble loop is shared by all three backends. The random stream is unchanged, so `'kappa'` results are bit-identical to before and `'iwd'` ones move by ~1e-15 (the batch IWD sums by FFT where the single-sequence one loops over pairs).

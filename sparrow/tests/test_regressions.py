@@ -257,61 +257,6 @@ def test_elm_equality_with_unrelated_type():
 
 
 # .................................................................
-# sparrow.sequence_analysis.grammar
-
-
-def test_grammar_module_is_deprecated_in_favour_of_nardini():
-    """grammar.py is superseded by sparrow.nardini but must still work."""
-    from sparrow.sequence_analysis import grammar
-
-    with pytest.warns(DeprecationWarning, match="sparrow.nardini"):
-        vector = grammar.compute_feature_vector(TEST_SEQ, num_scrambles=10, seed=1)
-    assert vector.shape == (86,)
-
-    with pytest.warns(DeprecationWarning, match="sparrow.nardini"):
-        grammar.compute_composition_background_stats([TEST_SEQ, "QQQQNNNNSSSS"])
-
-
-def test_extract_feature_vector_still_works_while_deprecated():
-    p = Protein(TEST_SEQ)
-    with pytest.warns(DeprecationWarning):
-        assert p.extract_feature_vector(num_scrambles=10, seed=1).shape == (86,)
-
-
-def test_patch_features_exclude_tryptophan_only():
-    """W Patch is deliberately excluded to match NARDINI+; every other residue is present."""
-    from sparrow.data.amino_acids import VALID_AMINO_ACIDS
-    from sparrow.sequence_analysis import grammar
-
-    for residue in VALID_AMINO_ACIDS:
-        if residue == "W":
-            continue
-        assert f"{residue} Patch" in grammar.PATCH_FEATURES
-
-    assert "W Patch" not in grammar.PATCH_FEATURES
-    assert "RG Frac" in grammar.PATCH_FEATURES
-    assert len(grammar.PATCH_FEATURES) == len(VALID_AMINO_ACIDS)
-
-
-def test_patch_features_match_bundled_background():
-    """The feature schema must line up with the shipped composition background."""
-    from sparrow.sequence_analysis import grammar
-
-    stats = grammar.load_default_composition_stats()
-    expected = list(grammar.COMPOSITION_FEATURES) + list(grammar.PATCH_FEATURES)
-    assert list(stats.feature_names) == expected
-
-
-@pytest.mark.filterwarnings("ignore::DeprecationWarning")
-def test_zscore_feature_vector_length():
-    # the deprecation itself is asserted separately, above
-    from sparrow.sequence_analysis import grammar
-
-    vec = grammar.compute_feature_vector(TEST_SEQ, num_scrambles=10, seed=1)
-    assert vec.shape == (86,)
-
-
-# .................................................................
 # sparrow.predictors -- binary_disorder must key its cache on its parameters
 
 

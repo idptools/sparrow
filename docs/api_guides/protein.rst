@@ -342,21 +342,6 @@ proteins at once, :func:`~sparrow.nardini.batch.nardini_proteins` computes the
 vectors in parallel and attaches them to the ``Protein`` objects, after which the
 calls above cost nothing -- see :ref:`nardini-proteome`.
 
-Machine-learning feature vectors
---------------------------------
-
-.. autosummary::
-   :nosignatures:
-
-   sparrow.protein.Protein.extract_feature_vector
-
-.. code-block:: python
-
-   vec = p.extract_feature_vector(num_scrambles=256, seed=1)
-
-.. deprecated::
-   Superseded by ``Protein.nardini`` above -- see :ref:`nardini-migration`.
-
 Visualization
 -------------
 

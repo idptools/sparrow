@@ -41,35 +41,16 @@ Direct Parameter Calculations
    complexity = calculate_parameters.calculate_seg_complexity(seq)
    hydro = calculate_parameters.calculate_hydrophobicity(seq, mode="KD")
 
-Grammar Feature Vectors
------------------------
+NARDINI+ Feature Vectors
+------------------------
 
-Use ``sparrow.sequence_analysis.grammar`` when you want a single-sequence
-feature-vector workflow with optional scramble-based z-scores.
-
-.. code-block:: python
-
-   from sparrow.sequence_analysis.grammar import compute_feature_vector
-
-   # Default output is a float32 NumPy array.
-   vec = compute_feature_vector(
-       "MEEEKKKKSSSTTTDDD",
-       num_scrambles=200,
-       seed=1,
-   )
-
-   # Only request names when needed.
-   vec, names = compute_feature_vector(
-       "MEEEKKKKSSSTTTDDD",
-       num_scrambles=200,
-       seed=1,
-       return_feature_names=True,
-   )
+Patterning and compositional feature vectors -- NARDINI+, and assignment to the
+human GIN grammars -- live in :mod:`sparrow.nardini`. See :doc:`nardini`.
 
 Patch Primitives
 ----------------
 
-Patch metrics used by grammar are available directly as reusable primitives:
+Patch metrics used by NARDINI+ are available directly as reusable primitives:
 
 .. code-block:: python
 
@@ -104,7 +85,6 @@ Key function entry points:
 * :func:`sparrow.calculate_parameters.calculate_seg_complexity`
 * :func:`sparrow.calculate_parameters.calculate_hydrophobicity`
 * :func:`sparrow.calculate_parameters.calculate_linear_hydrophobicity`
-* :func:`sparrow.sequence_analysis.grammar.compute_feature_vector`
 * :func:`sparrow.sequence_analysis.patching.patch_fraction`
 * :func:`sparrow.sequence_analysis.patching.rg_patch_fraction`
 
@@ -125,9 +105,6 @@ compositional features, so the two cannot disagree.
              fraction_in_set, mean_residue_scale
 
 .. automodule:: sparrow.calculate_parameters
-   :no-index:
-
-.. automodule:: sparrow.sequence_analysis.grammar
    :no-index:
 
 .. automodule:: sparrow.sequence_analysis.patching
