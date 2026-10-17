@@ -862,34 +862,6 @@ class Protein:
 
     # .................................................................
     #
-    def compute_rg_patch_fraction(self, interruption=2, min_adjacent_rg_pairs=2):
-        """
-        Returns the sequence fraction covered by RG motif-enriched patches.
-
-        Parameters
-        ----------
-        interruption : int, optional
-            Maximum number of non-R/G residues bridged inside a candidate RG
-            patch. Default is 2.
-        min_adjacent_rg_pairs : int, optional
-            Minimum number of adjacent ``RG`` pairs required for a bridged
-            region to count. Default is 2.
-
-        Returns
-        -------
-        float
-            Fraction of sequence positions covered by valid RG patch spans.
-        """
-        return self.compute_patch_fraction(
-            residue_selector="RG",
-            interruption=interruption,
-            min_target_count=None,
-            adjacent_pair_pattern="RG",
-            min_adjacent_pair_count=min_adjacent_rg_pairs,
-        )
-
-    # .................................................................
-    #
     def compute_SCD_x(self, group1, group2):
         """
         Function that computes the sequence charge decoration (SCD)

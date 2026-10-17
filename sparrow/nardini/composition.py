@@ -70,6 +70,8 @@ from sparrow.sparrow_exceptions import SparrowException
 __all__ = [
     "PATCH_INTERRUPTION",
     "PATCH_MIN_TARGET_COUNT",
+    "RG_PATCH_RESIDUES",
+    "RG_MOTIF",
     "RG_MIN_ADJACENT_PAIRS",
     "PATCH_RESIDUES",
     "COMPOSITION_FEATURE_NAMES",
@@ -84,8 +86,14 @@ PATCH_INTERRUPTION = patches.DEFAULT_INTERRUPTION
 #: Minimum number of target residues required for a patch to count.
 PATCH_MIN_TARGET_COUNT = patches.DEFAULT_MIN_TARGET_COUNT
 
+#: Residues an RG patch ('RG Frac') is made of.
+RG_PATCH_RESIDUES = "RG"
+
+#: Two-residue motif an RG patch must contain.
+RG_MOTIF = "RG"
+
 #: Minimum number of adjacent ``RG`` pairs required for an RG patch to count.
-RG_MIN_ADJACENT_PAIRS = patches.DEFAULT_MIN_ADJACENT_RG_PAIRS
+RG_MIN_ADJACENT_PAIRS = 2
 
 #: Residues that get a patch feature. Tryptophan is deliberately excluded.
 PATCH_RESIDUES = tuple(aa for aa in amino_acids.VALID_AMINO_ACIDS if aa != "W")
@@ -153,11 +161,16 @@ def _patch_columns(encoded):
         )
         for aa in PATCH_RESIDUES
     ]
+    # An RG patch has no minimum residue count of its own: RG_MIN_ADJACENT_PAIRS
+    # pairs is the requirement (two pairs already mean four R/G residues)
     columns.append(
-        patches.rg_patch_fraction(
+        patches.patch_fraction(
             encoded,
+            residue_selector=RG_PATCH_RESIDUES,
             interruption=PATCH_INTERRUPTION,
-            min_adjacent_rg_pairs=RG_MIN_ADJACENT_PAIRS,
+            min_target_count=None,
+            adjacent_pair_pattern=RG_MOTIF,
+            min_adjacent_pair_count=RG_MIN_ADJACENT_PAIRS,
         )
     )
     return columns

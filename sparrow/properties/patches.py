@@ -29,9 +29,7 @@ from sparrow.sparrow_exceptions import CalculationException
 __all__ = [
     "DEFAULT_INTERRUPTION",
     "DEFAULT_MIN_TARGET_COUNT",
-    "DEFAULT_MIN_ADJACENT_RG_PAIRS",
     "patch_fraction",
-    "rg_patch_fraction",
 ]
 
 #: Maximum number of non-target residues bridged inside a patch. NARDINI+ uses 2.
@@ -39,9 +37,6 @@ DEFAULT_INTERRUPTION = 2
 
 #: Minimum number of target residues for a patch to count. NARDINI+ uses 4.
 DEFAULT_MIN_TARGET_COUNT = 4
-
-#: Minimum number of adjacent ``RG`` pairs for an RG patch to count. NARDINI+ uses 2.
-DEFAULT_MIN_ADJACENT_RG_PAIRS = 2
 
 #: What the functions in this module accept.
 PatchBatch = str | Sequence[str] | encoding.EncodedBatch
@@ -212,45 +207,3 @@ def patch_fraction(
     )
     fraction: NDArray[np.float64] = np.divide(span, np.maximum(batch.lengths, 1), dtype=np.float64)
     return fraction
-
-
-def rg_patch_fraction(
-    sequences: PatchBatch,
-    interruption: int = DEFAULT_INTERRUPTION,
-    min_adjacent_rg_pairs: int = DEFAULT_MIN_ADJACENT_RG_PAIRS,
-) -> NDArray[np.float64]:
-    """Fraction of each sequence covered by RG-motif patches.
-
-    A patch of R and G residues counts when it holds at least
-    ``min_adjacent_rg_pairs`` adjacent ``RG`` pairs, however many R and G
-    residues it has. This is the NARDINI+ ``'RG Frac'`` feature.
-
-    Parameters
-    ----------
-    sequences : str, sequence of str, or EncodedBatch
-        The batch.
-    interruption : int, optional
-        Maximum number of non-R/G residues bridged inside a patch. Default 2.
-    min_adjacent_rg_pairs : int, optional
-        Minimum number of adjacent ``RG`` pairs in a patch. Default 2.
-
-    Returns
-    -------
-    numpy.ndarray
-        ``(n_sequences,)`` fractions between 0 and 1.
-
-    Raises
-    ------
-    sparrow.sparrow_exceptions.CalculationException
-        If ``min_adjacent_rg_pairs`` is below 1 or ``interruption`` below 0.
-    """
-    if min_adjacent_rg_pairs < 1:
-        raise CalculationException("min_adjacent_rg_pairs must be >= 1")
-    return patch_fraction(
-        sequences,
-        residue_selector="RG",
-        interruption=interruption,
-        min_target_count=None,
-        adjacent_pair_pattern="RG",
-        min_adjacent_pair_count=min_adjacent_rg_pairs,
-    )

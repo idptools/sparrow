@@ -1120,7 +1120,7 @@ NARDINI+ vector, and are the *same* numbers -- one implementation, read by both:
    'Iso point'               p.isoelectric_point
    'PPII'                    p.PPII_propensity
    'A Patch' ... 'Y Patch'   p.compute_patch_fraction(residue_selector=...)
-   'RG Frac'                 p.compute_rg_patch_fraction()
+   'RG Frac'                 p.compute_patch_fraction("RG", ...)  -- see below
 
    'Frac Polar'              p.fraction_polar  -- DIFFERS, see below
 
@@ -1138,8 +1138,18 @@ comparable across sequences.
    carries no signal. The ``'Frac W'`` composition feature *is* present.
 
 Patches are contiguous runs of the target residue tolerating up to 2
-interrupting residues, requiring at least 4 target residues; ``'RG Frac'``
-requires at least 2 adjacent ``RG`` pairs. These are computed with sparrow's
+interrupting residues, requiring at least 4 target residues. An ``'RG Frac'``
+patch is a run of R and G residues with the same tolerance, which counts when it
+holds at least 2 adjacent ``RG`` pairs, with no minimum residue count of its own
+(``RG_PATCH_RESIDUES``, ``RG_MOTIF`` and ``RG_MIN_ADJACENT_PAIRS`` in
+:mod:`sparrow.nardini.composition`):
+
+.. code-block:: python
+
+   p.compute_patch_fraction("RG", min_target_count=None,
+                            adjacent_pair_pattern="RG", min_adjacent_pair_count=2)
+
+These are computed with sparrow's
 :func:`~sparrow.properties.patches.patch_fraction`, the same function behind
 ``Protein.compute_patch_fraction``.
 

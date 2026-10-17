@@ -78,11 +78,14 @@ The patch metrics used by NARDINI+ are batch functions too, in
 
 .. code-block:: python
 
-   from sparrow.properties.patches import patch_fraction, rg_patch_fraction
+   from sparrow.properties.patches import patch_fraction
 
    sequences = ["AAAAQQRGRGTTTAAAQQ", "GRGRGGYGGSSSS"]
    a_patch = patch_fraction(sequences, "A")      # one fraction per sequence
-   rg_patch = rg_patch_fraction(sequences)
+
+   # NARDINI+'s 'RG Frac': R/G patches holding at least two adjacent RG pairs
+   rg_patch = patch_fraction(sequences, "RG", min_target_count=None,
+                             adjacent_pair_pattern="RG", min_adjacent_pair_count=2)
 
 Linear Profiles
 ---------------
@@ -131,7 +134,6 @@ Key function entry points (all documented in :doc:`sequence_properties`):
 * :func:`sparrow.properties.composition.hydrophobicity`
 * :func:`sparrow.properties.encoding.scale_values`
 * :func:`sparrow.properties.patches.patch_fraction`
-* :func:`sparrow.properties.patches.rg_patch_fraction`
 * :func:`sparrow.properties.profiles.window_profile`
 * :func:`sparrow.properties.profiles.fraction_profile`
 

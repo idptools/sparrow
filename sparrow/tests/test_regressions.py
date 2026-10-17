@@ -449,6 +449,8 @@ def test_patch_features_match_nardini():
         PATCH_MIN_TARGET_COUNT,
         PATCH_RESIDUES,
         RG_MIN_ADJACENT_PAIRS,
+        RG_MOTIF,
+        RG_PATCH_RESIDUES,
         composition_values,
     )
 
@@ -467,9 +469,12 @@ def test_patch_features_match_nardini():
             )
 
         assert (
-            protein.compute_rg_patch_fraction(
+            protein.compute_patch_fraction(
+                residue_selector=RG_PATCH_RESIDUES,
                 interruption=PATCH_INTERRUPTION,
-                min_adjacent_rg_pairs=RG_MIN_ADJACENT_PAIRS,
+                min_target_count=None,
+                adjacent_pair_pattern=RG_MOTIF,
+                min_adjacent_pair_count=RG_MIN_ADJACENT_PAIRS,
             )
             == features["RG Frac"]
         )

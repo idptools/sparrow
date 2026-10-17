@@ -83,18 +83,6 @@ def test_patch_fraction_motif_requirement():
     assert with_motif[0] == 0.6
 
 
-def test_rg_patch_fraction_matches_generic_call():
-    sequence = "AAAAQQRGRGTTTAAAQQ"
-    assert (
-        patches.rg_patch_fraction(sequence)[0]
-        == (
-            patches.patch_fraction(
-                sequence, "RG", min_target_count=None, adjacent_pair_pattern="RG", min_adjacent_pair_count=2
-            )[0]
-        )
-    )
-
-
 def test_patches_do_not_cross_from_one_sequence_into_the_next():
     """Laid end to end, AAA + A would bridge into a patch of four; it must not."""
     batch = ["GGAAA", "AGGGG"]
@@ -115,11 +103,6 @@ def test_patch_fraction_invalid_selector_residue_raises():
 def test_patch_fraction_non_standard_sequence_raises():
     with pytest.raises(SparrowException, match="non-standard"):
         patches.patch_fraction("AAXA", "A")
-
-
-def test_rg_patch_fraction_needs_at_least_one_pair():
-    with pytest.raises(CalculationException):
-        patches.rg_patch_fraction("RGRG", min_adjacent_rg_pairs=0)
 
 
 def test_patch_fraction_matches_the_original_algorithm():

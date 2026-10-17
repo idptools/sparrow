@@ -75,7 +75,7 @@ from sparrow.properties.composition import (
     seg_complexity,
 )
 from sparrow.properties.encoding import EncodedBatch, encode_batch
-from sparrow.properties.patches import patch_fraction, rg_patch_fraction
+from sparrow.properties.patches import patch_fraction
 from sparrow.properties.patterning import (
     binary_asymmetry,
     bivariate_iwd_charged_weighted,
@@ -133,7 +133,6 @@ __all__ = [
     "isoelectric_point",
     # patches
     "patch_fraction",
-    "rg_patch_fraction",
     # patterning
     "sigma",
     "delta",

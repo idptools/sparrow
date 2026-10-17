@@ -164,12 +164,15 @@ Complexity, clustering & patches
    sparrow.protein.Protein.compute_iwd_charged_weighted
    sparrow.protein.Protein.compute_bivariate_iwd_charged_weighted
    sparrow.protein.Protein.compute_patch_fraction
-   sparrow.protein.Protein.compute_rg_patch_fraction
 
 .. code-block:: python
 
    p.compute_iwd(["D", "E"])                 # clustering of acidic residues
    p.compute_patch_fraction("Q")            # fraction in Q-rich patches
+
+   # NARDINI+'s 'RG Frac': R/G patches holding at least two adjacent RG pairs
+   p.compute_patch_fraction("RG", min_target_count=None,
+                            adjacent_pair_pattern="RG", min_adjacent_pair_count=2)
 
 Linear (per-residue) profiles
 -----------------------------

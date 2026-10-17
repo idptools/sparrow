@@ -60,7 +60,6 @@ CALLS = {
     "charge.charge_at_pH": lambda batch: charge.charge_at_pH(batch, pH=5.0, normalize=False),
     "charge.isoelectric_point": charge.isoelectric_point,
     "patches.patch_fraction": lambda batch: patches.patch_fraction(batch, "EK", interruption=1, min_target_count=3),
-    "patches.rg_patch_fraction": lambda batch: patches.rg_patch_fraction(batch, min_adjacent_rg_pairs=1),
     "patterning.sigma": lambda batch: patterning.sigma(batch, ["E", "D"], ["R", "K"]),
     "patterning.delta": lambda batch: patterning.delta(batch, ["E", "D"], ["R", "K"], 5),
     "patterning.kappa_x": lambda batch: patterning.kappa_x(batch, ["S", "G"], [], 4, flatten=False),

@@ -41,6 +41,7 @@ All notable changes to SPARROW are documented here.
 * `sparrow.calculate_parameters` and `sparrow.sequence_analysis.physical_properties` - use `sparrow.properties.composition` and `sparrow.properties.charge`; `calculate_linear_hydrophobicity` becomes `sparrow.properties.encoding.scale_values`.
 * `validate_protein_sequence`, `is_valid_protein_sequence` and `normalize_residue_selector` from `sparrow.tools.general_tools` - now in `sparrow.properties.encoding`.
 * The `charge_at_pH` and `isoelectric_point` re-exports in `sparrow.nardini.composition`.
+* `Protein.compute_rg_patch_fraction` and `sparrow.properties.patches.rg_patch_fraction` (with `DEFAULT_MIN_ADJACENT_RG_PAIRS`) - shortcuts that filled in four arguments of the general patch fraction to give NARDINI+'s `'RG Frac'`, the only patch feature with one. Use `compute_patch_fraction("RG", min_target_count=None, adjacent_pair_pattern="RG", min_adjacent_pair_count=2)`, or `patch_fraction` with the same arguments for a batch. The definition now lives with the other NARDINI+ patch settings, as `RG_PATCH_RESIDUES`, `RG_MOTIF` and `RG_MIN_ADJACENT_PAIRS` in `sparrow.nardini.composition`, and `'RG Frac'` is unchanged to the last bit over the 24,508 human IDRs. The general call accepts `min_adjacent_pair_count=0`, which the shortcuts refused, and which gives a plain fraction in R/G runs with no motif requirement.
 
 ### Fixed — NARDINI scores the complete windows only, and the GIN centroids are refit to match
 

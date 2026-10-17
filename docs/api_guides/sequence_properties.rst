@@ -76,8 +76,6 @@ itself. The ones that take arguments are the batch counterparts of the
      - :func:`~sparrow.properties.patterning.shd`
    * - ``p.compute_patch_fraction(residues, ...)``
      - :func:`~sparrow.properties.patches.patch_fraction`
-   * - ``p.compute_rg_patch_fraction()``
-     - :func:`~sparrow.properties.patches.rg_patch_fraction`
    * - ``p.linear_sequence_profile(mode, ...)``
      - :func:`~sparrow.properties.profiles.window_profile`
    * - ``p.linear_composition_profile(residues, ...)``

@@ -57,22 +57,11 @@ def test_compute_patch_fraction_wrapper_matches_functional_api(patch_protein):
     )
 
 
-def test_compute_rg_patch_fraction_wrapper_matches_functional_api(patch_protein):
+def test_compute_patch_fraction_forwards_the_motif_arguments(patch_protein):
+    motif_arguments = dict(min_target_count=None, adjacent_pair_pattern="RG", min_adjacent_pair_count=2)
     assert np.isclose(
-        patch_protein.compute_rg_patch_fraction(),
-        patches.rg_patch_fraction(PATCH_SEQUENCE)[0],
-    )
-
-
-def test_compute_rg_patch_fraction_matches_generic_patch_call(patch_protein):
-    assert np.isclose(
-        patch_protein.compute_patch_fraction(
-            residue_selector="RG",
-            min_target_count=None,
-            adjacent_pair_pattern="RG",
-            min_adjacent_pair_count=2,
-        ),
-        patch_protein.compute_rg_patch_fraction(),
+        patch_protein.compute_patch_fraction("RG", **motif_arguments),
+        patches.patch_fraction(PATCH_SEQUENCE, "RG", **motif_arguments)[0],
     )
 
 
@@ -129,15 +118,6 @@ def test_patch_fraction_matches_functional_api_on_canonical_sequence(canonical_p
     assert np.isclose(
         canonical_protein.compute_patch_fraction("Q"),
         patches.patch_fraction(canonical_protein.sequence, "Q")[0],
-    )
-
-
-def test_rg_patch_fraction_matches_functional_api_on_canonical_sequence(
-    canonical_protein,
-):
-    assert np.isclose(
-        canonical_protein.compute_rg_patch_fraction(),
-        patches.rg_patch_fraction(canonical_protein.sequence)[0],
     )
 
 
