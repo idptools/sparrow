@@ -16,7 +16,7 @@ description = "Next generation sequence analysis package for working with disord
 authors = [
     {name = "Alex Holehouse", email = "alex.holehouse@wustl.edu"}
 ]
-license = {text = "CC-NC-ND"}
+license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.10"
 

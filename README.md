@@ -334,6 +334,8 @@ is **1.0.0**.
 
 Released under the MIT License — see [LICENSE](LICENSE).
 
+Two bundled components are MIT-licensed by their own authors, and their notices ship beside them: the PLAAC port in `sparrow/sequence_analysis/plaac/` (see its `LICENSE.TXT`) and the NARDINI+ / GIN reference data in `sparrow/data/nardini/` (see `LICENSE-GIN`).
+
 ## Authors & acknowledgements
 
 Built in the [Holehouse Lab](https://www.holehouselab.com/) by Alex Holehouse, Ryan Emenecker, Jeff Lotthammer, Nick Razo, Garrett Ginell, and Dan Griffith.

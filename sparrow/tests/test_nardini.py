@@ -4,7 +4,8 @@ The patterning tests include a deliberately naive reference implementation
 transcribed from the NARDINI+ reference notebook (``_reference_*`` below). The
 production code is a vectorized rewrite, so keeping the slow version here and
 asserting bit-level agreement is what guarantees the rewrite did not change any
-numbers.
+numbers. The notebook is MIT-licensed, like the rest of the GIN resource; see
+``sparrow/data/nardini/SOURCES.md`` and ``LICENSE-GIN`` beside it.
 
 The notebook scores the ``n - b + 1`` complete windows of a sequence, and so does
 the transcription. The ``nardini`` package scores one more, a trailing window of

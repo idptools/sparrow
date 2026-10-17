@@ -94,6 +94,14 @@ Where to start
    api_guides/patterning
    predictors
 
+License
+-------
+
+sparrow is released under the MIT License. The PLAAC port and the bundled
+NARDINI+ / GIN reference data are MIT-licensed by their own authors, and their
+notices ship beside them. See ``LICENSE`` and the README in the
+`repository <https://github.com/idptools/sparrow>`_.
+
 Indices
 -------
 

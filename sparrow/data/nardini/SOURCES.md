@@ -8,7 +8,7 @@ All files derive from the GIN resource accompanying:
 
 > K. M. Ruff, M. R. King, A. W. Ying, V. Liu, A. Pant, W. E. Lieberman, M. K. Shinn, X. Su, C. Kadoch, R. V. Pappu. *Molecular grammars of predicted intrinsically disordered regions that span the human proteome.* **Cell** (2025).
 
-Source repository: <https://github.com/kierstenruff/RUFF_KING_Grammars_of_IDRs_using_NARDINI-> — distributed under the **MIT licence**, © 2025 kierstenruff. Redistribution here is permitted under that licence.
+Source repository: <https://github.com/kierstenruff/RUFF_KING_Grammars_of_IDRs_using_NARDINI-> — distributed under the **MIT licence**, © 2025 kierstenruff. Redistribution here is permitted under that licence, whose text is in [`LICENSE-GIN`](LICENSE-GIN). The authors have confirmed (October 2026) that the same MIT licence covers the official NARDINI+ Colab notebook (`NARDINI+_from_FASTA.ipynb`) and the Google Sheets it reads, below - so it covers the tables here, and the reference implementations sparrow's tests transcribe from that notebook.
 
 The tabular data were retrieved from the Google Sheets that the official NARDINI+ Colab notebook reads at runtime:
 

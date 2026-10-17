@@ -3,7 +3,8 @@
 As in ``test_nardini.py``, the assignment algorithm from the reference notebook is
 transcribed here (``_reference_assign``) and used as an oracle, so any change to
 the production implementation that would alter a published cluster call fails
-loudly.
+loudly. The notebook is MIT-licensed, like the rest of the GIN resource; see
+``sparrow/data/nardini/SOURCES.md`` and ``LICENSE-GIN`` beside it.
 """
 
 import numpy as np
