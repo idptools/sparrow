@@ -385,8 +385,8 @@ cores you give :func:`~sparrow.nardini.batch.nardini_proteins`.
 This is a recent change. ``'kappa'`` and ``'iwd'`` originally delegated to
 sparrow's Cython extensions, which score one sequence per call and made those
 backends 9-22x slower than ``'nardini'`` (9 minutes for that same 1000-residue
-IDR). Both statistics have since been reimplemented in vectorized NumPy in
-:mod:`sparrow.patterning.vectorized`, which evaluates a whole block of scrambles
+IDR). Both statistics have since been reimplemented in vectorized NumPy, now in
+:mod:`sparrow.properties.patterning`, which evaluates a whole block of scrambles
 per call.
 
 .. note::
@@ -1172,10 +1172,10 @@ in sparrow. Differences worth knowing about:
   fractions, FCR, NCPR, hydrophobicity, the R/K and E/D ratios and all 20 patch
   features come from :mod:`sparrow.properties` -- the same code paths
   ``Protein`` uses. A whole batch is encoded once, every compositional feature
-  read off its residue counts, and every patch found in one pass along it. The patterning half likewise: the ``'kappa'`` and ``'iwd'`` backends call
-  :mod:`sparrow.patterning.vectorized`, and only the NARDINI omega/kappa window
-  asymmetry itself is implemented in this module, because nothing else in sparrow
-  computes it.
+  read off its residue counts, and every patch found in one pass along it. The patterning half likewise: omega and the pair features are Das & Pappu's
+  delta, computed by the same :mod:`sparrow.properties.patterning` function
+  behind ``kappa_x`` and ``patterning_percentile``, and the ``'kappa'`` and
+  ``'iwd'`` backends call that module's kappa and IWD.
 
   .. warning::
      One feature deliberately differs from its ``Protein`` counterpart.

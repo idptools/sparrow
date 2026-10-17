@@ -1,16 +1,15 @@
 Patterning Metrics
 ==================
 
-These APIs give direct access to sparrow's patterning metrics outside
-``Protein`` methods. They are **pure Python** -- vectorized NumPy, with no
-compiled extensions and no compiler needed.
+These APIs give direct access to sparrow's patterning metrics -- how a
+sequence's residues are *arranged*, as opposed to what they are -- outside
+``Protein`` methods. They all live in :mod:`sparrow.properties.patterning`, are
+**pure Python** (vectorized NumPy, no compiled extensions, no compiler needed),
+and are the same functions behind the corresponding ``Protein`` properties and
+NARDINI's patterning features.
 
-The windowed-asymmetry statistics -- kappa, delta, sigma and the patterning
-percentile -- live in :mod:`sparrow.properties.patterning`, which is also where
-NARDINI's omega and pair features are computed: they are all Das & Pappu's
-delta, from one function. Every function there takes a batch of sequences and
-returns one value per sequence. The inverse-weighted distance, SCD and SHD are
-still in ``sparrow.patterning`` for now.
+Every function takes a batch of sequences and returns one value per sequence;
+a single string is a batch of one.
 
 Public Functions Covered
 ------------------------
@@ -19,19 +18,21 @@ Public Functions Covered
    :toctree: generated
    :nosignatures:
 
+   sparrow.properties.patterning.kappa
+   sparrow.properties.patterning.kappa_x
    sparrow.properties.patterning.sigma
    sparrow.properties.patterning.delta
-   sparrow.properties.patterning.kappa_x
-   sparrow.properties.patterning.kappa
    sparrow.properties.patterning.patterning_percentile
-   sparrow.patterning.iwd.calculate_average_inverse_distance_from_sequence
-   sparrow.patterning.iwd.calculate_average_inverse_distance_charge
-   sparrow.patterning.iwd.calculate_average_bivariate_inverse_distance_charge
+   sparrow.properties.patterning.iwd
+   sparrow.properties.patterning.iwd_charged_weighted
+   sparrow.properties.patterning.bivariate_iwd_charged_weighted
+   sparrow.properties.patterning.scd
+   sparrow.properties.patterning.shd
 
 Examples
 --------
 
-Binary/ternary patterning with ``kappa_x``, for as many sequences as you like:
+Charge patterning and generalized kappa:
 
 .. code-block:: python
 
@@ -43,25 +44,32 @@ Binary/ternary patterning with ``kappa_x``, for as many sequences as you like:
    custom = kappa_x(sequences, ["E", "D"], ["K", "R"], window_size=6, flatten=True)
    binary = kappa_x(sequences, ["Q", "N"], [], window_size=6, flatten=True)
 
-Inverse-weighted distance examples:
+Inverse-weighted distance -- plain, and weighted by the local net charge:
 
 .. code-block:: python
 
-   import numpy as np
-   from sparrow.patterning.iwd import (
-       calculate_average_inverse_distance_from_sequence,
-       calculate_average_inverse_distance_charge,
-       calculate_average_bivariate_inverse_distance_charge,
+   from sparrow.properties.patterning import (
+       bivariate_iwd_charged_weighted,
+       iwd,
+       iwd_charged_weighted,
    )
 
-   seq = "MEEEKKKKSSSTTTDDD"
-   linear_ncpr = np.linspace(-0.5, 0.5, len(seq))
+   sequences = ["MEEEKKKKSSSTTTDDD", "MEKEKEKEKSSSTTTDDD"]
 
-   acidic_iwd = calculate_average_inverse_distance_from_sequence(seq, ["D", "E"])
-   neg_weighted = calculate_average_inverse_distance_charge(linear_ncpr, seq, "-")
-   bi_weighted = calculate_average_bivariate_inverse_distance_charge(linear_ncpr, seq)
+   acidic = iwd(sequences, ["D", "E"])
+   negative = iwd_charged_weighted(sequences, "-")
+   mixing = bivariate_iwd_charged_weighted(sequences)
 
-Patterning percentile from binary grouping:
+Charge and hydropathy decoration:
+
+.. code-block:: python
+
+   from sparrow.properties.patterning import scd, shd
+
+   charge_decoration = scd(sequences)                 # E/D against R/K
+   hydropathy_decoration = shd(sequences)             # HPS hydropathy scale
+
+Patterning percentile against random shuffles:
 
 .. code-block:: python
 
@@ -69,40 +77,62 @@ Patterning percentile from binary grouping:
 
    percentiles = patterning_percentile(["QQQQAAAQQQQAAAQQQQ"], ["Q"], window_size=6, count=200, seed=1)
 
+One statistic underneath
+------------------------
+
+kappa, delta, the patterning percentile and NARDINI's omega and pair features
+are all built on the windowed compositional asymmetry of Das & Pappu (2013),
+computed by one function, :func:`~sparrow.properties.patterning.window_delta`:
+
+* :func:`~sparrow.properties.patterning.delta` is the asymmetry between two
+  residue groups over the windows of the sequence -- exactly what NARDINI
+  z-scores for a pair of residue types;
+* the patterning percentile's statistic is one group against everything else --
+  exactly NARDINI's omega;
+* :func:`~sparrow.properties.patterning.kappa_x` is delta over the sequence padded
+  with neutral wings, divided by the delta of the most segregated arrangement of
+  the same composition.
+
+``sparrow/tests/test_properties_patterning.py`` asserts the NARDINI equalities to
+the last bit.
+
+Batches
+-------
+
+Sequences of the same length are scored together as one array, so a whole
+proteome costs a few array passes per distinct length rather than one call per
+sequence. They are grouped by exact length rather than padded to a common one: a
+padded row is summed in a different order, and would differ in the last bit. As
+a result a sequence gets the same value -- to the last bit -- alone or in any
+batch, and each patterning percentile reseeds its shuffles from ``seed``, so it
+does not depend on the batch either.
+
+For scrambles of one sequence, which all share a length and a composition, two
+lower-level functions take arrays directly:
+:func:`~sparrow.properties.patterning.kappa_from_ternary` (computing
+``delta_max`` once for the whole stack) and
+:func:`~sparrow.properties.patterning.iwd_from_masks`. NARDINI's ``'kappa'`` and
+``'iwd'`` backends use them.
+
 Interpretation and Edge Cases
 -----------------------------
 
 * ``kappa_x`` returns ``-1`` for non-computable inputs (for example, sequence too
-  short for window size, or missing required residues).
+  short for window size, or missing required residues); ``kappa`` likewise for
+  a sequence shorter than 6 residues or lacking either charge.
 * ``delta`` returns NaN for a sequence shorter than the window, which has no
   windows to average.
 * ``window_size`` must be at least 2 for ``kappa_x`` and ``patterning_percentile``,
   and ``patterning_percentile`` rejects any sequence shorter than the window.
 * For ``kappa_x``, use ``flatten=True`` if you want values capped at 1.
-* A sequence gets the same value -- to the last bit -- whether it is scored
-  alone or in a batch. Sequences of the same length are scored together as one
-  array, and each patterning percentile reseeds its shuffles from ``seed``.
-
-.. _patterning-vectorized:
-
-Where the implementations live
-------------------------------
-
-The kappa family is implemented in :mod:`sparrow.properties.patterning`; IWD,
-SCD and SHD in :mod:`sparrow.patterning.vectorized`, with ``iwd`` and ``scd``
-as thin re-exports of it. Both score whole stacks at once, which is what makes
-scramble-based null distributions cheap:
-
-.. code-block:: python
-
-   from sparrow.patterning import vectorized as vec
-   from sparrow.properties import encoding, patterning
-
-   patterning.kappa_from_ternary(encoding.ternarize_winged_batch(codes, ["E", "D"], ["K", "R"], 5), 5)
-   vec.iwd_batch(stack_of_binary_masks)
+* The charge-weighted IWDs need sequences at least as long as their NCPR window
+  (8 by default).
+* ``shd`` reads its scale character by character, so it works for any alphabet
+  the scale covers; the SHD paper's own checks use binary ``'0'``/``'1'``
+  sequences.
 
 Why it is often faster
-^^^^^^^^^^^^^^^^^^^^^^
+----------------------
 
 Partly vectorization, but mostly better algorithms. Three of these statistics
 have structure the loop-based versions do not exploit:
@@ -115,7 +145,7 @@ have structure the loop-based versions do not exploit:
 * **SHD** has a *sum* rather than a product in its numerator, so grouping by
   separation leaves only prefix sums: ``O(n)`` rather than ``O(n^2)``.
 
-Measured against the compiled extensions:
+Measured against the Cython extensions sparrow used to ship:
 
 .. code-block:: text
 
@@ -129,68 +159,41 @@ Measured against the compiled extensions:
      kappa     (L=1000)        1.01 s     0.04 s      28x
      iwd       (L=1000)        0.47 s     0.03 s      18x
 
-Numerical agreement
-^^^^^^^^^^^^^^^^^^^
+Numerical history
+-----------------
 
-The IWD, SCD and SHD routines are double precision on both sides and agree to
-~1e-13 or better. The kappa routines carry their intermediates in C ``float`` in
-the Cython code and ``float64`` here, so they agree to ~1e-6 -- and where they
-differ, **the NumPy value is the more accurate one**.
-``sparrow/tests/test_patterning_vectorized.py`` pins all of this, including a
-test that replays the Cython arithmetic in single precision to demonstrate the
-residual gap is the compiled code's precision rather than an error in the
-reimplementation.
+These metrics were compiled Cython extensions, under ``sparrow.patterning``,
+until they were reimplemented in NumPy; that module has since been removed in
+favour of :mod:`sparrow.properties.patterning`.
+
+The IWD, SCD and SHD routines were double precision on both sides and agree with
+the compiled ones to ~1e-13 or better. The kappa routines carried their
+intermediates in C ``float`` in the Cython code and ``float64`` here, so they
+agree to ~1e-6 -- and where they differ, **the NumPy value is the more accurate
+one**. ``sparrow/tests/test_properties_patterning.py`` pins all of this against
+values captured from the extensions before they were removed, including a test
+that replays the Cython arithmetic in single precision to show the residual gap
+is the compiled code's precision rather than an error here.
 
 .. warning::
-   ``patterning_percentile`` is the one function whose *seed* behaviour changes.
-   The compiled version draws its shuffles from C's ``rand()``; the C standard
-   leaves that generator implementation-defined, so its seed-to-result mapping
-   was never portable across platforms or libc versions in the first place. The
-   NumPy version uses NumPy's generator, so the same ``seed`` produces a
-   different - statistically equivalent - set of shuffles.
-
-   The *statistic* is unchanged (it agrees to ~1e-6, i.e. the compiled code's
-   precision), and percentiles from the two agree to within Monte Carlo sampling
-   error. Do not compare a stored percentile from one implementation against the
-   other; recompute instead.
-
-What ``Protein`` uses
----------------------
-
-As of this release :class:`sparrow.protein.Protein` and
-:mod:`sparrow.polymer.scaling_parameters` call the NumPy implementations, not the
-compiled extensions. The effect on user-facing values:
-
-.. code-block:: text
-
-   Protein.kappa / compute_kappa_x     shifted by <= 6e-06   (single -> double precision)
-   Protein.SCD / SHD                   shifted by <= 5e-14
-   compute_iwd / the charge-weighted   shifted by <= 7e-16
-   IWD variants
-
-   Protein.SHD    (L=3000)   138.85 ms -> 0.14 ms    967x
-   Protein.SCD    (L=3000)     2.82 ms -> 0.08 ms     34x
-   Protein.kappa  (L=3000)     3.33 ms -> 0.23 ms     15x
-
-The kappa shift is the compiled code's single-precision arithmetic being
-replaced by double, so the new values are the more accurate ones. It is far below
-any tolerance that matters scientifically, but if you have stored kappa values
-from an earlier release expect agreement to about six significant figures rather
-than exactly.
+   ``patterning_percentile`` is the one function whose *seed* behaviour changed.
+   The compiled version drew its shuffles from C's ``rand()``, whose algorithm
+   the C standard leaves implementation-defined, so its seed-to-result mapping
+   was never portable across platforms in the first place. The NumPy version
+   uses NumPy's generator, so the same ``seed`` produces a different -
+   statistically equivalent - set of shuffles. Do not compare a stored
+   percentile from the compiled version against one computed now; recompute.
 
 Installation notes
 ------------------
 
 * There is **no build step**. sparrow is pure Python, so there are no extensions
   to compile and no compiler to install.
-* If you are updating a checkout from before the extensions were removed, delete
-  the stale artifacts first::
-
-      rm -f sparrow/patterning/*.so sparrow/patterning/*.c
-
-  Python resolves extension modules before source modules, so a leftover
-  ``kappa.cpython-*.so`` would shadow ``kappa.py`` and silently keep running the
-  old compiled code.
+* If you are updating a checkout from before ``sparrow.patterning`` was removed,
+  delete that directory - ``rm -r sparrow/patterning`` from the repository root.
+  Python would otherwise still find any compiled ``kappa.cpython-*.so`` left in
+  it, and ``import sparrow.patterning.kappa`` would silently run the old compiled
+  code instead of failing.
 
 Reference: ``sparrow.properties.patterning``
 --------------------------------------------
@@ -204,17 +207,4 @@ Reference: ``sparrow.properties.windows``
 
 .. automodule:: sparrow.properties.windows
    :members:
-   :no-index:
-
-Reference: ``sparrow.patterning.vectorized``
---------------------------------------------
-
-.. automodule:: sparrow.patterning.vectorized
-   :members:
-   :no-index:
-
-Reference: ``sparrow.patterning.iwd``
--------------------------------------
-
-.. automodule:: sparrow.patterning.iwd
    :no-index:

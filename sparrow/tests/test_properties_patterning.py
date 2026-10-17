@@ -1,11 +1,13 @@
-"""Tests for the windowed-asymmetry statistics in sparrow.properties.patterning.
+"""Tests for sparrow.properties.patterning.
 
-kappa, sigma, delta and the patterning percentile are pinned against **golden
-reference values captured from the Cython extensions before they were removed**
+Every statistic is pinned against **golden reference values captured from the
+Cython extensions before they were removed**
 (``test_data/cython_patterning_golden_v1.npz``, 400 randomly generated cases).
-kappa carried its intermediates in C ``float`` there and ``float64`` here, so it
-agrees to ~1e-6, and ``test_kappa_is_more_accurate_than_the_cython_code`` shows
-the gap is the compiled code's precision rather than an error here.
+IWD, SCD and SHD were computed in ``double`` on both sides, so they agree to
+~1e-13 or better. kappa carried its intermediates in C ``float`` there and
+``float64`` here, so it agrees to ~1e-6, and
+``test_kappa_is_more_accurate_than_the_cython_code`` shows the gap is the
+compiled code's precision rather than an error here.
 
 The last section pins the reason this module exists: NARDINI's omega and pair
 features, kappa, delta and the patterning percentile are one statistic, computed
@@ -20,7 +22,7 @@ import pytest
 from sparrow.nardini.groups import TYPES_8, patterning_feature_names
 from sparrow.nardini.patterning import patterning_values
 from sparrow.properties import encoding, patterning
-from sparrow.sparrow_exceptions import PatterningException
+from sparrow.sparrow_exceptions import PatterningException, SparrowException
 
 from . import reference_data_path
 
@@ -64,6 +66,8 @@ def _case(golden, index):
         group1=list(str(golden["group1"][index])),
         group2=list(str(golden["group2"][index])),
         targets=list(str(golden["targets"][index])),
+        scd_group1=list(str(golden["scd_group1"][index])),
+        scd_group2=list(str(golden["scd_group2"][index])),
         window_size=int(golden["window_size"][index]),
     )
 
@@ -363,3 +367,107 @@ def test_nardini_pair_features_are_delta(sequence):
             assert values[names.index(f"{name_i}-{name_j}")] == expected, (name_i, name_j)
             compared += 1
     assert compared >= 10
+
+
+# =====================================================================
+# inverse-weighted distance
+# =====================================================================
+
+
+def test_iwd_matches_cython_golden(golden):
+    for index in range(len(golden["sequence"])):
+        case = _case(golden, index)
+        got = patterning.iwd(case["sequence"], case["targets"])[0]
+        assert got == pytest.approx(float(golden["iwd"][index]), rel=DOUBLE_TOLERANCE, abs=1e-14), f"case {index}"
+
+
+def test_charged_iwd_matches_cython_golden(golden):
+    for index in range(len(golden["sequence"])):
+        case = _case(golden, index)
+        for charge, key in (("-", "iwd_charge_neg"), ("+", "iwd_charge_pos")):
+            got = patterning.iwd_charged_weighted(case["sequence"], charge)[0]
+            assert got == pytest.approx(float(golden[key][index]), rel=DOUBLE_TOLERANCE, abs=1e-14), (
+                f"case {index} charge {charge}"
+            )
+        got = patterning.bivariate_iwd_charged_weighted(case["sequence"])[0]
+        assert got == pytest.approx(float(golden["iwd_bivariate"][index]), rel=DOUBLE_TOLERANCE, abs=1e-14), (
+            f"case {index}"
+        )
+
+
+def test_iwd_edge_cases():
+    # no targets, a single target (no pair to sum over), and an empty sequence
+    assert patterning.iwd(["AAAA", "AAQAA", ""], ["Q"]).tolist() == [0.0, 0.0, 0.0]
+
+
+def test_iwd_clustered_exceeds_dispersed():
+    clustered, dispersed = patterning.iwd(["AAAAAQQQQQ", "AQAQAQAQAQ"], ["Q"])
+    assert clustered > dispersed
+
+
+def test_iwd_matches_the_pairwise_definition():
+    """The FFT autocorrelation must give the explicit pairwise sum, dense or sparse."""
+    rng = random.Random(13)
+    for _ in range(40):
+        sequence = _random_sequence(rng, rng.randint(2, 300))
+        targets = rng.sample(list(AMINO_ACIDS), rng.randint(1, 10))
+        positions = [i for i, residue in enumerate(sequence) if residue in targets]
+        if positions:
+            pairwise = sum(1 / abs(i - j) for i in positions for j in positions if i != j) / len(positions)
+        else:
+            pairwise = 0.0
+        assert patterning.iwd(sequence, targets)[0] == pytest.approx(pairwise, rel=DOUBLE_TOLERANCE, abs=1e-14)
+
+
+def test_iwd_from_masks_with_every_position_occupied():
+    masks = np.ones((3, 25), dtype=bool)
+    assert np.all(patterning.iwd_from_masks(masks) == patterning.iwd("Q" * 25, ["Q"])[0])
+
+
+def test_charged_iwd_needs_a_sequence_as_long_as_its_window():
+    with pytest.raises(SparrowException, match="larger than sequence"):
+        patterning.iwd_charged_weighted("EEKKEE", "-")
+
+
+def test_charged_iwd_rejects_an_unknown_charge():
+    with pytest.raises(PatterningException):
+        patterning.iwd_charged_weighted("EEEEKKKKEEEE", "?")
+
+
+# =====================================================================
+# SCD and SHD
+# =====================================================================
+
+
+def test_scd_and_shd_match_cython_golden(golden):
+    for index in range(len(golden["sequence"])):
+        case = _case(golden, index)
+        sequence = case["sequence"]
+        assert patterning.scd(sequence)[0] == pytest.approx(float(golden["scd"][index]), rel=1e-11, abs=1e-11), (
+            f"case {index}"
+        )
+        custom = patterning.scd(sequence, case["scd_group1"], case["scd_group2"])[0]
+        assert custom == pytest.approx(float(golden["scd_custom"][index]), rel=1e-11, abs=1e-11), f"case {index}"
+        assert patterning.shd(sequence)[0] == pytest.approx(float(golden["shd"][index]), rel=1e-11, abs=1e-11), (
+            f"case {index}"
+        )
+
+
+def test_scd_blocky_versus_mixed():
+    """SCD is more negative for well-mixed charge, more positive for blocky."""
+    blocky, mixed = patterning.scd(["E" * 20 + "K" * 20, "EK" * 20])
+    assert blocky < mixed
+
+
+def test_scd_and_shd_of_short_sequences_are_zero():
+    assert patterning.scd(["", "E"]).tolist() == [0.0, 0.0]
+    assert patterning.shd(["", "A"]).tolist() == [0.0, 0.0]
+
+
+def test_shd_names_every_residue_missing_from_its_scale():
+    with pytest.raises(SparrowException, match=r"\['C', 'D', 'E', 'F'\]"):
+        patterning.shd("ACDEF", {"A": 0.5})
+
+
+def test_shd_takes_any_alphabet_its_scale_covers():
+    assert patterning.shd("0101", {"0": 0.0, "1": 1.0})[0] > 0

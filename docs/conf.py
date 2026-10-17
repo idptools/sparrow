@@ -95,9 +95,9 @@ htmlhelp_basename = "sparrowdoc"
 # only if it actually fails, which keeps local builds (where everything is
 # installed) documenting the real objects.
 #
-# NB: sparrow.patterning.* used to be compiled extensions that were never built
-# on RTD. They are pure Python now, but they still pull in the sparrow package
-# and hence its dependencies, so they stay on this list - the import test decides.
+# NB: sparrow.properties.* is pure Python, but importing it pulls in the sparrow
+# package and hence its dependencies, so it is on this list - the import test
+# decides.
 MOCK = os.getenv("READTHEDOCS") or os.getenv("SPARROW_DOC_BUILD")
 if MOCK:
     candidates = [
@@ -107,9 +107,12 @@ if MOCK:
         "pandas",
         "IPython",
         "protfasta",
-        "sparrow.patterning.iwd",
-        "sparrow.patterning.scd",
-        "sparrow.patterning.vectorized",
+        "sparrow.properties.encoding",
+        "sparrow.properties.composition",
+        "sparrow.properties.charge",
+        "sparrow.properties.patches",
+        "sparrow.properties.windows",
+        "sparrow.properties.patterning",
     ]
     autodoc_mock_imports = []
     for module_name in candidates:

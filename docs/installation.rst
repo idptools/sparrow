@@ -9,9 +9,8 @@ isolated environment and installing sparrow directly from GitHub with either
 .. note::
    Releases before this one shipped Cython extensions for the patterning
    metrics and needed a working compiler to install. Those were replaced by
-   vectorized NumPy implementations - see
-   :mod:`sparrow.patterning.vectorized` - so installation is now a plain
-   pure-Python wheel.
+   vectorized NumPy implementations - see :mod:`sparrow.properties.patterning`
+   - so installation is now a plain pure-Python wheel.
 
 .. contents:: On this page
    :local:
@@ -91,14 +90,14 @@ If you want to work on sparrow itself, clone it and install in editable mode:
 There is no build step - sparrow is pure Python.
 
 .. warning::
-   If you are upgrading a checkout that predates the removal of the Cython
-   extensions, delete any stale compiled artifacts first::
+   If you are upgrading a checkout that predates the removal of
+   ``sparrow.patterning``, delete that directory first::
 
-       rm -f sparrow/patterning/*.so sparrow/patterning/*.c
+       rm -r sparrow/patterning
 
-   Python looks for extension modules before source modules, so a leftover
-   ``kappa.cpython-*.so`` would shadow the new ``kappa.py`` and you would
-   silently keep running the old compiled code.
+   A compiled ``kappa.cpython-*.so`` left in it would still be importable, so
+   code that imports ``sparrow.patterning.kappa`` would silently keep running
+   the old compiled version rather than failing.
 
 3. Verify the installation
 --------------------------

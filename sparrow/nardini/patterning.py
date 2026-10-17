@@ -87,7 +87,7 @@ from sparrow.nardini.groups import (
     patterning_feature_names,
 )
 from sparrow.properties import encoding
-from sparrow.properties.patterning import asymmetry, kappa_from_ternary, window_delta
+from sparrow.properties.patterning import asymmetry, iwd_from_masks, kappa_from_ternary, window_delta
 from sparrow.properties.windows import label_window_counts
 from sparrow.sparrow_exceptions import SparrowException
 
@@ -465,8 +465,6 @@ def _alternative_values(codes, groups, pairs, evaluated, backend, blob_size):
         ``(n_arrangements, len(pairs))`` raw values; features excluded by
         ``evaluated`` are 0.0.
     """
-    from sparrow.patterning import vectorized as vec
-
     group_lists = [sorted(residues) for residues in groups.values()]
     values = np.zeros((codes.shape[0], len(pairs)), dtype=np.float64)
 
@@ -483,7 +481,7 @@ def _alternative_values(codes, groups, pairs, evaluated, backend, blob_size):
             values[:, feature] = np.where(kappa < 0, 0.0, kappa)
         else:
             targets = group_lists[i] if i == j else sorted(set(group_lists[i]) | set(group_lists[j]))
-            values[:, feature] = vec.iwd_batch(encoding.residue_membership(targets)[codes])
+            values[:, feature] = iwd_from_masks(encoding.residue_membership(targets)[codes])
 
     return values
 

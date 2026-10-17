@@ -60,12 +60,24 @@ CALLS = {
     "patterning.kappa": patterning.kappa,
     "patterning.binary_asymmetry": lambda batch: patterning.binary_asymmetry(batch, ["E", "D"]),
     "patterning.patterning_percentile": lambda batch: patterning.patterning_percentile(batch, ["E", "K"], 5, 50, 3),
+    "patterning.iwd": lambda batch: patterning.iwd(batch, ["E", "K", "S"]),
+    "patterning.iwd_charged_weighted": lambda batch: patterning.iwd_charged_weighted(batch, "-"),
+    "patterning.bivariate_iwd_charged_weighted": patterning.bivariate_iwd_charged_weighted,
+    "patterning.scd": patterning.scd,
+    "patterning.shd": patterning.shd,
 }
 
-#: Functions that reject sequences shorter than their window, and so are given
-#: only the sequences that are long enough.
-NEEDS_LONG_SEQUENCES = {"patterning.patterning_percentile"}
-LONG_ENOUGH = 5
+#: Functions that reject sequences shorter than their window, mapped to the
+#: shortest sequence they accept; they are given only sequences that long.
+MINIMUM_LENGTH = {
+    "patterning.patterning_percentile": 5,
+    "patterning.iwd_charged_weighted": patterning.CHARGE_IWD_WINDOW,
+    "patterning.bivariate_iwd_charged_weighted": patterning.CHARGE_IWD_WINDOW,
+}
+
+#: Functions that read characters rather than residue codes, and so do not take
+#: an EncodedBatch.
+TAKES_CHARACTERS = {"patterning.shd"}
 
 #: Functions that depend only on composition, and so also accept ResidueCounts.
 TAKES_COUNTS = {name for name in CALLS if name.split(".")[0] in ("composition", "charge")} | {
@@ -84,6 +96,7 @@ NOT_BATCH_FUNCTIONS = {
     "patterning.ternary_delta",
     "patterning.segregated_arrangements",
     "patterning.kappa_from_ternary",
+    "patterning.iwd_from_masks",
 }
 
 MODULES = {"composition": composition, "charge": charge, "patches": patches, "patterning": patterning}
@@ -91,9 +104,7 @@ MODULES = {"composition": composition, "charge": charge, "patches": patches, "pa
 
 def batch_for(name):
     """The test batch a function is given."""
-    if name in NEEDS_LONG_SEQUENCES:
-        return [sequence for sequence in BATCH if len(sequence) >= LONG_ENOUGH]
-    return BATCH
+    return [sequence for sequence in BATCH if len(sequence) >= MINIMUM_LENGTH.get(name, 0)]
 
 
 def test_every_batch_function_is_covered():
@@ -127,7 +138,7 @@ def test_batch_matches_one_sequence_at_a_time(name):
 def test_a_large_batch_matches_one_sequence_at_a_time(name):
     """Large enough that numpy iterates, buffers and reduces it differently."""
     sequences = batch_for(name)
-    repeats = 20 if name in NEEDS_LONG_SEQUENCES else 300
+    repeats = 20 if name in MINIMUM_LENGTH else 300
     batch = CALLS[name](sequences * repeats)
     one_at_a_time = np.stack([CALLS[name]([sequence])[0] for sequence in sequences])
     np.testing.assert_array_equal(batch, np.concatenate([one_at_a_time] * repeats))
@@ -139,7 +150,7 @@ def test_counts_and_sequences_give_the_same_answer(name):
     np.testing.assert_array_equal(CALLS[name](counts), CALLS[name](BATCH))
 
 
-@pytest.mark.parametrize("name", sorted(CALLS))
+@pytest.mark.parametrize("name", sorted(set(CALLS) - TAKES_CHARACTERS))
 def test_an_encoded_batch_gives_the_same_answer(name):
     sequences = batch_for(name)
     np.testing.assert_array_equal(CALLS[name](encoding.encode_batch(sequences)), CALLS[name](sequences))

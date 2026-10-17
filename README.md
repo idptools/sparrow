@@ -302,9 +302,9 @@ pytest sparrow/tests
 ```
 
 There is no build step. If you are updating a checkout that predates the removal
-of the Cython extensions, delete any stale compiled artifacts first —
-`rm -f sparrow/patterning/*.so sparrow/patterning/*.c` — since a leftover `.so`
-would shadow the new pure-Python module of the same name.
+of `sparrow.patterning`, delete that directory first — `rm -r sparrow/patterning`
+— since a leftover compiled `.so` in it would let `import sparrow.patterning.kappa`
+silently run the old compiled code instead of failing.
 
 Contributions are welcome — `sparrow` is designed so that new predictors and
 plugins are easy to add (see the developer guides in the documentation).

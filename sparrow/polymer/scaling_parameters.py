@@ -1,4 +1,4 @@
-from sparrow.patterning import vectorized as patterning_metrics
+from sparrow.properties import patterning
 import numpy as np
 
 
@@ -31,8 +31,8 @@ def compute_nu_zheng2020(seq):
 
     """
 
-    SHD = patterning_metrics.compute_shd(seq)
-    SCD = patterning_metrics.compute_scd_x(seq)
+    SHD = float(patterning.shd(seq)[0])
+    SCD = float(patterning.scd(seq)[0])
 
     # calculate Nu from SHD and SCD
     nu = (-0.0423 * SHD) + (0.0074 * SCD) + 0.701

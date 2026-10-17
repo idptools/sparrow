@@ -23,6 +23,13 @@ Everything else is delta in a particular setting:
 * NARDINI's omega and pair features (:mod:`sparrow.nardini.patterning`), which
   call :func:`asymmetry` and :func:`window_delta` directly on window counts.
 
+The module also holds the other patterning metrics: the inverse-weighted
+distance (:func:`iwd` and its charge-weighted forms), and the sequence charge
+and hydropathy decorations (:func:`scd`, :func:`shd`). IWD and SCD sum over every
+pair of residues, which grouping the pairs by separation turns into an
+autocorrelation - one FFT rather than ``O(N^2)`` work - and SHD collapses further,
+to prefix sums.
+
 Batches
 -------
 Every sequence-level function here takes a batch and returns one value per
@@ -36,7 +43,7 @@ the last bit.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 import numpy as np
 from numpy.typing import NDArray
@@ -45,7 +52,7 @@ from sparrow.data import amino_acids
 from sparrow.properties import encoding
 from sparrow.properties.composition import Batch, as_counts
 from sparrow.properties.windows import window_sums
-from sparrow.sparrow_exceptions import PatterningException
+from sparrow.sparrow_exceptions import PatterningException, SparrowException
 
 __all__ = [
     "KAPPA_WINDOW_SIZES",
@@ -60,6 +67,13 @@ __all__ = [
     "kappa",
     "binary_asymmetry",
     "patterning_percentile",
+    "CHARGE_IWD_WINDOW",
+    "iwd_from_masks",
+    "iwd",
+    "iwd_charged_weighted",
+    "bivariate_iwd_charged_weighted",
+    "scd",
+    "shd",
 ]
 
 #: Window sizes whose kappa values are averaged for :func:`kappa`, the charge
@@ -616,3 +630,420 @@ def patterning_percentile(
     if return_distribution:
         return percentiles, observed, null
     return percentiles
+
+
+# =====================================================================
+# inverse-weighted distance
+# =====================================================================
+
+
+def _inverse_distance_kernel(length: int) -> NDArray[np.float64]:
+    """``[0, 1, 1/2, 1/3, ...]``, up to ``1 / (length - 1)``."""
+    kernel = np.zeros(length, dtype=np.float64)
+    if length > 1:
+        kernel[1:] = 1.0 / np.arange(1, length, dtype=np.float64)
+    return kernel
+
+
+def _autocorrelation(values: NDArray[np.float64]) -> NDArray[np.float64]:
+    """Autocorrelation of every row at every lag, ``A[d] = sum_i v[i] v[i + d]``, by FFT.
+
+    Rounded to the nearest integer, which is exact for the integer-valued inputs
+    used here (0/1 masks and -1/0/+1 charges) and removes the FFT's ~1e-17 noise.
+    """
+    length = values.shape[1]
+    size = 1
+    while size < 2 * length:
+        size *= 2
+    spectrum = np.fft.rfft(values, n=size, axis=1)
+    autocorrelation: NDArray[np.float64] = np.rint(
+        np.fft.irfft(spectrum * np.conjugate(spectrum), n=size, axis=1)[:, :length]
+    )
+    return autocorrelation
+
+
+def iwd_from_masks(masks: NDArray[np.generic]) -> NDArray[np.float64]:
+    """Inverse-weighted distance for a stack of 0/1 occupancy masks of one length.
+
+    For every marked position, sum ``1 / distance`` to every other marked
+    position, and average over the marked positions. Grouping the pairs by their
+    separation ``d`` turns the double sum into ``sum_d A(d) / d``, where ``A`` is
+    the mask's autocorrelation, so a whole stack is one batched FFT rather than
+    a pairwise loop per row.
+
+    Parameters
+    ----------
+    masks : array_like
+        Array of shape ``(n_masks, length)`` of 0/1 (or boolean) values.
+
+    Returns
+    -------
+    numpy.ndarray
+        IWD per mask; 0.0 for a mask with fewer than two marked positions.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> values = iwd_from_masks(np.array([[1, 1, 1, 0, 0, 0], [1, 0, 1, 0, 1, 0]]))
+    >>> bool(values[0] > values[1])
+    True
+    """
+    # ascontiguousarray, not just astype: pocketfft takes a different path for a
+    # non-C-contiguous input, and the results then differ in the last bit between
+    # rows of the same call - which turns a null distribution that should be an
+    # exact point mass into one with ~1e-16 of spread
+    stack = np.ascontiguousarray(np.atleast_2d(np.asarray(masks)), dtype=np.float64)
+    counts = stack.sum(axis=1)
+
+    # Each unordered pair is counted once by the autocorrelation and contributes
+    # to two positions' sums, hence the factor of 2. Each row is summed on its
+    # own rather than as a matrix product: BLAS orders a matrix product's
+    # additions by the number of rows, which would give a sequence different last
+    # bits alone than in a stack (or than its own scrambles).
+    pair_sum = 2.0 * (_autocorrelation(stack) * _inverse_distance_kernel(stack.shape[1])).sum(axis=1)
+
+    out = np.zeros(stack.shape[0], dtype=np.float64)
+    np.divide(pair_sum, counts, out=out, where=counts > 0)
+    return out
+
+
+def iwd(
+    sequences: str | Sequence[str] | encoding.EncodedBatch,
+    target_residues: Sequence[str],
+) -> NDArray[np.float64]:
+    """Inverse-weighted distance (IWD) between the target residues of each sequence.
+
+    A clustering metric: high when the target residues sit close together, low
+    when they are spread out.
+
+    Parameters
+    ----------
+    sequences : str, sequence of str, or EncodedBatch
+        The batch.
+    target_residues : sequence of str
+        Residues that count as occupied positions.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``(n_sequences,)`` IWD values; 0.0 with fewer than two target residues.
+
+    Examples
+    --------
+    >>> clustered, spread = iwd(["AAAAAQQQQQ", "AQAQAQAQAQ"], ["Q"])
+    >>> bool(clustered > spread)
+    True
+    """
+    batch = encoding.encode_batch(sequences)
+    member = encoding.residue_membership(target_residues)
+
+    result = np.zeros(len(batch), dtype=np.float64)
+    for indices, codes in batch.by_length():
+        result[indices] = iwd_from_masks(member[codes])
+    return result
+
+
+#: Window over which the local net charge per residue is taken for the
+#: charge-weighted IWD.
+CHARGE_IWD_WINDOW = 8
+
+# which residue codes are positive or negative, and the formal charge of each
+_IS_POSITIVE = encoding.residue_membership(amino_acids.POS)
+_IS_NEGATIVE = encoding.residue_membership(amino_acids.NEG)
+_FORMAL_CHARGE = _IS_POSITIVE.astype(np.int64) - _IS_NEGATIVE.astype(np.int64)
+
+
+def _local_ncpr(codes: NDArray[np.int8], window_size: int) -> NDArray[np.float64]:
+    """Local net charge per residue at every position, with the ends extended.
+
+    The NCPR of each window, placed at the window's centre, with the first and
+    last values copied out to the ends so there is one value per residue.
+    """
+    length = codes.size
+    if length < window_size:
+        raise SparrowException("Windowsize [%i] is larger than sequence [%i]" % (window_size, length))
+
+    per_window = window_sums(_FORMAL_CHARGE[codes], window_size) / window_size
+
+    front = window_size // 2
+    back = length - front - per_window.size
+    profile: NDArray[np.float64] = np.concatenate(
+        [np.full(front, per_window[0]), per_window, np.full(back, per_window[-1])]
+    )
+    return profile
+
+
+def _pairwise_inverse_distance_sums(positions: NDArray[np.intp]) -> NDArray[np.float64]:
+    """For each position, the sum of ``1 / distance`` to every other position in the set."""
+    separation = np.abs(positions[:, None] - positions[None, :]).astype(np.float64)
+    with np.errstate(divide="ignore"):
+        inverse = np.where(separation > 0, 1.0 / separation, 0.0)
+    sums: NDArray[np.float64] = inverse.sum(axis=1)
+    return sums
+
+
+def _charged_iwd_of(codes: NDArray[np.int8], charge: str, window_size: int) -> float:
+    """Charge-weighted IWD of one sequence's positive or negative residues."""
+    ncpr = _local_ncpr(codes, window_size)
+    if charge == "-":
+        selected = _IS_NEGATIVE[codes]
+        wanted_sign = -1.0
+    else:
+        selected = _IS_POSITIVE[codes]
+        wanted_sign = 1.0
+
+    positions = np.flatnonzero(selected)
+    if positions.size == 0:
+        return 0.0
+
+    per_hit = _pairwise_inverse_distance_sums(positions)
+    local_charge = ncpr[positions]
+    # only residues sitting in a correctly signed local environment contribute
+    weights = np.where(np.sign(local_charge) == wanted_sign, np.abs(local_charge), 0.0)
+
+    # the denominator is the residue count, not the weight sum
+    return float(np.dot(per_hit, weights) / positions.size)
+
+
+def iwd_charged_weighted(
+    sequences: str | Sequence[str] | encoding.EncodedBatch,
+    charge: str,
+    window_size: int = CHARGE_IWD_WINDOW,
+) -> NDArray[np.float64]:
+    """Charge-weighted IWD of the positive or the negative residues of each sequence.
+
+    Each residue's contribution is weighted by the magnitude of the local net
+    charge per residue (over ``window_size`` residues) at its position, and a
+    residue whose local NCPR has the opposite sign contributes nothing.
+
+    Parameters
+    ----------
+    sequences : str, sequence of str, or EncodedBatch
+        The batch.
+    charge : {'-', '+'}
+        ``'-'`` for the clustering of D and E, ``'+'`` for R and K.
+    window_size : int, optional
+        Window for the local NCPR. Default 8.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``(n_sequences,)`` non-negative values.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.PatterningException
+        If ``charge`` is not ``'-'`` or ``'+'``.
+    sparrow.sparrow_exceptions.SparrowException
+        If a sequence is shorter than ``window_size``.
+    """
+    if charge not in ("-", "+"):
+        raise PatterningException(f"charge must be '-' or '+', not {charge!r}")
+    batch = encoding.encode_batch(sequences)
+    return np.array(
+        [
+            _charged_iwd_of(batch.codes[batch.offsets[i] : batch.offsets[i + 1]], charge, window_size)
+            for i in range(len(batch))
+        ],
+        dtype=np.float64,
+    )
+
+
+def _bivariate_charged_iwd_of(codes: NDArray[np.int8], window_size: int) -> float:
+    """Charge-weighted IWD between one sequence's positive and negative residues."""
+    ncpr = _local_ncpr(codes, window_size)
+    is_negative = _IS_NEGATIVE[codes]
+    is_positive = _IS_POSITIVE[codes]
+    negative_positions = np.flatnonzero(is_negative)
+    positive_positions = np.flatnonzero(is_positive)
+    if negative_positions.size == 0 or positive_positions.size == 0:
+        return 0.0
+
+    # a residue only carries its charge if its local environment agrees in sign
+    masked = np.zeros_like(ncpr)
+    negative_here = is_negative & (ncpr < 0)
+    positive_here = is_positive & (ncpr > 0)
+    masked[negative_here] = ncpr[negative_here]
+    masked[positive_here] = ncpr[positive_here]
+
+    charge_difference = np.abs(masked[positive_positions][None, :] - masked[negative_positions][:, None])
+    separation = np.abs(positive_positions[None, :] - negative_positions[:, None]).astype(np.float64)
+    return float(np.sum(charge_difference / separation) / negative_positions.size)
+
+
+def bivariate_iwd_charged_weighted(
+    sequences: str | Sequence[str] | encoding.EncodedBatch,
+    window_size: int = CHARGE_IWD_WINDOW,
+) -> NDArray[np.float64]:
+    """Charge-weighted IWD between the positive and negative residues of each sequence.
+
+    How intermixed the oppositely charged residues are: each positive/negative
+    pair is weighted by the difference in their local net charge per residue
+    and divided by their separation.
+
+    Parameters
+    ----------
+    sequences : str, sequence of str, or EncodedBatch
+        The batch.
+    window_size : int, optional
+        Window for the local NCPR. Default 8.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``(n_sequences,)`` non-negative values; 0.0 for a sequence lacking either
+        charge.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If a sequence is shorter than ``window_size``.
+    """
+    batch = encoding.encode_batch(sequences)
+    return np.array(
+        [
+            _bivariate_charged_iwd_of(batch.codes[batch.offsets[i] : batch.offsets[i + 1]], window_size)
+            for i in range(len(batch))
+        ],
+        dtype=np.float64,
+    )
+
+
+# =====================================================================
+# sequence charge and hydropathy decoration
+# =====================================================================
+
+
+def scd(
+    sequences: str | Sequence[str] | encoding.EncodedBatch,
+    group1: Sequence[str] = tuple(amino_acids.NEG),
+    group2: Sequence[str] = tuple(amino_acids.POS),
+) -> NDArray[np.float64]:
+    """Sequence charge decoration (SCD) of Sawle & Ghosh, for any two groups.
+
+    ``SCD = (1/N) sum_{m > n} q_m q_n sqrt(m - n)``, with ``group1`` residues
+    charged -1 and ``group2`` residues +1 (a residue in both counts as +1).
+    Grouping the pairs by separation turns the double sum into the charge
+    sequence's autocorrelation, so it costs one FFT - ``O(N log N)`` - rather than
+    ``O(N^2)``.
+
+    Parameters
+    ----------
+    sequences : str, sequence of str, or EncodedBatch
+        The batch.
+    group1 : sequence of str, optional
+        Residues charged -1. Default E and D.
+    group2 : sequence of str, optional
+        Residues charged +1. Default R and K.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``(n_sequences,)`` SCD values; 0.0 for a sequence shorter than 2.
+
+    References
+    ----------
+    Sawle L, Ghosh K. A theoretical method to compute sequence dependent
+    configurational properties in charged polymers and proteins. J Chem Phys.
+    2015;143(8):085101.
+
+    Examples
+    --------
+    >>> blocky, mixed = scd(["EEEEEEEEEEKKKKKKKKKK", "EKEKEKEKEKEKEKEKEKEK"])
+    >>> bool(blocky < mixed)
+    True
+    """
+    batch = encoding.encode_batch(sequences)
+    charge = np.zeros(encoding.NUM_RESIDUES, dtype=np.float64)
+    charge[encoding.residue_membership(group1)] = -1.0
+    charge[encoding.residue_membership(group2)] = 1.0
+
+    result = np.zeros(len(batch), dtype=np.float64)
+    for indices, codes in batch.by_length():
+        length = codes.shape[1]
+        if length < 2:
+            continue
+        separations = np.sqrt(np.arange(length, dtype=np.float64))
+        autocorrelation = _autocorrelation(charge[codes])
+        # summed row by row, not as a matrix product - see iwd_from_masks
+        result[indices] = (autocorrelation[:, 1:] * separations[1:]).sum(axis=1) / length
+    return result
+
+
+def _hydropathy_table(scale: Mapping[str, float], batch: Sequence[str]) -> NDArray[np.float64]:
+    """A 256-entry table of ``scale`` by ASCII code, checked against the batch.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If a character in the batch has no value in the scale.
+    """
+    missing = sorted(set("".join(batch)) - set(scale))
+    if missing:
+        raise SparrowException(f"When calculating SHD the hydropathy scale has no value for {missing}")
+    table = np.zeros(encoding.ASCII_TABLE_SIZE, dtype=np.float64)
+    for character, value in scale.items():
+        table[ord(character)] = float(value)
+    return table
+
+
+def shd(
+    sequences: str | Sequence[str],
+    hydropathy: Mapping[str, float] | None = None,
+) -> NDArray[np.float64]:
+    """Sequence hydropathy decoration (SHD) of Zheng et al.
+
+    ``SHD = (1/N) sum_{m > n} (h_m + h_n) / (m - n)``. Because the numerator is a
+    sum rather than a product, grouping by separation ``d`` leaves only prefix
+    sums: ``O(N)`` rather than ``O(N^2)``.
+
+    The scale is looked up character by character, so any alphabet it covers
+    works - the SHD paper's own checks use binary ``'0'``/``'1'`` sequences.
+
+    Parameters
+    ----------
+    sequences : str or sequence of str
+        The batch.
+    hydropathy : mapping of str to float, optional
+        Value of each character. Default the HPS model's hydropathy
+        (:data:`sparrow.data.amino_acids.AA_hydro_HPS`), which SHD was defined
+        with.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``(n_sequences,)`` SHD values; 0.0 for a sequence shorter than 2.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If a sequence holds a character the scale has no value for. The message
+        lists every such character.
+
+    References
+    ----------
+    Zheng W, Dignon GL, Brown M, Kim YC, Mittal J. Hydropathy patterning
+    complements charge patterning to describe conformational preferences of
+    disordered proteins. J Phys Chem Lett. 2020;11(9):3408-3415.
+    """
+    batch = encoding.as_batch(sequences)
+    table = _hydropathy_table(amino_acids.AA_hydro_HPS if hydropathy is None else hydropathy, batch)
+
+    result = np.zeros(len(batch), dtype=np.float64)
+    by_length: dict[int, list[int]] = {}
+    for index, sequence in enumerate(batch):
+        by_length.setdefault(len(sequence), []).append(index)
+
+    for length, indices in by_length.items():
+        if length < 2:
+            continue
+        values = table[np.stack([encoding.ascii_codes(batch[i]) for i in indices])]
+
+        # sum_d (1/d) [ sum_{m >= d} h_m + sum_{n <= N-1-d} h_n ], both prefix sums
+        prefix = np.concatenate([np.zeros((len(indices), 1)), np.cumsum(values, axis=1)], axis=1)
+        total = prefix[:, -1:]
+        separations = np.arange(1, length, dtype=np.float64)
+        upper = total - prefix[:, 1:length]
+        lower = prefix[:, length - np.arange(1, length)]
+        result[indices] = np.sum((upper + lower) / separations, axis=1) / length
+    return result

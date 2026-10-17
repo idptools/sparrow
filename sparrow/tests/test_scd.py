@@ -2,7 +2,7 @@ import numpy as np
 import protfasta
 
 from sparrow import Protein
-from sparrow.patterning import scd
+from sparrow.properties import patterning
 
 from . import reference_data_path
 
@@ -40,5 +40,5 @@ def test_shd_custom_binary():
     """
     hydro_dict = {"0": 0.0, "1": 1.0}
     for seq, true_val in shd_paper_toy_sequences.items():
-        calc = scd.compute_shd(seq, hydro_dict=hydro_dict)
+        calc = patterning.shd(seq, hydropathy=hydro_dict)[0]
         assert np.isclose(calc, true_val, atol=1e-3), f"{seq}: {calc} != {true_val}"

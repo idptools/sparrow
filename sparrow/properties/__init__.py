@@ -13,4 +13,16 @@ Modules
 -------
 :mod:`~sparrow.properties.encoding`
     Validation, and turning sequences into integer arrays.
+:mod:`~sparrow.properties.composition`
+    Everything that depends only on composition: fractions, residue sets,
+    ratios, mean scales, molecular weight, SEG complexity.
+:mod:`~sparrow.properties.charge`
+    pH-dependent charge and the isoelectric point.
+:mod:`~sparrow.properties.patches`
+    Patch fractions.
+:mod:`~sparrow.properties.windows`
+    Sliding-window sums and counts.
+:mod:`~sparrow.properties.patterning`
+    How residues are arranged: kappa, delta, the patterning percentile, IWD,
+    SCD and SHD.
 """

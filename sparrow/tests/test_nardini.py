@@ -432,7 +432,6 @@ def test_alternative_backends_are_the_sparrow_statistics(sequence):
     batch IWD sums inverse distances by FFT autocorrelation where the
     single-sequence one loops over pairs, so the two agree to rounding only.
     """
-    from sparrow.patterning import vectorized as vec
     from sparrow.properties import patterning
 
     groups = [sorted(residues) for residues in TYPES_8.values()]
@@ -450,7 +449,7 @@ def test_alternative_backends_are_the_sparrow_statistics(sequence):
 
         expected_kappa = patterning.kappa_x(sequence, groups[i], [] if i == j else groups[j], 5, flatten=True)[0]
         targets = groups[i] if i == j else sorted(set(groups[i]) | set(groups[j]))
-        expected_iwd = vec.calculate_average_inverse_distance_from_sequence(sequence, targets)
+        expected_iwd = patterning.iwd(sequence, targets)[0]
 
         # kappa_x reports -1 for "undefined", which the backend reports as 0
         assert kappa[feature] == max(expected_kappa, 0.0)

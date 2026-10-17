@@ -11,11 +11,6 @@ from protfasta import utilities as protfasta_utilities
 from sparrow import sparrow_exceptions
 from sparrow.data import amino_acids
 
-# The patterning metrics come from the vectorized NumPy implementations rather
-# than the Cython extensions. They are the same functions to within the
-# compiled code's single-precision arithmetic, and more accurate where they
-# differ - see sparrow.patterning.vectorized and its test module.
-from sparrow.patterning import vectorized as patterning_metrics
 from sparrow.properties import charge, composition, encoding, patches, patterning
 from sparrow.sequence_analysis import (
     elm,
@@ -305,7 +300,7 @@ class Protein:
         Phys. 143, 085101 (2015).
         """
         if self.__scd is None:
-            self.__scd = patterning_metrics.compute_scd_x(self.sequence, group1=["E", "D"], group2=["R", "K"])
+            self.__scd = float(patterning.scd(self.__encoded_sequence(), group1=["E", "D"], group2=["R", "K"])[0])
 
         return self.__scd
 
@@ -332,7 +327,7 @@ class Protein:
         Chem. Lett. 11, 3408-3415 (2020).
         """
         if self.__shd is None:
-            self.__shd = patterning_metrics.compute_shd(self.sequence)
+            self.__shd = float(patterning.shd(self.__seq)[0])
 
         return self.__shd
 
@@ -800,7 +795,7 @@ class Protein:
             return_type="list",
         )
 
-        return patterning_metrics.calculate_average_inverse_distance_from_sequence(self.sequence, residues)
+        return float(patterning.iwd(self.__encoded_sequence(), residues)[0])
 
     # .................................................................
     #
@@ -913,7 +908,7 @@ class Protein:
         Phys. 143, 085101 (2015).
         """
 
-        return patterning_metrics.compute_scd_x(self.sequence, group1=group1, group2=group2)
+        return float(patterning.scd(self.__encoded_sequence(), group1=group1, group2=group2)[0])
 
     # .................................................................
     #
@@ -948,7 +943,7 @@ class Protein:
         Chem. Lett. 11, 3408-3415 (2020).
         """
 
-        return patterning_metrics.compute_shd(self.sequence, hydro_dict=hydro_dict)
+        return float(patterning.shd(self.__seq, hydropathy=hydro_dict)[0])
 
     # .................................................................
     #
@@ -984,15 +979,7 @@ class Protein:
                 f'Passed charge {charge} is not a valid option. Pass "-" for negative residues and "+" for positive residues.'
             )
 
-        # calculate or retrieve mask of NCPR for sequence
-        if "NCPR-8-extend-ends" not in self.__linear_profiles:
-            self.__linear_profiles["NCPR-8-extend-ends"] = track_tools.predefined_linear_track(
-                self.__seq, "NCPR", 8, "extend-ends", None
-            )
-
-        linear_NCPR = self.__linear_profiles["NCPR-8-extend-ends"]
-
-        return patterning_metrics.calculate_average_inverse_distance_charge(linear_NCPR, self.sequence, charge)
+        return float(patterning.iwd_charged_weighted(self.__encoded_sequence(), charge)[0])
 
     # .................................................................
     #
@@ -1011,15 +998,7 @@ class Protein:
             A non-negative clustering value.
         """
 
-        # calculate or retrieve mask of NCPR for sequence
-        if "NCPR-8-extend-ends" not in self.__linear_profiles:
-            self.__linear_profiles["NCPR-8-extend-ends"] = track_tools.predefined_linear_track(
-                self.__seq, "NCPR", 8, "extend-ends", None
-            )
-
-        linear_NCPR = self.__linear_profiles["NCPR-8-extend-ends"]
-
-        return patterning_metrics.calculate_average_bivariate_inverse_distance_charge(linear_NCPR, self.sequence)
+        return float(patterning.bivariate_iwd_charged_weighted(self.__encoded_sequence())[0])
 
     ## .................................................................
     ##
