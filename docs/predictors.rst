@@ -21,16 +21,26 @@ The guide below assumes you have cloned the git repository of sparrow, created a
 This guide assumes these ideas are clear, and specifically provides insight into the details of implementing a new predictor in sparrow, focussing here on using PARROT to train that predictor. 
 
 
-**Step 1: Train a predictor with PARROT**
+**Step 1: Train a predictor with PARROT 2**
 
-The first step in adding a new PARROT based predictor is to use PARROT to train your model. The details of how one does this go beyond the scope of this documentation, but once trained you should be left with a Torch parameter file (a ``.pt`` file). This is the file we're going to use with SPARROW to add our custom predictor. Lets call this parameter file ``new_predictor.pt`` to make this concrete.
+The first step in adding a new PARROT based predictor is to use PARROT 2 to train your model. PARROT 2 has not been released yet, so install it from its branch (sparrow itself only needs PARROT 1, which is what ``pip install idptools-parrot`` gives you)::
 
-Note that the PARROT network can be trained in ``residues`` mode (one value per residue, like the disorder or transmembrane predictors) or in ``sequence`` mode (one value per sequence, like the ALBATROSS radius of gyration); you declare which when you build the predictor class in step 3.
+  pip install "git+https://github.com/idptools/parrot.git@parrot2"
+
+The details of training go beyond the scope of this documentation (``parrot-train --show-examples`` is a good place to start), but as a concrete example::
+
+  parrot-train brnn --input-file data.tsv --output-network my_property_network_v1.pt --split kmer -d residues --regression
+
+Once trained you're left with a Torch file (a ``.pt`` file), which is the file we're going to use with SPARROW to add our custom predictor, and a ``my_property_network_v1_info.txt`` describing how it was trained, which is worth keeping with your notes.
+
+You can train the network in ``residues`` mode (one value per residue, like the disorder or transmembrane predictors) or in ``sequence`` mode (one value per sequence, like the ALBATROSS radius of gyration), for regression or classification, with any of PARROT's architectures and encodings. A PARROT 2 network file records all of this, so there is nothing to declare about it in sparrow.
+
+Note that anyone using your predictor will need PARROT 2 installed too, until it is released; without it, sparrow raises an error saying how to install it.
 
 
 **Step 2: Copy the parameter file into SPARROW**
 
-Next we take ``new_predictor.pt`` and we're going to copy it into sparrow. Specifically, this trained network should be placed in its own directory under ``sparrow/data/networks/``::
+Next we take ``my_property_network_v1.pt`` and we're going to copy it into sparrow. Specifically, this trained network should be placed in its own directory under ``sparrow/data/networks/``::
 
   sparrow/data/networks/<predictor_name>/
 
@@ -67,24 +77,29 @@ The reason to make a separate package (directory) for every predictor is that if
 
 ``__init__.py`` should probably just be empty - it's what tells Python that this directory is a package. 
 
-``<relevant_name>_predictor.py`` should NOT be empty. As of the current backend, all network loading is centralized: each predictor is a thin subclass of :class:`sparrow.predictors.base.BaseNetworkPredictor`, which handles reading the ``.pt`` file, inferring the network hyper-parameters, and the forward pass via the shared :func:`sparrow.predictors.network_loader.load_parrot_network`. A new predictor therefore only declares what differs from the common pattern:
+``<relevant_name>_predictor.py`` should NOT be empty, but it is short: copy the template ``sparrow/predictors/predictor_template.py`` into it and fill it in. All network loading is centralized, so the predictor is a thin subclass of :class:`sparrow.predictors.base.BaseNetworkPredictor`, which reads the ``.pt`` file via the shared :func:`sparrow.predictors.network_loader.load_parrot_network` and runs the network. You only need to:
 
-* ``NETWORK_PATH`` -- a ``{version}`` template for the weights file under ``sparrow/data/networks/`` (for example ``"networks/rg/rg_network_v{version}.pt"``).
-* ``DEFAULT_VERSION`` -- the default network version string.
-* ``ARCHITECTURE`` -- ``"MtO"`` (one value per sequence) or ``"MtM"`` (one value per residue).
-* a single ``predict_<thing>(self, seq)`` method that turns the raw network output into the desired result, typically using a helper from :mod:`sparrow.predictors.outputs` (``scalar_regression``, ``per_residue_class1_probability``, or ``argmax_per_residue``).
+* rename the class (``MyPropertyPredictor``) and its method (``predict_my_property``);
+* set ``NETWORK_PATH`` -- a ``{version}`` template for the weights file under ``sparrow/data/`` (here ``"networks/my_property/my_property_network_v{version}.pt"``) -- and ``DEFAULT_VERSION``, the version loaded when none is asked for;
+* reduce PARROT's prediction to what the predictor should return, in ``predict_my_property``. For a regression network, ``self._predict(seq)`` gives one value per residue, or a one-element array for a ``sequence`` network; for a classification network it gives the probability of each class (per residue, or for the sequence).
 
-See ``sparrow/predictors/rg/radius_of_gyration_predictor.py`` (regression / MtO) and ``sparrow/predictors/nls/nuclear_import_signal_predictor.py`` (per-residue / MtM) for minimal worked examples.
+The whole template is:
 
-Once this is done, it's worth seeing if you can import and run predictions using this class/function as a stand-alone predictor i.e. you should be able to do::
+.. literalinclude:: ../sparrow/predictors/predictor_template.py
+   :language: python
 
+``sparrow/tests/test_predictors_parrot2.py`` runs this template, with only its weights path changed, on per-residue and per-sequence networks saved by PARROT 2, so it is known to work as written.
 
-    from sparrow.predictors.<predictor_package>.<predictor_module> import <RelevantName>Predictor
-    
+.. note::
+   Every network sparrow currently ships was trained with PARROT 1, which saved only a BRNN's weights. Those predictors (for example ``sparrow/predictors/rg/radius_of_gyration_predictor.py``) also declare ``ARCHITECTURE`` -- ``"MtO"`` for one value per sequence or ``"MtM"`` for one per residue -- and turn the raw network output from ``self._raw_predict(seq)`` into a result with a helper from :mod:`sparrow.predictors.outputs`. A network saved by PARROT 2 records its architecture, so new predictors need neither.
+
+Once this is done, it's worth seeing if you can import and run predictions using this class as a stand-alone predictor i.e. you should be able to do::
+
+    from sparrow.predictors.my_property.my_property_predictor import MyPropertyPredictor
+
     sequence = 'MSAAVTAGKLARAPADPGKAGVPGVAAPGAPAAAPPAKEIPEVLVDPRSRRRYVRGRFLG'
-    P = <RelevantName>Predictor()
-    P.predict_<SOMETHING_RELEVANT>(sequence)
-
+    P = MyPropertyPredictor()
+    P.predict_my_property(sequence)
 
 and it return a set of values.
 
@@ -123,6 +138,7 @@ Reference: the shared predictor machinery
 .. automodule:: sparrow.predictors.base
 
 .. automodule:: sparrow.predictors.network_loader
-   :exclude-members: number_of_classes, input_size, number_of_layers, hidden_vector_size, device
+   :exclude-members: number_of_classes, input_size, number_of_layers, hidden_vector_size, device,
+                     saved_by_parrot2, datatype
 
 .. automodule:: sparrow.predictors.outputs
