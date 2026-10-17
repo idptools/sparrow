@@ -145,15 +145,16 @@ have structure the loop-based versions do not exploit:
 * **SHD** has a *sum* rather than a product in its numerator, so grouping by
   separation leaves only prefix sums: ``O(n)`` rather than ``O(n^2)``.
 
-Measured against the Cython extensions sparrow used to ship:
+Measured against the Cython extensions sparrow used to ship, when they were
+replaced:
 
 .. code-block:: text
 
    single sequence           cython      numpy
      kappa_x   (L=300)       142.7 us    48.6 us       3x
      iwd       (L=300)        27.8 us    29.1 us       1x
-     compute_scd_x (L=5000)    7.75 ms    0.148 ms    53x
-     compute_shd   (L=5000)  392.81 ms    0.221 ms  1779x
+     scd       (L=5000)        7.75 ms    0.148 ms    53x
+     shd       (L=5000)      392.81 ms    0.221 ms  1779x
 
    2000 scrambles, batch     cython      numpy
      kappa     (L=1000)        1.01 s     0.04 s      28x
@@ -198,13 +199,16 @@ Installation notes
 Reference: ``sparrow.properties.patterning``
 --------------------------------------------
 
+The functions listed at the top of this page each have a page of their own;
+everything else in the module is documented here.
+
 .. automodule:: sparrow.properties.patterning
    :members:
-   :no-index:
+   :exclude-members: kappa, kappa_x, sigma, delta, patterning_percentile, iwd,
+                     iwd_charged_weighted, bivariate_iwd_charged_weighted, scd, shd
 
 Reference: ``sparrow.properties.windows``
 -----------------------------------------
 
 .. automodule:: sparrow.properties.windows
    :members:
-   :no-index:

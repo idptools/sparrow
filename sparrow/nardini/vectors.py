@@ -515,7 +515,7 @@ def nardini_vectors(
         saved with :meth:`~sparrow.nardini.background.NardiniBackground.save`.
         If None (default) only the 36 patterning features are returned - those
         need no background. Build one with
-        :func:`sparrow.nardini.build_background`.
+        :func:`sparrow.nardini.background.build_background`.
     num_scrambles : int, optional
         Scrambles used per sequence for the patterning null distribution.
         Default 10,000. The NARDINI paper uses 100,000; 1,000 is usually adequate
@@ -580,10 +580,10 @@ def nardini_vectors(
 
     See Also
     --------
-    sparrow.nardini.nardini_proteins : The same work, returning ``Protein`` objects
-        with the results attached, and with an ``on_error`` option for proteomes
-        that contain unscoreable entries.
-    sparrow.nardini.build_background : Build the compositional background.
+    sparrow.nardini.batch.nardini_proteins : The same work, returning ``Protein``
+        objects with the results attached, and with an ``on_error`` option for
+        proteomes that contain unscoreable entries.
+    sparrow.nardini.background.build_background : Build the compositional background.
     sparrow.nardini.patterning.patterning_zscores : Patterning half only.
 
     Notes

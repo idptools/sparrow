@@ -27,7 +27,7 @@ Quick start
    }
 
    results = batch_predict(sequences, network="rg", batch_size=64)
-   #   {"p1": ["MEEE...", 14.7], "p2": [...], "p3": [...]}
+   #   {"p1": ["MEEEKKKKSSSTTTDDD", 10.44...], "p2": [...], "p3": [...]}
 
 Inputs and outputs
 ------------------
@@ -50,7 +50,7 @@ Inputs and outputs
    seq2rg = batch_predict(sequences, network="rg", return_seq2prediction=True)
 
    # list input -> integer-keyed output
-   from_list = batch_predict(["MEEE...", "QQQQ..."], network="asphericity")
+   from_list = batch_predict(["MEEEKKKKSSSTTTDDD", "QQQQQQAASSSSTTTTQQQQQ"], network="asphericity")
 
 Key options
 -----------

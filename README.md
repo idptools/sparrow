@@ -37,7 +37,7 @@ SPARROW integrates direct sequence calculations with per-residue predictions fro
 - **Deep-learning predictions** via `Protein.predictor` — disorder and pLDDT, DSSP secondary structure, polymer dimensions (Rg, Re, scaling exponent, asphericity, prefactor), phosphorylation, localization signals, transactivation domains, transmembrane regions, and phase-separation propensity. Built on the [ALBATROSS](https://www.nature.com/articles/s41592-023-02159-5) networks.
 - **Polymer-model properties** via `Protein.polymeric` — analytical and simulation-derived dimensions and distance distributions.
 - **Molecular grammars** — a native NARDINI / NARDINI+ implementation (`sparrow.nardini`) for detecting non-random residue patterning, with user-buildable compositional backgrounds, assignment to the 30 human GIN grammars, clustering to derive your own, and parallel computation across a whole proteome.
-- **Scale-up tools** — every sequence parameter and profile for a whole batch of sequences at once (`sparrow.properties`), fast batch prediction across whole sequence sets, and fixed-length feature vectors for machine learning.
+- **Scale-up tools** — every sequence parameter and profile for a whole batch of sequences at once (`sparrow.properties`), fast batch prediction across whole sequence sets, and fixed-length feature vectors for machine learning (the 20 scalar properties from `sparrow.properties.compute()`, or 90-feature NARDINI+ vectors).
 - **Extensible** — a simple plugin system for adding new sequence analyses.
 
 ## Installation
@@ -311,7 +311,7 @@ IMPORTANTLY: If you cite specific tools, metrics, parameters etc you MUST cite t
 ```bash
 git clone https://github.com/idptools/sparrow.git
 cd sparrow
-pip install -e .
+pip install -e ".[test]"     # or ".[dev]" to add pre-commit as well
 
 # run the test suite (works from anywhere in the repo)
 pytest sparrow/tests

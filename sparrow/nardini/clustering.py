@@ -67,10 +67,10 @@ the published centroids rather than clustering afresh - see
 Cost
 ----
 The clustering itself takes seconds. The vectors are the expensive part, at
-roughly 110 ms per IDR at 1,000 scrambles and 560 ms at 10,000 (for a 200-residue
-IDR), so a 25,000-IDR proteome is around 45 minutes or 4 hours single-core. It
-parallelizes trivially over sequences, and :meth:`GINReference.save` means you pay
-it once.
+roughly 90 ms per IDR at 1,000 scrambles and 240 ms at 10,000 (for a 200-residue
+IDR), so a 25,000-IDR proteome is around 40 minutes or 1.7 hours single-core. It
+parallelizes trivially over sequences, and
+:meth:`~sparrow.nardini.gin.GINReference.save` means you pay it once.
 """
 
 import warnings

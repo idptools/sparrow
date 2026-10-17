@@ -280,7 +280,7 @@ def kappa_from_ternary(
     Returns
     -------
     numpy.ndarray
-        kappa per row, or :data:`KAPPA_UNDEFINED` (-1) where a group is absent.
+        kappa per row, or ``KAPPA_UNDEFINED`` (-1) where a group is absent.
 
     Raises
     ------

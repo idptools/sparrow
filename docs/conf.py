@@ -8,6 +8,11 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
+from sphinx.ext.autodoc.mock import mock
+from sphinx.util import logging
+
+logger = logging.getLogger(__name__)
+
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -95,9 +100,10 @@ htmlhelp_basename = "sparrowdoc"
 # only if it actually fails, which keeps local builds (where everything is
 # installed) documenting the real objects.
 #
-# NB: sparrow.properties.* is pure Python, but importing it pulls in the sparrow
-# package and hence its dependencies, so it is on this list - the import test
-# decides.
+# Only third-party packages belong on this list, never sparrow's own modules: a
+# sparrow module fails this plain import test whenever one of these packages is
+# missing, and a mocked module is documented as empty. With these mocked, autodoc
+# imports sparrow's modules for real.
 MOCK = os.getenv("READTHEDOCS") or os.getenv("SPARROW_DOC_BUILD")
 if MOCK:
     candidates = [
@@ -107,13 +113,9 @@ if MOCK:
         "pandas",
         "IPython",
         "protfasta",
-        "sparrow.properties.encoding",
-        "sparrow.properties.composition",
-        "sparrow.properties.charge",
-        "sparrow.properties.patches",
-        "sparrow.properties.windows",
-        "sparrow.properties.profiles",
-        "sparrow.properties.patterning",
+        "torch",
+        "tqdm",
+        "parrot",
     ]
     autodoc_mock_imports = []
     for module_name in candidates:
@@ -143,12 +145,15 @@ def _generate_property_index_table(app):
     """Write the AAindex property reference table included by api_guides/properties.
 
     Regenerated on every build so the table always matches the shipped database.
+    Importing sparrow needs the same third-party mocks as autodoc on Read the Docs.
     """
     try:
-        from sparrow.data import aaindex
+        with mock(app.config.autodoc_mock_imports):
+            from sparrow.data import aaindex
 
-        rows = aaindex.list_property_indices()
-    except Exception:  # pragma: no cover - keep docs building if data is unavailable
+            rows = aaindex.list_property_indices()
+    except Exception as error:  # pragma: no cover - warn, but keep the rest of the docs building
+        logger.warning("Could not build the AAindex property table: %s", error)
         return
 
     def clean(text):

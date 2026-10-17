@@ -51,7 +51,9 @@ What can it do?
   clustering to derive your own, and parallel computation across a whole proteome.
 * **Scale-up tools** -- every sequence parameter and profile for a whole batch
   of sequences at once (:doc:`api_guides/sequence_properties`), batch prediction
-  over whole sequence sets, and fixed-length feature vectors for machine learning.
+  over whole sequence sets, and fixed-length feature vectors for machine learning
+  (the 20 scalar properties from :func:`sparrow.properties.compute`, or
+  90-feature NARDINI+ vectors).
 * **Extensible** -- a simple plugin system for adding new sequence analyses.
 
 Where to start

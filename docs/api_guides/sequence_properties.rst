@@ -123,7 +123,7 @@ time, count once and pass the counts:
 
 The functions in :mod:`~sparrow.properties.composition` and
 :mod:`~sparrow.properties.charge` take counts; the rest take an encoded batch
-from :func:`~sparrow.properties.encode_batch`, which likewise saves encoding the
+from :func:`~sparrow.properties.encoding.encode_batch`, which likewise saves encoding the
 sequences more than once. :func:`~sparrow.properties.compute` does both for you.
 
 What a batch can be
@@ -138,9 +138,11 @@ What a batch can be
   without computing anything. SHD is the one exception: it reads its scale
   character by character, so it works for any alphabet the scale covers.
 * **Empty sequences** have every fraction, their SEG complexity, molecular weight,
-  SCD and SHD equal to 0.0, a mean hydrophobicity or PPII propensity of NaN
-  (there is nothing to average), and a kappa of -1. A profile needs a sequence at
-  least as long as its window.
+  SCD, SHD and R/K and E/D ratios equal to 0.0, a mean hydrophobicity or PPII
+  propensity of NaN (there is nothing to average), a kappa of -1, and an
+  isoelectric point of 7.0 -- as does any sequence with no titratable residues,
+  whose charge is zero at every pH. A profile needs a sequence at least as long as
+  its window.
 
 The same answer alone or in a batch
 -----------------------------------
@@ -240,3 +242,11 @@ Reference
 
 .. automodule:: sparrow.properties.profiles
    :members:
+
+The residue sets and scales these functions use:
+
+.. automodule:: sparrow.data.amino_acids
+   :members: VALID_AMINO_ACIDS, POS, NEG, CHARGE, ARO, ALI, POLAR, NARDINI_POLAR,
+             EXPANDING, DISORDER_PROMOTING, TITRATABLE_BASES, TITRATABLE_ACIDS,
+             AA_PKA, AA_MOLECULAR_WEIGHT, AA_hydro_KD, AA_hydro_KD_normalized,
+             AA_hydro_HPS, AA_PPII_HILSER

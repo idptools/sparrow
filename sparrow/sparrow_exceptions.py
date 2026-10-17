@@ -58,7 +58,7 @@ class SparrowWarning(UserWarning):
 
 
 class BackgroundQualityWarning(SparrowWarning):
-    """Raised by :func:`sparrow.nardini.build_background` for a weak background.
+    """Raised by :func:`sparrow.nardini.background.build_background` for a weak background.
 
     A NARDINI+ compositional background is a per-feature mean and standard
     deviation over a reference set of IDRs. Built from too few sequences, or from
@@ -70,7 +70,7 @@ class BackgroundQualityWarning(SparrowWarning):
 
 
 class ClusteringQualityWarning(SparrowWarning):
-    """Raised by :func:`sparrow.nardini.build_gin_reference` for a weak clustering.
+    """Raised by :func:`sparrow.nardini.clustering.build_gin_reference` for a weak clustering.
 
     k-means always returns k centroids, however little structure the data holds.
     Too few sequences per cluster and the centroids describe noise - they will

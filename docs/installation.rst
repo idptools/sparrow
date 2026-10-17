@@ -82,7 +82,7 @@ If you want to work on sparrow itself, clone it and install in editable mode:
 
    git clone https://github.com/idptools/sparrow.git
    cd sparrow
-   pip install -e .
+   pip install -e ".[test]"       # or ".[dev]" to add pre-commit as well
 
    # run the test suite (works from the repository root)
    pytest sparrow/tests

@@ -1,8 +1,14 @@
-##
-## Data on individual amino acids
-##
-##
+"""Data on individual amino acids.
 
+The residue sets sparrow's composition properties count, and the per-residue
+scales they average. These are the definitions behind the properties in
+:mod:`sparrow.properties` and on :class:`~sparrow.protein.Protein`. Every set and
+scale uses one-letter codes.
+"""
+
+#: The 20 standard amino acids, in alphabetical order of one-letter code. Every
+#: sequence property is defined over these, and residue counts are held in this
+#: order.
 VALID_AMINO_ACIDS = [
     "A",
     "C",
@@ -49,17 +55,30 @@ VALID_AMINO_ACIDS_PHYS = [
 ]
 
 
+#: Aromatic residues, as ``fraction_aromatic`` counts them.
 ARO = ["Y", "W", "F"]
+
+#: Aliphatic residues, as ``fraction_aliphatic`` counts them.
 ALI = ["A", "L", "M", "I", "V"]
+
+#: Polar residues, as ``Protein.fraction_polar`` counts them. Cysteine is not
+#: included - compare :data:`NARDINI_POLAR`.
 POLAR = ["Q", "N", "S", "T", "H", "G"]
 
-# NARDINI+ counts cysteine as polar where POLAR above does not. Both conventions are
-# used in the literature, and the bundled NARDINI+ backgrounds and GIN centroids are
-# defined against this one, so the two sets are kept side by side.
-# Reference: Ruff KM, King MR, et al. (2025), the NARDINI+ / GIN resource.
+#: Polar residues as NARDINI+ counts them, cysteine included, where :data:`POLAR`
+#: does not. Both conventions are used in the literature, and the bundled NARDINI+
+#: backgrounds and GIN centroids are defined against this one, so the two sets are
+#: kept side by side. From Ruff KM, King MR, et al. (2025), the NARDINI+ / GIN
+#: resource.
 NARDINI_POLAR = ["Q", "N", "S", "T", "G", "C", "H"]
+
+#: Residues with a formal charge, as FCR counts them.
 CHARGE = ["E", "D", "R", "K"]
+
+#: Positively charged residues.
 POS = ["R", "K"]
+
+#: Negatively charged residues.
 NEG = ["E", "D"]
 
 AA_THREE_TO_ONE = {
@@ -93,6 +112,8 @@ for x in AA_THREE_TO_ONE:
 # acetyl groups have 1C-2O, 4H prior to
 # peptide bond formation
 #
+#: Molecular weight of each free amino acid, in Daltons (Da). ``molecular_weight``
+#: subtracts one water per peptide bond.
 AA_MOLECULAR_WEIGHT = {
     "A": 89.1,
     "C": 121.2,
@@ -152,6 +173,9 @@ AA_COLOR = {
 # Protines: Structure, function, and genetics 41:415-427 (2000)
 # Main hydrophobicity scale
 
+#: Kyte-Doolittle hydropathy, shifted by +4.5 so it runs from 0 (R) to 9 (I). This
+#: is the scale ``hydrophobicity`` averages. From Kyte J, Doolittle RF. J Mol Biol.
+#: 1982;157(1):105-32.
 AA_hydro_KD = {
     "A": 6.3,
     "R": 0.0,
@@ -175,24 +199,21 @@ AA_hydro_KD = {
     "V": 8.7,
 }
 
-# Residues classed as 'disorder promoting'.
-# Reference
-# Campen A, Williams RM, Brown CJ, Meng J, Uversky VN, Dunker AK.
-# TOP-IDP-scale: a new amino acid scale measuring propensity for intrinsic
-# disorder. Protein Pept Lett. 2008;15(9):956-63.
-# This is the set used by localCIDER's get_fraction_disorder_promoting().
+#: Residues classed as 'disorder promoting' - the set localCIDER's
+#: ``get_fraction_disorder_promoting()`` uses. From Campen A, Williams RM, Brown CJ,
+#: Meng J, Uversky VN, Dunker AK. TOP-IDP-scale: a new amino acid scale measuring
+#: propensity for intrinsic disorder. Protein Pept Lett. 2008;15(9):956-63.
 DISORDER_PROMOTING = ["T", "A", "G", "R", "D", "H", "Q", "K", "S", "E", "P"]
 
-# Residues classed as 'chain expanding' - the charged residues plus proline.
-# Used by localCIDER's get_fraction_expanding(); at neutral pH the fraction of
-# expanding residues is simply FCR + the proline fraction.
+#: Residues classed as 'chain expanding' - the charged residues plus proline, as
+#: localCIDER's ``get_fraction_expanding()`` counts them. At neutral pH the fraction
+#: of expanding residues is simply FCR plus the proline fraction.
 EXPANDING = ["E", "D", "R", "K", "P"]
 
-# Polyproline II (PPII) propensity scale.
-# Reference
-# Elam WA, Schrank TP, Campagnolo AJ, Hilser VJ. Evolutionary conservation of
-# the polyproline II conformation surrounding intrinsically disordered
-# phosphorylation sites. Protein Sci. 2013;22(4):405-17.
+#: Polyproline II (PPII) propensity of each residue. From Elam WA, Schrank TP,
+#: Campagnolo AJ, Hilser VJ. Evolutionary conservation of the polyproline II
+#: conformation surrounding intrinsically disordered phosphorylation sites.
+#: Protein Sci. 2013;22(4):405-17.
 AA_PPII_HILSER = {
     "A": 0.37,
     "C": 0.25,
@@ -216,16 +237,21 @@ AA_PPII_HILSER = {
     "Y": 0.25,
 }
 
-# Side-chain pKa values for the titratable residues, as used for pH-dependent
-# charge and isoelectric-point calculations. These are the EMBOSS values, and
-# match those used by localCIDER.
+#: Side-chain pKa values for the titratable residues, as used for pH-dependent
+#: charge and isoelectric-point calculations. These are the EMBOSS values, and
+#: match those used by localCIDER.
 AA_PKA = {"C": 8.5, "Y": 10.1, "H": 6.5, "E": 4.1, "D": 3.9, "K": 10.0, "R": 12.5}
 
-# The titratable residues of AA_PKA, split by the charge they carry when ionized:
-# bases are +1 when protonated, acids -1 when deprotonated.
+# The titratable residues of AA_PKA, split by the charge they carry when ionized.
+
+#: Titratable bases, which carry +1 when protonated.
 TITRATABLE_BASES = ["K", "R", "H"]
+
+#: Titratable acids, which carry -1 when deprotonated.
 TITRATABLE_ACIDS = ["E", "D", "Y", "C"]
 
+#: :data:`AA_hydro_KD` divided by 9, so it runs from 0 (R) to 1 (I), to three
+#: decimal places.
 AA_hydro_KD_normalized = {
     "A": 0.7,
     "R": 0.0,
@@ -249,17 +275,16 @@ AA_hydro_KD_normalized = {
     "V": 0.967,
 }
 
-# Residue hydropathy (lambda) of the HPS coarse-grained model, which rescales the
-# Kapcha-Rossky hydrophobicity scale to run from 0 to 1. This is the scale the
-# sequence hydropathy decoration (SHD) is defined with, and its default in sparrow.
-# Note it is NOT a normalized Kyte-Doolittle scale - compare AA_hydro_KD_normalized
-# above, which gives quite different values (e.g. P 0.322 there, 1.0 here).
-# References
-# Dignon GL, Zheng W, Kim YC, Best RB, Mittal J. Sequence determinants of protein
-# phase behavior from a coarse-grained model. PLoS Comput Biol. 2018;14(1):e1005941.
-# Zheng W, Dignon GL, Brown M, Kim YC, Mittal J. Hydropathy patterning complements
-# charge patterning to describe conformational preferences of disordered proteins.
-# J Phys Chem Lett. 2020;11(9):3408-3415.
+#: Residue hydropathy (lambda) of the HPS coarse-grained model, which rescales the
+#: Kapcha-Rossky hydrophobicity scale to run from 0 to 1. This is the scale the
+#: sequence hydropathy decoration (SHD) is defined with, and its default in sparrow.
+#: Note it is NOT a normalized Kyte-Doolittle scale - compare
+#: :data:`AA_hydro_KD_normalized`, which gives quite different values (e.g. P 0.322
+#: there, 1.0 here). From Dignon GL, Zheng W, Kim YC, Best RB, Mittal J. Sequence
+#: determinants of protein phase behavior from a coarse-grained model. PLoS Comput
+#: Biol. 2018;14(1):e1005941; and Zheng W, Dignon GL, Brown M, Kim YC, Mittal J.
+#: Hydropathy patterning complements charge patterning to describe conformational
+#: preferences of disordered proteins. J Phys Chem Lett. 2020;11(9):3408-3415.
 AA_hydro_HPS = {
     "A": 0.730,
     "R": 0.000,

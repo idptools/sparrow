@@ -25,7 +25,7 @@ This guide assumes these ideas are clear, and specifically provides insight into
 
 The first step in adding a new PARROT based predictor is to use PARROT to train your model. The details of how one does this go beyond the scope of this documentation, but once trained you should be left with a Torch parameter file (a ``.pt`` file). This is the file we're going to use with SPARROW to add our custom predictor. Lets call this parameter file ``new_predictor.pt`` to make this concrete.
 
-Note that the PARROT predictor should be predicted in ``residues`` mode - i.e. we need to recieve one value per residue
+Note that the PARROT network can be trained in ``residues`` mode (one value per residue, like the disorder or transmembrane predictors) or in ``sequence`` mode (one value per sequence, like the ALBATROSS radius of gyration); you declare which when you build the predictor class in step 3.
 
 
 **Step 2: Copy the parameter file into SPARROW**
@@ -65,7 +65,7 @@ and within this directory there are two files::
 
 The reason to make a separate package (directory) for every predictor is that if someone has a non-parrot-based predictor they want to incoporate into sparrow (1) this is absolutely welcome and (2) we want to provide a consistent file ecosystem where they have a directory to implement as much/little additional code as they want. As such, the ``__init__.py`` and ``<predictor_name>_predictor.py`` are the **minimum** files needed, but you are free to add anything else as well.
 
-``__init__.py``` should probably just be empty - it's what tells Python that this directory is a package. 
+``__init__.py`` should probably just be empty - it's what tells Python that this directory is a package. 
 
 ``<relevant_name>_predictor.py`` should NOT be empty. As of the current backend, all network loading is centralized: each predictor is a thin subclass of :class:`sparrow.predictors.base.BaseNetworkPredictor`, which handles reading the ``.pt`` file, inferring the network hyper-parameters, and the forward pass via the shared :func:`sparrow.predictors.network_loader.load_parrot_network`. A new predictor therefore only declares what differs from the common pattern:
 
@@ -79,7 +79,7 @@ See ``sparrow/predictors/rg/radius_of_gyration_predictor.py`` (regression / MtO)
 Once this is done, it's worth seeing if you can import and run predictions using this class/function as a stand-alone predictor i.e. you should be able to do::
 
 
-    from sparrow.predictor.<predictor_package>.<predictor_module> import <RelevantName>Predictor
+    from sparrow.predictors.<predictor_package>.<predictor_module> import <RelevantName>Predictor
     
     sequence = 'MSAAVTAGKLARAPADPGKAGVPGVAAPGAPAAAPPAKEIPEVLVDPRSRRRYVRGRFLG'
     P = <RelevantName>Predictor()
@@ -89,13 +89,13 @@ Once this is done, it's worth seeing if you can import and run predictions using
 and it return a set of values.
 
 
-**Step 4: Integrate the predictior in the sparrow.Predictor class**
+**Step 4: Integrate the predictor in the sparrow.predictors.Predictor class**
 
 At this stage we have a working predictor - the last step is to connect this predictor to the sparrow Protein object in a way that inccurs minimal computational overhead if not used, is syntactically simple, and offers functionality like other Protein analysis functions and properties.
 
-This is achieved by adding a function into the ``sparrow.predictor.Predictor`` class, a class implemented in the ``sparrow.predictor.__init__.py``.
+This is achieved by adding a function into the :class:`sparrow.predictors.Predictor` class, a class implemented in ``sparrow/predictors/__init__.py``.
 
-This class generates an object which is accessible in Protein object under the ``.predictor`` dot operator. As such, functions defined in the `sparrow.predictor.Predictor`` class are then accessible as::
+This class generates an object which is accessible in Protein object under the ``.predictor`` dot operator. As such, functions defined in the ``sparrow.predictors.Predictor`` class are then accessible as::
 
   seq = 'MSAAVTAGKLARAPADPGKAGVPGVAAPGAPAAAPPAKEIPE'
   p = Protein(seq)
@@ -103,7 +103,7 @@ This class generates an object which is accessible in Protein object under the `
   p.predictor.<predictor function>
 
 
-As such, to finally make a new predictor accessible, ``sparrow.predictor.Predictor`` class should be edited to add a new function which is simply the name of the prediction (e.g. ``dssp``, ``transmembrane`` etc). This function should do three things:
+As such, to finally make a new predictor accessible, ``sparrow.predictors.Predictor`` class should be edited to add a new function which is simply the name of the prediction (e.g. ``dssp``, ``transmembrane`` etc). This function should do three things:
 
 1. It should UPON BEING CALLED import the predictor package you just created.
 2. It should then perform the prediction on the underlying protein sequence
@@ -116,3 +116,13 @@ One important thing is to document these predictors clearly. In particular:
 * Give every option a numpydoc ``Parameters`` entry, including its default. Options that exist in the signature but are absent from the docstring are effectively invisible to users.
 * If a predictor memoizes its result, make the memoization key include **every** argument that can change the returned value. A selector that ignores an argument will silently hand back a result computed with different settings - see ``binary_disorder()`` for the pattern to follow.
 * State the return type and units explicitly (for example, Rg and Re are returned in Angstroms).
+
+Reference: the shared predictor machinery
+-----------------------------------------
+
+.. automodule:: sparrow.predictors.base
+
+.. automodule:: sparrow.predictors.network_loader
+   :exclude-members: number_of_classes, input_size, number_of_layers, hidden_vector_size, device
+
+.. automodule:: sparrow.predictors.outputs

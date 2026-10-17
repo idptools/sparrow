@@ -63,9 +63,10 @@ Implementation note
 The residue groupings are exact partitions of the 20 amino acids, so a sequence
 reduces to an array of integer type labels. Scrambling is then a permutation of
 that label array, and all window counts for all types follow from one cumulative
-sum. This makes the calculation a few hundred times faster than the loop-based
-reference implementation while agreeing with it to rounding error, which matters
-because the published protocol uses 100,000 scrambles per sequence.
+sum. This makes the calculation about 100 times faster than the loop-based
+reference implementation for a 1000-residue IDR, while agreeing with it to
+rounding error, which matters because the published protocol uses 100,000
+scrambles per sequence.
 
 Omega and the pair features are both Das & Pappu's delta, computed from the
 window counts by :func:`sparrow.properties.patterning.window_delta` - the same

@@ -6,3 +6,7 @@ sphinx-copybutton
 sphinx-autodoc-typehints
 numpy
 scipy
+# sparrow/__init__.py takes its version from versioningit on Read the Docs, where
+# sparrow is not installed, so without it `import sparrow` fails and autodoc
+# documents nothing
+versioningit~=2.0

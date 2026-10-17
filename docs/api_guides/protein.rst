@@ -33,7 +33,7 @@ Creating a protein
    from sparrow import Protein
 
    p = Protein("MGSQSSRSSSQQQQQQQ")
-   p = Protein("MGSQXU--", validate=True)   # convert non-standard residues
+   cleaned = Protein("MGSQXU--", validate=True)   # convert non-standard residues
 
    len(p)            # sequence length
    p.sequence        # the (upper-cased) sequence string
@@ -432,3 +432,13 @@ Reached as ``protein.polymeric``.
 .. autoclass:: sparrow.polymer.Polymeric
    :members:
    :undoc-members:
+
+Exceptions
+----------
+
+The advisory warnings NARDINI raises are documented with :doc:`nardini`.
+
+.. automodule:: sparrow.sparrow_exceptions
+   :members:
+   :exclude-members: SparrowWarning, BackgroundQualityWarning, ClusteringQualityWarning
+   :no-inherited-members:

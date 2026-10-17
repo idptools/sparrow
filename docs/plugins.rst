@@ -29,8 +29,9 @@ Caching and Call Semantics
 --------------------------
 
 Plugin calls are memoized by argument signature in ``PluginWrapper`` using
-``(args, frozenset(kwargs.items()))``. Plugin argument values must therefore
-be hashable.
+``(args, frozenset(kwargs.items()))``. A call with an unhashable argument value
+(a list, dict or NumPy array) cannot be cached, so it is computed afresh every
+time.
 
 Plugin lifecycle:
 
@@ -100,20 +101,9 @@ Key user entrypoint: :attr:`sparrow.protein.Protein.plugin`.
    sparrow.sequence_analysis.plugins.BasePlugin
    sparrow.sequence_analysis.community_plugins.contributed.MultiplicativeFCR
 
-.. autoclass:: sparrow.sequence_analysis.plugins.PluginManager
-   :no-index:
-
-.. autoclass:: sparrow.sequence_analysis.plugins.BasePlugin
-   :no-index:
-
 .. automodule:: sparrow.sequence_analysis.plugins
-   :no-index:
 
 Reference: Contributed Plugins Module
 -------------------------------------
 
-.. autoclass:: sparrow.sequence_analysis.community_plugins.contributed.MultiplicativeFCR
-   :no-index:
-
 .. automodule:: sparrow.sequence_analysis.community_plugins.contributed
-   :no-index:

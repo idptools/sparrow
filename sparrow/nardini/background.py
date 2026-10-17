@@ -10,10 +10,10 @@ places:
   same features across a *reference set* of IDRs - typically a whole IDRome.
 
 This module builds, saves, and applies that reference set. The NARDINI+ notebook
-downloads precomputed per-species means and standard deviations; here you build
-them from whatever set of IDRs you like, which is what you want if you are
-working with a non-model organism, a filtered sub-proteome, or a specific
-experimental library.
+downloads precomputed per-species means and standard deviations, which sparrow
+bundles (:func:`load_reference_background`); you can also build them from
+whatever set of IDRs you like, which is what you want if you are working with a
+non-model organism, a filtered sub-proteome, or a specific experimental library.
 
 Typical use::
 
@@ -312,7 +312,7 @@ def load_reference_background(species="human"):
     tables the official NARDINI+ notebook downloads at runtime. Using one makes
     your compositional z-scores directly comparable to published NARDINI+ values,
     and the ``'human'`` background is the space the GIN cluster centroids were
-    defined in, so it is what :func:`sparrow.nardini.assign_gin_clusters` expects.
+    defined in, so it is what :func:`sparrow.nardini.gin.assign_gin_clusters` expects.
 
     Use :func:`build_background` instead when you want a background over your own
     set of IDRs.
@@ -542,7 +542,7 @@ def build_background(
     This is step one of the NARDINI+ workflow: estimate the mean and standard
     deviation of each of the 54 compositional features across a reference set of
     IDRs. The resulting object is then passed to
-    :func:`sparrow.nardini.nardini_vectors` to convert query sequences into
+    :func:`sparrow.nardini.vectors.nardini_vectors` to convert query sequences into
     z-score vectors.
 
     Sequences containing non-standard residues (``X``, ``U``, ``Z``, ``J``, ``B``,
@@ -594,7 +594,7 @@ def build_background(
 
     See Also
     --------
-    sparrow.nardini.nardini_vectors : Apply a background to query sequences.
+    sparrow.nardini.vectors.nardini_vectors : Apply a background to query sequences.
     NardiniBackground.save : Persist a background for reuse.
 
     Examples

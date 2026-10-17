@@ -3,7 +3,7 @@
 These functions capture the handful of output shapes that the predictors share,
 so each predictor's ``predict_<thing>`` method stays a one-liner over the raw
 network output returned by
-:meth:`sparrow.predictors.base.BaseNetworkPredictor._raw_predict`.
+``sparrow.predictors.base.BaseNetworkPredictor._raw_predict``.
 """
 
 import numpy as np

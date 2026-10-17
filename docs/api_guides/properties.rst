@@ -83,7 +83,6 @@ Module reference
 
 .. automodule:: sparrow.data.aaindex
    :members:
-   :no-index:
 
 Property Index Reference
 ------------------------
@@ -98,7 +97,7 @@ fall out of step with what is actually installed.
   against the `AAindex database <https://www.genome.jp/aaindex/>`_ directly.
 * **Description** -- the original AAindex summary of what the score measures.
 * **Source** -- the publication the scale comes from, linked to PubMed where the
-  database records a PMID (453 of the 569 do). Worth checking: many descriptions
+  database records a PMID (452 of the 569 do). Worth checking: many descriptions
   are terse, and several scales with near-identical descriptions differ in how they
   were derived.
 

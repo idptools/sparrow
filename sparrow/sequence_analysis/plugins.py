@@ -9,9 +9,10 @@ namespace and exposed as attributes on :class:`PluginManager` instances.
 
 Typical usage
 -------------
->>> mgr = PluginManager(protein_obj)
->>> result = mgr.HydrophobicityIndex()          # call plugin with no args
->>> result2 = mgr.SomeOtherMetric(window=5)     # call plugin with args (cached)
+>>> from sparrow import Protein
+>>> plugins = Protein("MEEEKKKKSSSTTTDDD").plugin     # this protein's PluginManager
+>>> result = plugins.MultiplicativeFCR()              # call a plugin with no args
+>>> result2 = plugins.MultiplicativeFCR(factor=3.0)   # call a plugin with args (cached)
 
 Caching
 -------
@@ -57,8 +58,8 @@ class PluginWrapper:
 
     Notes
     -----
-    The cache key is constructed as ``(args, frozenset(kwargs.items()))`` which
-    requires that all argument values be hashable.
+    The cache key is constructed as ``(args, frozenset(kwargs.items()))``. If
+    any argument value is unhashable, the call is computed without caching.
     """
 
     def __init__(self, name, cache_dict, plugin_instance):
@@ -129,7 +130,7 @@ class PluginManager:
     * Attribute access for an undiscovered plugin raises ``AttributeError`` with
       a helpful list of available plugins.
     * Autocompletion in interactive environments is aided by overriding
-      :meth:`__dir__` to include discovered plugin names.
+      ``__dir__`` to include discovered plugin names.
     """
 
     def __init__(self, protein_obj: "Protein"):

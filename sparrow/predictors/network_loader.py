@@ -90,7 +90,7 @@ def load_parrot_network(relative_path, architecture="MtO", device=None):
     relative_path : str
         Path to the weights file relative to the sparrow ``data`` directory,
         for example ``"networks/rg/rg_network_v2.pt"``. Resolved with
-        :func:`sparrow.get_data`.
+        ``sparrow.get_data``.
     architecture : {"MtO", "MtM"}, optional
         Network architecture. ``"MtO"`` builds a many-to-one network (one value
         per sequence); ``"MtM"`` builds a many-to-many network (one value per

@@ -1,13 +1,13 @@
 """Base class shared by all sparrow network predictors.
 
 A concrete predictor only needs to declare *what differs* from the common
-pattern: the path to its weights (:attr:`NETWORK_PATH`), the default version
-(:attr:`DEFAULT_VERSION`), and the network architecture (:attr:`ARCHITECTURE`).
+pattern: the path to its weights (``NETWORK_PATH``), the default version
+(``DEFAULT_VERSION``), and the network architecture (``ARCHITECTURE``).
 Loading the weights and running the forward pass are handled here, so no
 predictor subclass needs to touch ``torch`` directly.
 
 Subclasses then expose a single ``predict_<thing>(seq, ...)`` method that turns
-the raw network output (from :meth:`BaseNetworkPredictor._raw_predict`) into the
+the raw network output (from ``BaseNetworkPredictor._raw_predict``) into the
 desired result, typically using a helper from :mod:`sparrow.predictors.outputs`.
 """
 
@@ -32,7 +32,8 @@ class BaseNetworkPredictor:
     DEFAULT_VERSION : str
         Version string used when none is supplied to the constructor.
     ARCHITECTURE : {"MtO", "MtM"}
-        Network architecture passed to :func:`load_parrot_network`.
+        Network architecture passed to
+        :func:`~sparrow.predictors.network_loader.load_parrot_network`.
     """
 
     # Declared without a value: every subclass must supply them, and an

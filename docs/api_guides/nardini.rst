@@ -344,13 +344,14 @@ you have a specific reason not to. It is also the fastest of the three, and the
 only one GIN cluster assignment accepts.
 
 What the choice looks like in practice, on a blocky vs. a well-mixed E/K
-sequence (``pos-neg`` z-score, 500 scrambles):
+sequence (``"E" * 15 + "K" * 15`` and ``"EK" * 15``; ``pos-neg`` z-score, 500
+scrambles, ``seed=42``):
 
 .. code-block:: text
 
    backend     blocky EK    mixed EK
-   nardini        +11.62       -1.27
-   kappa          +11.45       -1.41
+   nardini        +12.91       -1.22
+   kappa          +12.70       -1.38
    iwd              0.00        0.00
 
 The two window-based statistics agree on the qualitative answer. ``iwd`` returns
@@ -374,13 +375,13 @@ for 10,000 scrambles of a single sequence:
 .. code-block:: text
 
    length     nardini     kappa       iwd
-     200        0.28 s    0.43 s    0.36 s
-     500        0.51 s    0.90 s    0.67 s
-    1000        0.81 s    1.50 s    1.45 s
+     200        0.31 s    0.42 s    0.36 s
+     500        0.48 s    0.75 s    0.69 s
+    1000        0.78 s    1.28 s    1.36 s
 
-Scaled to the published 100,000 scrambles, a 1000-residue IDR takes roughly
-8 s, 15 s and 15 s respectively. For a whole proteome, divide by however many
-cores you give :func:`~sparrow.nardini.batch.nardini_proteins`.
+At the published 100,000 scrambles, a 1000-residue IDR takes about 7 s, 12 s
+and 13 s respectively. For a whole proteome, divide by however many cores you
+give :func:`~sparrow.nardini.batch.nardini_proteins`.
 
 This is a recent change. ``'kappa'`` and ``'iwd'`` originally delegated to
 sparrow's Cython extensions, which score one sequence per call and made those
@@ -418,16 +419,16 @@ them:
        seed=42,
    )
 
-   result.gin_clusters().records()
+   for record in result.gin_clusters().records():
+       print(record["name"], record["cluster"], record["description"],
+             round(record["distance"], 2), round(record["separation"], 2))
 
 .. code-block:: text
 
-                 cluster                              description  distance  separation
-   Name
-   de_tract            7                               D/E-tracts     70.67       24.38
-   s_patch             6                                S patches     77.12       17.03
-   q_tract            11                                 Q-tracts     71.38       36.36
-   notebook_idr       17                     Weak positive charge     33.08        6.13
+   de_tract 7 D/E-tracts 70.67 24.38
+   s_patch 6 S patches 77.12 17.03
+   q_tract 11 Q-tracts 71.38 36.36
+   notebook_idr 17 Weak positive charge 33.08 6.13
 
 This is *assignment*, not clustering: your sequences are matched to the existing
 grammars, nothing is re-clustered. The procedure is the published one --
@@ -485,8 +486,10 @@ is worth believing.
 
 **A small separation means the sequence sits between two grammars** and should not
 be treated as firmly belonging to either. There is no universal cutoff; compare
-within your own dataset. In the table above, ``q_tract`` (36.4) is unambiguous
-while ``notebook_idr`` (6.1) is genuinely borderline. When that happens, look at
+within your own dataset. In the output above, ``q_tract`` (36.4) is unambiguous
+while ``notebook_idr`` (6.1) is genuinely borderline. (Separation is not the only
+check: the three designed sequences are flagged by ``is_typical``, below, because
+no real IDR is that extreme in composition.) When a separation is small, look at
 the runners-up rather than trusting the single label:
 
 .. code-block:: python
@@ -746,14 +749,16 @@ the wrong move. ``k`` defaults to 30 to match the published analysis, but there 
 nothing special about 30 for your data.
 
 Clusters are numbered largest-first, and each gets a description derived from its
-centroid's most extreme features:
+centroid's most extreme features. For the worked example in
+``examples/nardini_module.ipynb`` -- four planted grammars of ten sequences each,
+clustered with ``k=4`` -- that gives:
 
 .. code-block:: text
 
-   cluster 0 (n=15): low Frac Aliphatic, high Frac D, high Frac E
-   cluster 1 (n=15): S patches, high Frac Polar, high Frac S
-   cluster 2 (n=15): high Frac K, high Frac K+R, low Frac Aliphatic
-   cluster 3 (n=15): high Frac Polar, high Frac Q, Q patches
+   cluster 0 (n=10): low Frac Aliphatic, high Frac E, high Frac D
+   cluster 1 (n=10): blocky pol-pol, high Frac Q, low Frac Aliphatic
+   cluster 2 (n=10): high Frac K, K patches, blocky pol-pos
+   cluster 3 (n=10): high Frac S, S patches, high Disorder Promoting
 
 Those are generated, not published prose - pass ``descriptions={0: '...'}`` to
 override any of them. Note that cluster *numbers* mean nothing across runs: k-means
@@ -767,7 +772,9 @@ How big is each cluster, and what is in it?
 
 **Cluster sizes** are recorded on the reference as
 :attr:`~sparrow.nardini.gin.GINReference.num_idrs`, a ``{cluster: count}`` dict.
-Clusters are numbered largest-first, so cluster 0 is always the most populated:
+Clusters are numbered largest-first, so cluster 0 is always the most populated.
+With ``k=30`` on the 4,529 human IDRs of 100-300 residues that GIN was clustered
+from (100,000 scrambles), the first three are:
 
 .. code-block:: python
 
@@ -776,15 +783,15 @@ Clusters are numbered largest-first, so cluster 0 is always the most populated:
 
 .. code-block:: text
 
-   0 812 blocky neg-neg, high Frac D, high Frac E
-   1 693 well-mixed pol-gly, high Frac G
-   2 455 high Frac Q, Q patches
+   0 304 high Iso point, well-mixed pol-pol
+   1 264 low Iso point, low NCPR, low Disorder Promoting
+   2 259 blocky pos-pos, blocky pol-pos, blocky hyd-pos
 
 :meth:`~sparrow.nardini.gin.GINReference.definitions` gives the same information as
 a list of dicts, which is handier for sorting or writing out::
 
    reference.definitions()
-   # [{'cluster': 0, 'description': 'blocky neg-neg, ...', 'num_idrs': 812}, ...]
+   # [{'cluster': 0, 'description': 'high Iso point, ...', 'num_idrs': 304}, ...]
 
 **Which IDRs are in each cluster** is a property of an *assignment*, not of the
 reference -- the reference stores only the centroids and how many sequences formed
@@ -800,7 +807,8 @@ each one. Assign your sequences, then group the records by cluster:
    for record in assignment.records():
        members[record["cluster"]].append(record["name"])
 
-Now iterate the clusters, and the IDRs within each:
+Now iterate the clusters, and the IDRs within each (here, and below, for the
+planted grammars):
 
 .. code-block:: python
 
@@ -812,7 +820,7 @@ Now iterate the clusters, and the IDRs within each:
 
 .. code-block:: text
 
-   cluster 0: low Frac Aliphatic, high Frac E, high Frac D  (8 IDRs)
+   cluster 0: low Frac Aliphatic, high Frac E, high Frac D  (10 IDRs)
        DE_0
        DE_1
        DE_2
@@ -836,7 +844,7 @@ both, in the same order, so one ``zip`` gives you a lookup:
 
    sequence_of = dict(zip(vectors.names, vectors.sequences))
 
-   cluster = 1
+   cluster = 3
    print(f"cluster {cluster}: {reference.describe(cluster)}")
 
    for record in assignment.records():
@@ -846,11 +854,11 @@ both, in the same order, so one ``zip`` gives you a lookup:
 
 .. code-block:: text
 
-   cluster 1: high Frac S, S patches, high Disorder Promoting
+   cluster 3: high Frac S, S patches, high Disorder Promoting
    >Srich_0
    SGPSSPTSSPPSSSSSSSSSTSTPSSSPSGSSSPSTSTSSGSSGSTSGSSTTSSPPSGSS...
    >Srich_1
-   SGSSSSGGSPSSGSPTSSSSGSTGSGSSTTPGSTSSSSSSSPSSSPTGSSTSSSSSSSSP...
+   STGSGSSTTPGSTSSSSSSSPSSSPTGSSTSSSSSSSSPSSTSSSSSGSTPSGSSSSSST...
 
 That output is already FASTA, so writing a cluster out for use elsewhere -- an
 alignment, a motif search, a figure -- is the same loop pointed at a file:
@@ -905,8 +913,8 @@ records its backend and ``assign_gin_clusters`` refuses to mix spaces:
    kappa = nardini_vectors(seqs, background=bg, backend="kappa")
 
    assign_gin_clusters(kappa)                      # refused: the bundled centroids are 'nardini'
-   reference = build_gin_reference(kappa, k=10, seed=0)
-   assign_gin_clusters(kappa, reference=reference)  # fine: both in 'kappa' space
+   kappa_reference = build_gin_reference(kappa, k=10, seed=0)
+   assign_gin_clusters(kappa, reference=kappa_reference)  # fine: both in 'kappa' space
 
 Did I recover GIN?
 ^^^^^^^^^^^^^^^^^^
@@ -934,9 +942,10 @@ your clusters are not comparable structure however well they appear to match.
 
 Note that a poor distance does not mean a meaningless pairing. Clustering four
 designed grammars (D/E tracts, poly-Q, S-rich, K blocks) and matching them against
-the human reference pairs them with ``'D/E-tracts'``, ``'Q-tracts'`` and
-``'K blocks'`` respectively -- purely from centroid geometry, with nothing told to
-it -- while the distances stay well above the published spacing, because designed
+the human reference pairs the D/E, poly-Q and K-block clusters with
+``'D/E-tracts'``, ``'Q-tracts'`` and ``'K blocks'`` (and the S-rich one with
+``'T patches'``) -- purely from centroid geometry, with nothing told to it --
+while the distances stay well above the published spacing, because designed
 sequences are compositionally extreme and sit far from anything in the human
 IDRome. The grammars are recognisably analogous; the coordinates are not the same.
 That worked example is in ``examples/nardini_module.ipynb``.
@@ -966,9 +975,9 @@ All distances here are squared Euclidean, matching ``assign_gin_clusters`` and
    the published ones", which is what ``compare_gin_references`` reports.
 
 .. note::
-   Cost is dominated by the vectors, not the clustering. Roughly 110 ms per IDR at
-   1,000 scrambles and 560 ms at 10,000 (200-residue IDR), so a 25,000-IDR
-   proteome is about 45 minutes or 4 hours single-core. The k-means itself takes
+   Cost is dominated by the vectors, not the clustering. Roughly 90 ms per IDR at
+   1,000 scrambles and 240 ms at 10,000 (200-residue IDR), so a 25,000-IDR
+   proteome is about 40 minutes or 1.7 hours single-core. The k-means itself takes
    seconds. ``build_gin_reference`` warns if you ask for fewer than
    :data:`~sparrow.nardini.clustering.MIN_SEQUENCES_PER_CLUSTER` sequences per
    cluster on average, since k-means returns ``k`` centroids whether or not the
@@ -1141,8 +1150,9 @@ Patches are contiguous runs of the target residue tolerating up to 2
 interrupting residues, requiring at least 4 target residues. An ``'RG Frac'``
 patch is a run of R and G residues with the same tolerance, which counts when it
 holds at least 2 adjacent ``RG`` pairs, with no minimum residue count of its own
-(``RG_PATCH_RESIDUES``, ``RG_MOTIF`` and ``RG_MIN_ADJACENT_PAIRS`` in
-:mod:`sparrow.nardini.composition`):
+(:data:`~sparrow.nardini.composition.RG_PATCH_RESIDUES`,
+:data:`~sparrow.nardini.composition.RG_MOTIF` and
+:data:`~sparrow.nardini.composition.RG_MIN_ADJACENT_PAIRS`):
 
 .. code-block:: python
 
@@ -1182,10 +1192,11 @@ in sparrow. Differences worth knowing about:
   fractions, FCR, NCPR, hydrophobicity, the R/K and E/D ratios and all 20 patch
   features come from :mod:`sparrow.properties` -- the same code paths
   ``Protein`` uses. A whole batch is encoded once, every compositional feature
-  read off its residue counts, and every patch found in one pass along it. The patterning half likewise: omega and the pair features are Das & Pappu's
-  delta, computed by the same :mod:`sparrow.properties.patterning` function
-  behind ``kappa_x`` and ``patterning_percentile``, and the ``'kappa'`` and
-  ``'iwd'`` backends call that module's kappa and IWD.
+  read off its residue counts, and every patch found in one pass along it. The
+  patterning half likewise: omega and the pair features are Das & Pappu's delta,
+  computed by the same :mod:`sparrow.properties.patterning` function behind
+  ``kappa_x`` and ``patterning_percentile``, and the ``'kappa'`` and ``'iwd'``
+  backends call that module's kappa and IWD.
 
   .. warning::
      One feature deliberately differs from its ``Protein`` counterpart.
@@ -1206,8 +1217,7 @@ in sparrow. Differences worth knowing about:
   Measured against a direct transcription of the reference loop, it is about
   **100x** faster at L=1000 and the margin grows with length. A 1000-residue IDR
   at the published 100,000 scrambles takes ~7 s rather than ~13 min, so the
-  notebook's limits of 20 sequences and 1000
-  residues do not apply.
+  notebook's limits of 20 sequences and 1000 residues do not apply.
 * **Robust gamma fitting.** The scramble distribution for each feature is
   summarized by a maximum-likelihood 3-parameter gamma fit, as in the reference.
   ``scipy.stats.gamma.fit`` is not fully reliable on these distributions: it
@@ -1285,7 +1295,7 @@ Two things to know when you migrate:
   example mean ``Hydrophobicity`` 3.81 vs. the published 3.41, ``FCR`` 0.24 vs.
   0.27). It is gone with the module; if you need continuity with previous
   results, rebuild a background from the same IDRs with
-  :func:`~sparrow.nardini.build_background` rather than switching to
+  :func:`~sparrow.nardini.background.build_background` rather than switching to
   ``load_reference_background('human')``.
 
 The old module's feature vector also merged raw and z-score blocks with
@@ -1318,6 +1328,11 @@ that work too:
 API Reference
 -------------
 
+.. py:module:: sparrow.nardini
+
+Everything below can also be imported from :mod:`sparrow.nardini` itself, which
+re-exports the public functions, classes and constants of its submodules.
+
 .. _nardini-protein:
 
 The ``Protein.nardini`` accessor
@@ -1338,6 +1353,8 @@ Labelled containers
 Background construction
 ^^^^^^^^^^^^^^^^^^^^^^^
 
+.. py:module:: sparrow.nardini.background
+
 .. autofunction:: sparrow.nardini.background.build_background
 
 .. autofunction:: sparrow.nardini.background.load_reference_background
@@ -1345,8 +1362,16 @@ Background construction
 .. autoclass:: sparrow.nardini.background.NardiniBackground
    :members:
 
+.. autodata:: sparrow.nardini.background.REFERENCE_SPECIES
+
+.. autodata:: sparrow.nardini.background.MIN_RECOMMENDED_SEQUENCES
+
+.. autodata:: sparrow.nardini.background.MAX_DEGENERATE_FRACTION
+
 GIN cluster assignment
 ^^^^^^^^^^^^^^^^^^^^^^
+
+.. py:module:: sparrow.nardini.gin
 
 .. autofunction:: sparrow.nardini.gin.assign_gin_clusters
 
@@ -1355,6 +1380,12 @@ GIN cluster assignment
 .. autofunction:: sparrow.nardini.gin.load_gin_reference
 
 .. autodata:: sparrow.nardini.gin.GIN_REFERENCES
+
+.. autodata:: sparrow.nardini.gin.GIN_CLIP
+
+.. autodata:: sparrow.nardini.gin.TYPICAL_COMPOSITION_RMS_Z
+
+.. autodata:: sparrow.nardini.gin.TYPICAL_MAX_SATURATED
 
 .. autoclass:: sparrow.nardini.gin.GINAssignment
    :members:
@@ -1381,7 +1412,9 @@ Composition
 ^^^^^^^^^^^
 
 .. automodule:: sparrow.nardini.composition
-   :members: composition_values, composition_matrix, composition_feature_names
+   :members: composition_values, composition_matrix, composition_feature_names,
+             PATCH_INTERRUPTION, PATCH_MIN_TARGET_COUNT, PATCH_RESIDUES,
+             RG_PATCH_RESIDUES, RG_MOTIF, RG_MIN_ADJACENT_PAIRS
 
 Clustering
 ^^^^^^^^^^

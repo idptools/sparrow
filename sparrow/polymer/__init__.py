@@ -26,7 +26,7 @@ class Polymeric:
 
         Parameters
         ----------
-        protein_obj : sparrow.Protein
+        protein_obj : sparrow.protein.Protein
             Composition-based interface into the functionalities from the sparrow.Protein class.
             Primarily used to give access to PARROT trained predictor objects.
 

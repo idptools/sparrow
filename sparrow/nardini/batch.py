@@ -29,14 +29,15 @@ parallel result is *identical* to the serial one, and identical to what each
 Protein would compute for itself. That is asserted directly in
 ``test_nardini_batch.py``.
 
-Only the patterning half is farmed out, because that is where the cost is: at
-1,000 scrambles it runs about 150x the cost of the compositional half per
-sequence, and the compositional half needs no scrambles at all.
+Each worker computes both halves of its chunk's vectors, but the patterning half
+is where the cost is: at 1,000 scrambles it costs about 100x the compositional
+half of a sequence scored on its own, and over 1,000x once the compositional half
+is computed for a whole chunk at once, which needs no scrambles at all.
 
 Cost
 ----
-Roughly 110 ms per IDR at 1,000 scrambles and 560 ms at 10,000 (200-residue IDR)
-on one core, so a 25,000-IDR proteome is about 45 minutes or 4 hours serially -
+Roughly 90 ms per IDR at 1,000 scrambles and 240 ms at 10,000 (200-residue IDR)
+on one core, so a 25,000-IDR proteome is about 40 minutes or 1.7 hours serially -
 divided by however many cores you give it. Worker start-up costs about a second
 each because sparrow has to be imported in every process, which is why this is
 worth using for hundreds of sequences and not for five.
@@ -432,7 +433,7 @@ def nardini_proteins(
 
     See Also
     --------
-    sparrow.nardini.nardini_vectors : The single-process equivalent, which returns
+    sparrow.nardini.vectors.nardini_vectors : The single-process equivalent, which returns
         a matrix rather than Protein objects.
     """
     if on_error not in ("raise", "skip"):

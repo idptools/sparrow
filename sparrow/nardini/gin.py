@@ -5,7 +5,7 @@ grammar, obtained by k-means on NARDINI+ z-score vectors. Each cluster has a
 human-readable description - ``'D/E-tracts'``, ``'S patches'``,
 ``'Well-mixed P and G'``, and so on.
 
-This module assigns *new* sequences to clusters: it computes each sequence's
+This module assigns *new* sequences to clusters: it takes each sequence's
 NARDINI+ vector and finds the nearest centroid. It does not derive clusters -
 :mod:`sparrow.nardini.clustering` does that, and produces a :class:`GINReference`
 that :func:`assign_gin_clusters` accepts in place of the bundled ones.
@@ -49,7 +49,7 @@ and ``sparrow/data/nardini/SOURCES.md`` records where both come from.
 Whichever reference is used, the vectors and the centroids must live in the same
 space. A reference records the patterning backend it was built from, and
 :func:`assign_gin_clusters` refuses a vector computed with a different one, since
-those are different statistics on different scales.
+those are different statistics on different scales. For example::
 
     from sparrow.nardini import (
         load_reference_background,
@@ -228,8 +228,9 @@ class GINReference:
         Provenance and citation information.
     backend : str
         The patterning statistic the centroids live in. ``'nardini'`` for the
-        bundled references. A reference built with :func:`build_gin_reference`
-        records whichever backend produced its vectors, and
+        bundled references. A reference built with
+        :func:`~sparrow.nardini.clustering.build_gin_reference` records whichever
+        backend produced its vectors, and
         :func:`assign_gin_clusters` refuses to mix the two.
     """
 
@@ -399,8 +400,9 @@ class GINReference:
         """Median *squared* distance from each centroid to its nearest neighbour.
 
         Squared Euclidean, so it is directly comparable to the distances reported
-        by :func:`assign_gin_clusters` and :func:`compare_gin_references`, which
-        use the same convention. About 17.8 for both bundled human references.
+        by :func:`assign_gin_clusters` and
+        :func:`~sparrow.nardini.clustering.compare_gin_references`, which use the
+        same convention. About 17.8 for both bundled human references.
 
         Describes how tightly packed the cluster structure is.
 
@@ -606,6 +608,12 @@ class GINAssignment:
         Array of shape ``(n_sequences, 30)`` of distances to every centroid.
     reference : GINReference
         The reference used.
+    n_saturated : numpy.ndarray
+        How many of each sequence's 90 features were pinned at the +/-3 clip.
+    composition_rms_z : numpy.ndarray
+        Root-mean-square of each sequence's 54 compositional z-scores, before
+        clipping: how far its composition sits from the reference IDRome (real
+        IDRs land at 0.6-0.9).
     """
 
     def __init__(
@@ -705,8 +713,8 @@ class GINAssignment:
     def to_dataframe(self):
         """Return the assignments as a pandas DataFrame.
 
-        Convenience only - :meth:`records` and :meth:`to_table` give the same
-        information without needing pandas.
+        Convenience only - :meth:`records` gives the same information without
+        needing pandas.
 
         Returns
         -------
@@ -792,8 +800,8 @@ def assign_gin_clusters(result, reference=None, clip=GIN_CLIP):
 
     See Also
     --------
-    sparrow.nardini.load_reference_background : Get the human background the
-        centroids were defined against.
+    sparrow.nardini.background.load_reference_background : Get the human
+        background the centroids were defined against.
     gin_cluster_definitions : What each cluster means.
 
     Examples
