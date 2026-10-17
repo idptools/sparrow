@@ -1,27 +1,32 @@
-"""
-Snippit to build and adapted from localcider to get all phosphoisoforms
-of an amino acid sequence which is to integrated into sparrow
+"""Phosphoisoforms: every phosphorylation state of a sequence, as phosphomimetic sequences.
 
-By : Garrett M. Ginell
-2023-02-08
+Each candidate phosphosite (S, T or Y) is either left alone or replaced with
+glutamate (E), the usual phosphomimetic, and every combination is returned as a
+sequence. Computing a property over all of them - its distribution of NCPR or
+kappa, say - shows how far phosphorylation could move it, which you can compare
+with the value for the unmodified sequence. The approach is adapted from
+localCIDER's phosphorylation isoforms (Holehouse AS, et al. CIDER: Resources to
+Analyze Sequence-Ensemble Relationships of Intrinsically Disordered Proteins.
+Biophys J. 2017;112(1):16-21); this implementation is by Garrett M. Ginell.
 
-BASIC workflow is as followed:
+A sequence with ``n`` candidate sites has ``2**n`` isoforms, so for a sequence
+with more than about twenty S/T/Y residues restrict the sites - with
+``mode='predict'`` or ``mode='custom'`` - or cap how many may be phosphorylated
+at once with ``phospho_rate``.
 
-  To get a list of run get_phosphoisoforms"
+From a :class:`~sparrow.protein.Protein`, ``Protein.generate_phosphoisoforms``
+calls :func:`get_phosphoisoforms`.
 
-    phosphoSeqome = get_phosphoisoforms(sequence, mode='predict')
-    # for options see various run variations in function header
-
-  Then once you get the phosphoisoforms from the list above you can iterate
-  the list and calculate a sequence parameter of choice and build a distribution:
-
-    parameter_list = []
-    for s in phosphoSeqome:
-        parameter_list.append(Protein(s).my_parameter_of_choice)
-
-  This distribution can then be compared back to value of the original sequence:
-
-    Protein(sequence).my_parameter_of_choice
+Examples
+--------
+>>> from sparrow import Protein
+>>> protein = Protein("MKSPEEKTPRYS")
+>>> isoforms = get_phosphoisoforms(protein)
+>>> len(isoforms)                  # four S/T/Y sites
+16
+>>> ncpr = [Protein(isoform).NCPR for isoform in isoforms]
+>>> round(protein.NCPR, 3), round(min(ncpr), 3)
+(0.083, -0.25)
 """
 
 import itertools
@@ -167,45 +172,54 @@ def _build_phosphoSeqome(sequence, phosphosites, phospho_rate=1):
 ## -----------------------------------
 ##
 def get_phosphoisoforms(protein, mode="all", phospho_rate=1, phosphosites=None):
-    """Phosphosites are replaced with the phosphomimetic 'E', enabling approximate calculation
-    of charge based sequence features with the presence of a phosphorylated residues.
+    """Every phosphoisoform of a protein, with phosphorylated sites replaced by E.
+
+    Replacing a phosphorylated residue with the phosphomimetic glutamate gives an
+    approximate way to compute charge-dependent sequence properties of the
+    phosphorylated protein.
 
     Parameters
     ----------
-    protein : sparrow.Protein
-        sparrow Protein object
+    protein : sparrow.protein.Protein
+        The protein.
+    mode : {'all', 'predict', 'custom'}, optional
+        How the candidate phosphosites are chosen. Default ``'all'``.
 
-    mode : str, optional
-        Defition for how the phosphosites should be determined, by default "all"
-
-        'all'       : Assumes all S/T/Y residues are potential phosphosites
-
-        'predict'   : Leverages PARROT trained predictors via _predict_all_phosphosites
-                        to predict phosphorylated sites based on sequence.
-
-        'custom'    : uses the 'phosphosites' parameter as indices for phosphosites.
-
+        * ``'all'`` - every S, T and Y residue.
+        * ``'predict'`` - the sites sparrow's serine, threonine and tyrosine
+          phosphorylation predictors call (``Protein.predictor``).
+        * ``'custom'`` - the positions in ``phosphosites``.
     phospho_rate : float, optional
-        Value between 0 and 1 which defines the maximum percent of phosphosites
-        can be 'phosphorylated' a each sequence, by default 1 (IE all sites can be
-        phosphorylated)
-
-    phosphosites : list, optional
-        Custom list of 0-based indices for valid phosphosite positions. Only used
-        when ``mode='custom'``, in which case it is required. Default is None.
+        The largest fraction of the candidate sites phosphorylated in any one
+        isoform, between 0 and 1: isoforms have at most
+        ``int(n_sites * phospho_rate)`` sites changed. Default 1, which allows
+        every combination.
+    phosphosites : list of int, optional
+        0-indexed positions of the candidate sites, used only (and required) with
+        ``mode='custom'``. They need not be S, T or Y. Default None.
 
     Returns
     -------
-    list
-        list of sequences for the possible phosphoisoforms based off the selected method.
-        Phosphorylatable amino acids are replaced with 'E'.
+    list of str
+        One sequence per phosphoisoform; the first is the unmodified sequence.
+        With ``n`` candidate sites and ``phospho_rate=1`` there are ``2**n``.
 
     Raises
-    -------
+    ------
     sparrow.sparrow_exceptions.SparrowException
         If ``mode`` is not one of 'all', 'predict' or 'custom'; if
         ``mode='custom'`` but no ``phosphosites`` were given; if ``phospho_rate``
         is outside 0-1; or if a phosphosite index falls outside the sequence.
+
+    Examples
+    --------
+    >>> from sparrow import Protein
+    >>> get_phosphoisoforms(Protein("MSAPTEEY"))[:4]
+    ['MSAPTEEY', 'MSAPTEEE', 'MSAPEEEY', 'MSAPEEEE']
+    >>> len(get_phosphoisoforms(Protein("MSAPTEEY"), phospho_rate=0.5))   # at most one site
+    4
+    >>> get_phosphoisoforms(Protein("MSAPTEEY"), mode="custom", phosphosites=[1])
+    ['MSAPTEEY', 'MEAPTEEY']
     """
 
     # get phosphosite positions

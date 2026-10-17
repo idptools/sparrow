@@ -91,6 +91,7 @@ Where to start
    api_guides/nardini
    plugins
    api_guides/sequence_analysis
+   api_guides/sequence_annotations
    api_guides/patterning
    predictors
 

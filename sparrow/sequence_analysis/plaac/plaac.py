@@ -1202,6 +1202,7 @@ class DisorderReport:
     Per-residue FoldIndex, PAPA, and PLAAC log-likelihood-ratio profiles.
 
     This combines:
+
     - **FoldIndex** disorder prediction
       (Prilusky et al, Bioinformatics, 2005)
     - **PAPA** prion propensity
@@ -2079,14 +2080,12 @@ def score_sequence(
 
     Examples
     --------
-    >>> import plaac
-    >>> result = plaac.score_sequence("MFKSGNQNN" * 20)
+    >>> from sparrow.sequence_analysis.plaac.plaac import score_sequence
+    >>> result = score_sequence("MFKSGNQNN" * 20)
     >>> result.protein_length
     180
-    >>> result.core_score  # NaN or float
-    ...
-    >>> result.fi_mean_hydro
-    ...
+    >>> round(result.core_score, 2), result.core_start, result.core_end   # 1-based
+    (33.98, 5, 64)
     >>> # Full per-residue disorder profile:
     >>> len(result.disorder.fi) == result.protein_length
     True
@@ -2138,18 +2137,20 @@ def score_sequences(
     ----------
     sequences : dict[str, str]
         Mapping of ``{name: amino_acid_sequence}``.
-    alpha, core_length, window_fi, window_papa, adjust_prolines,
-    bg_freqs, fg_freqs
+    alpha, core_length, window_fi, window_papa, adjust_prolines, bg_freqs, fg_freqs
         Same as :func:`score_sequence`.
 
     Returns
     -------
     dict[str, PLAACResult]
-        One :class:`PLAACResult` per input name, keyed by the same names.
+        One :class:`PLAACResult` per input name, keyed by the same names. A
+        sequence that is empty once stop codons are stripped is left out, where
+        :func:`score_sequence` raises.
 
     Examples
     --------
-    >>> results = plaac.score_sequences({
+    >>> from sparrow.sequence_analysis.plaac.plaac import score_sequences
+    >>> results = score_sequences({
     ...     "protein_A": "MFKSGNQNN" * 20,
     ...     "protein_B": "ACDEFGHIKLMNPQRSTVWY" * 10,
     ... })

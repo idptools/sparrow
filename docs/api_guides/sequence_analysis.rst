@@ -70,6 +70,13 @@ NARDINI+ Feature Vectors
 Patterning and compositional feature vectors -- NARDINI+, and assignment to the
 human GIN grammars -- live in :mod:`sparrow.nardini`. See :doc:`nardini`.
 
+Motifs, Domains and Phosphoisoforms
+-----------------------------------
+
+Eukaryotic linear motifs, prion-like domains (PLAAC), low-complexity domains and
+phosphoisoforms each have a module in ``sparrow.sequence_analysis``, covered
+in :doc:`sequence_annotations`.
+
 Patch Primitives
 ----------------
 

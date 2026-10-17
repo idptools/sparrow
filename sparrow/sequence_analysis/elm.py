@@ -1,3 +1,26 @@
+"""Eukaryotic Linear Motifs (ELMs) in a sequence, and how a point mutation changes them.
+
+ELMs are short linear motifs - degrons, docking sites, modification sites,
+targeting signals - each defined by a regular expression in the ELM resource.
+This module finds the matches of every ELM class in a sequence, and compares the
+matches of a sequence with those of a point mutant to say which motifs the
+mutation destroys, creates or leaves alone.
+
+The class definitions are the ELM resource's ``elm_classes.tsv`` (download
+version 1.4, 2 April 2024, 349 classes), bundled as
+``sparrow/data/elm_classes.tsv``. If you use these annotations, please cite the
+ELM resource: Kumar M, et al. ELM - the Eukaryotic Linear Motif resource - 2024
+update. Nucleic Acids Res. 2024;52(D1):D442-D455.
+
+A match is a candidate motif, not evidence of a functional site. Many ELM
+patterns are short enough to match by chance, and each class's ``probability``
+says how likely that is.
+
+From a :class:`~sparrow.protein.Protein`, ``Protein.elms`` gives the matches
+(found once and cached), and the comparison functions accept either a
+``Protein`` or a sequence.
+"""
+
 import functools
 import re
 from dataclasses import dataclass
@@ -9,6 +32,38 @@ from sparrow.sparrow_exceptions import SparrowException
 
 @dataclass(frozen=True)
 class ELM:
+    """One match of an ELM class in a sequence.
+
+    Attributes
+    ----------
+    regex : str
+        The ELM class's regular expression.
+    identifier : str
+        The ELM identifier, for example ``'DEG_Nend_UBRbox_1'``.
+    functional_site_name : str
+        The functional site the class belongs to, for example ``'N-degron'``.
+    description : str
+        The ELM resource's description of the class.
+    probability : float
+        The class's pattern probability from the ELM resource - how likely the
+        pattern is to match by chance - or NaN where the table gives none.
+    start : int
+        Position of the first matched residue (0-indexed).
+    end : int
+        Position after the last matched residue, so ``sequence[start:end]`` of
+        the searched sequence is the match.
+    sequence : str
+        The matched residues.
+
+    Notes
+    -----
+    Two matches count as the same motif when they have the same regular
+    expression, functional site and start position. That is what lets
+    :func:`compute_lost_elms` and its relatives compare the matches of a sequence
+    and of a point mutant with set operations, and it means a motif whose start
+    moves counts as both lost and gained.
+    """
+
     regex: str
     identifier: str
     functional_site_name: str
@@ -41,18 +96,34 @@ class ELM:
 
 
 def parse_hgvs(hgvs_notation: str) -> Tuple:
-    """This function takes an HGVS notation and returns a tuple of the form (position, mutation)
-    where position is the position of the mutation and mutation is the amino acid change.
+    """Read a protein point substitution written in HGVS notation.
 
     Parameters
     ----------
     hgvs_notation : str
-        HGVS notation of the form p.XXXX
+        A substitution in one-letter HGVS protein notation, such as ``'p.S7A'``,
+        with a 1-indexed position. Only one-letter codes are read correctly: the
+        mutant residue is taken to be the last character, so three-letter
+        notation such as ``'p.Ser7Val'`` is misread (as ``L``). The wild-type
+        residue is not checked against any sequence.
 
     Returns
     -------
-    Tuple[int,str]
-        Tuple containing the position of the mutation and the amino acid change.
+    tuple of (int, str)
+        The position, converted to 0-indexed, and the mutant residue in upper
+        case.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If the notation does not start with ``'p.'``, or its position is below 1.
+    ValueError
+        If the notation holds no position.
+
+    Examples
+    --------
+    >>> parse_hgvs("p.S7A")
+    (6, 'A')
     """
     if not hgvs_notation.startswith("p."):
         raise SparrowException("Invalid HGVS notation. Must start with 'p.'")
@@ -116,14 +187,14 @@ def read_elm_table(file: str) -> Tuple[list, list]:
 
 
 def generate_elm_df(file: str):
-    """Generates a pandas DataFrame object containing all the information
-    annotated as an elm.
+    """Read an ELM class TSV into a pandas DataFrame, one row per ELM class.
 
     Parameters
     ----------
     file : str
-        This generates a dataframe from the elm_classes.tsv in the data directory.
-        The latest elm class list can be found at http://elm.eu.org/downloads.html
+        Path to an ``elm_classes.tsv`` - for example the bundled one,
+        ``sparrow.get_data("elm_classes.tsv")``. The latest one can be downloaded
+        from http://elm.eu.org/downloads.html
 
     Returns
     -------
@@ -184,21 +255,27 @@ def _elm_class_records() -> tuple:
 
 
 def find_all_elms(sequence: str) -> Set[ELM]:
-    """This function takes an input sequence and returns the set of ELM
-    annotations found in it. Each entry records the regex used to find the ELM,
-    its identifier and functional annotation, its description and probability,
-    the start and stop position, and the matched subsequence.
+    """Every match of every bundled ELM class in a sequence.
+
+    Each class's regular expression is searched with :func:`re.finditer`, which
+    returns *non-overlapping* matches: where two matches of the same class
+    overlap, only the first is reported.
 
     Parameters
     ----------
     sequence : str
-        Amino Acid Sequence
+        Amino acid sequence.
 
     Returns
     -------
-    Set[sparrow.sequence_analysis.elm.ELM]
-        A set of :class:`ELM` objects for all possible elms in a given sequence.
-        Note this is a set (not a list), so entries are unordered.
+    set of ELM
+        One :class:`ELM` per match. This is a set, so the matches are unordered.
+
+    Examples
+    --------
+    >>> motifs = find_all_elms("MKKRPKSPSGSPTSRRPLL")
+    >>> sorted(motif.identifier for motif in motifs if motif.start == 0)
+    ['DEG_Nend_UBRbox_1', 'TRG_NLS_MonoExtC_3']
     """
     elms = []
     for (
@@ -225,21 +302,35 @@ def find_all_elms(sequence: str) -> Set[ELM]:
 
 
 def compute_lost_elms(target_protein, query: Union[Tuple[int, str], str]) -> Set:
-    """This function takes a protein sequence and a target query and returns a
-    the set of ELMs that were lost due to the mutation. The query can either be
-    a list or tuple of the form (position, mutant) where position is the position
-    of the mutation. or it can be a string in the HGVS format.
+    """ELM matches a point substitution destroys.
+
     Parameters
     ----------
-    target_protein : Union[sparrow.Protein, str]
-        sparrow.Protein or amino acid sequence
-    queries : Union[str, List[int,str], Tuple[int,str]]
-        List or tuple of the form (position, mutant) where position is the position of the mutation.
+    target_protein : sparrow.protein.Protein or str
+        The wild-type protein, or its sequence.
+    query : tuple of (int, str) or str
+        The substitution: either ``(position, mutant_residue)`` with a 0-indexed
+        position, or one-letter HGVS notation such as ``'p.S7A'``, whose position
+        is 1-indexed (see :func:`parse_hgvs`).
+
     Returns
     -------
-    Set
-        A set of ELMs containing the functional site name, the start and stop position,
-        the sequence of the elm.
+    set of ELM
+        The wild-type matches (``Protein.elms``) the mutant does not have.
+
+    Notes
+    -----
+    Matches are compared as described under :class:`ELM`. Because
+    :func:`find_all_elms` reports only non-overlapping matches of each class, a
+    wild-type match can hide an overlapping one; if the substitution removes the
+    first, the hidden one is reported as gained by :func:`compute_gained_elms`
+    even though the wild type has it too.
+
+    Examples
+    --------
+    >>> lost = compute_lost_elms("MKKRPKSPSGSPTSRRPLL", "p.S7A")
+    >>> sorted(motif.identifier for motif in lost)
+    ['DOC_WW_Pin1_4', 'MOD_DYRK1A_RPxSP_1', 'MOD_GSK3_1', 'MOD_ProDKin_1']
     """
 
     if isinstance(target_protein, str):
@@ -262,22 +353,23 @@ def compute_lost_elms(target_protein, query: Union[Tuple[int, str], str]) -> Set
 
 
 def compute_gained_elms(target_protein, query: Union[Tuple[int, str], str]) -> Set:
-    """This function takes a protein sequence and a target query and returns a
-    the set of ELMs that were gained due to the mutation. The query can either be
-    a list or tuple of the form (position, mutant) where position is the position
-    of the mutation. or it can be a string in the HGVS format.
+    """ELM matches a point substitution creates.
 
     Parameters
     ----------
-    target_protein : Union[sparrow.Protein, str]
-        sparrow.Protein or amino acid sequence
-    queries : Union[List[int,str], Tuple[int,str]]
-        List or tuple of the form (position, mutant) where position is the position of the mutation.
+    target_protein : sparrow.protein.Protein or str
+        The wild-type protein, or its sequence.
+    query : tuple of (int, str) or str
+        The substitution: either ``(position, mutant_residue)`` with a 0-indexed
+        position, or one-letter HGVS notation such as ``'p.S7A'``, whose position
+        is 1-indexed (see :func:`parse_hgvs`).
+
     Returns
     -------
-    Set
-        A set of ELMs containing the functional site name, the start and stop position,
-        the sequence of the elm.
+    set of ELM
+        The mutant's matches the wild type does not have. See the Notes of
+        :func:`compute_lost_elms` for when a match the wild type already has can
+        appear here.
     """
 
     if isinstance(target_protein, str):
@@ -300,22 +392,22 @@ def compute_gained_elms(target_protein, query: Union[Tuple[int, str], str]) -> S
 
 
 def compute_retained_elms(target_protein, query: Union[Tuple[int, str], str]) -> Set:
-    """This function takes a protein sequence and a target query and returns a
-    the set of ELMs that were retained (no change) after mutation. The query can
-    either be a list or tuple of the form (position, mutant) where position is
-    the position of the mutation. or it can be a string in the HGVS format.
+    """ELM matches a point substitution leaves in place.
 
     Parameters
     ----------
-    target_protein : Union[sparrow.Protein, str]
-        sparrow.Protein or amino acid sequence
-    queries : Union[List[int,str], Tuple[int,str]]
-        List or tuple of the form (position, mutant) where position is the position of the mutation.
+    target_protein : sparrow.protein.Protein or str
+        The wild-type protein, or its sequence.
+    query : tuple of (int, str) or str
+        The substitution: either ``(position, mutant_residue)`` with a 0-indexed
+        position, or one-letter HGVS notation such as ``'p.S7A'``, whose position
+        is 1-indexed (see :func:`parse_hgvs`).
+
     Returns
     -------
-    Set
-        A set of ELMs containing the functional site name, the start and stop position,
-        the sequence of the elm.
+    set of ELM
+        The matches the wild type and the mutant share. A match whose residues
+        change but which still matches at the same start counts as retained.
     """
     if isinstance(target_protein, str):
         target_protein = sparrow.Protein(target_protein)

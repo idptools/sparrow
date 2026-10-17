@@ -1,8 +1,33 @@
+"""Low-complexity domains (LCDs) enriched in a chosen set of residues.
+
+An LCD here is a stretch of sequence made of residues from a chosen set
+(``residue_selector``, such as ``'Q'`` or ``'ED'``) interrupted by runs of no
+more than ``max_interruption`` other residues, which is at least
+``minimum_length`` long and in which the chosen residues make up more than
+``fractional_threshold`` of its length. A run of more than ``max_interruption``
+other residues ends a stretch; within each stretch the longest region that starts
+at its first chosen residue, ends at a chosen residue and passes both thresholds
+is reported. The approach follows Gutierrez et al. from the Holt lab (hence the
+names): Gutierrez JI, et al. SWI/SNF senses carbon starvation with a
+pH-sensitive low-complexity sequence. eLife. 2022;11:e70344. They allowed
+interruptions of up to 17 residues, where the default here is 5.
+
+The two variants differ only in what counts towards the fraction:
+:func:`low_complexity_domains_holt` counts only the chosen residues, while
+:func:`low_complexity_domains_holt_permissive` also counts the bridged
+interruptions, so it finds more and longer domains.
+
+From a :class:`~sparrow.protein.Protein`,
+``Protein.low_complexity_domains(mode='holt', residue_selector=...)`` (or
+``mode='holt-permissive'``) calls these.
+"""
+
+
 def low_complexity_domains_holt_permissive(
     sequence, residue_selector, minimum_length=15, max_interruption=5, fractional_threshold=0.25
 ):
     """
-    Function to identify low complexity domains enriched in a specific residues.
+    Low-complexity domains, counting bridged interruptions towards the fraction.
 
     This is the "permissive" variant of :func:`low_complexity_domains_holt`: the
     bridged interruption residues also count towards the domain's residue count,
@@ -37,6 +62,15 @@ def low_complexity_domains_holt_permissive(
         the start index (0-indexed) and the end index (exclusive), such that
         ``sequence[start:end]`` is the domain.
 
+    Examples
+    --------
+    One Q in every three residues is 38% Q, so it fails a threshold of 0.5 unless
+    the bridged residues count:
+
+    >>> low_complexity_domains_holt_permissive("QAAQAAQAAQAAQAAQ", "Q", minimum_length=10, fractional_threshold=0.5)
+    [['QAAQAAQAAQAAQAAQ', 0, 16]]
+    >>> low_complexity_domains_holt("QAAQAAQAAQAAQAAQ", "Q", minimum_length=10, fractional_threshold=0.5)
+    []
     """
     return __low_complexity_domains_holt_internal(
         sequence=sequence,
@@ -52,7 +86,7 @@ def low_complexity_domains_holt(
     sequence, residue_selector, minimum_length=15, max_interruption=5, fractional_threshold=0.25
 ):
     """
-    Function to identify low complexity domains enriched in a specific residues.
+    Low-complexity domains, counting only the chosen residues towards the fraction.
 
     Only residues drawn from ``residue_selector`` count towards a domain's
     residue count. See :func:`low_complexity_domains_holt_permissive` for the
@@ -87,6 +121,10 @@ def low_complexity_domains_holt(
         the start index (0-indexed) and the end index (exclusive), such that
         ``sequence[start:end]`` is the domain.
 
+    Examples
+    --------
+    >>> low_complexity_domains_holt("MKKRPKSPSGEEEQQQQQQQQQQQQQQQQASDLEKRK", "Q", minimum_length=10)
+    [['QQQQQQQQQQQQQQQQ', 13, 29]]
     """
     return __low_complexity_domains_holt_internal(
         sequence=sequence,
