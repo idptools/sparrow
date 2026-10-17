@@ -237,3 +237,37 @@ AA_hydro_KD_normalized = {
     "Y": 0.356,
     "V": 0.967,
 }
+
+# Residue hydropathy (lambda) of the HPS coarse-grained model, which rescales the
+# Kapcha-Rossky hydrophobicity scale to run from 0 to 1. This is the scale the
+# sequence hydropathy decoration (SHD) is defined with, and its default in sparrow.
+# Note it is NOT a normalized Kyte-Doolittle scale - compare AA_hydro_KD_normalized
+# above, which gives quite different values (e.g. P 0.322 there, 1.0 here).
+# References
+# Dignon GL, Zheng W, Kim YC, Best RB, Mittal J. Sequence determinants of protein
+# phase behavior from a coarse-grained model. PLoS Comput Biol. 2018;14(1):e1005941.
+# Zheng W, Dignon GL, Brown M, Kim YC, Mittal J. Hydropathy patterning complements
+# charge patterning to describe conformational preferences of disordered proteins.
+# J Phys Chem Lett. 2020;11(9):3408-3415.
+AA_hydro_HPS = {
+    "A": 0.730,
+    "R": 0.000,
+    "N": 0.432,
+    "D": 0.378,
+    "C": 0.595,
+    "Q": 0.514,
+    "E": 0.459,
+    "G": 0.649,
+    "H": 0.514,
+    "I": 0.973,
+    "L": 0.973,
+    "K": 0.514,
+    "M": 0.838,
+    "F": 1.000,
+    "P": 1.000,
+    "S": 0.595,
+    "T": 0.676,
+    "W": 0.946,
+    "Y": 0.865,
+    "V": 0.892,
+}

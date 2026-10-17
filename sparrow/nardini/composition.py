@@ -59,10 +59,10 @@ import numpy as np
 
 from sparrow import calculate_parameters
 from sparrow.data import amino_acids
+from sparrow.properties import encoding
 from sparrow.sequence_analysis import physical_properties
 from sparrow.sequence_analysis.patching import patch_fraction, rg_patch_fraction
 from sparrow.sparrow_exceptions import SparrowException
-from sparrow.tools import general_tools
 
 __all__ = [
     "PATCH_INTERRUPTION",
@@ -183,7 +183,7 @@ def composition_values(sequence, validate=True):
     0.44
     """
     if validate:
-        sequence = general_tools.validate_protein_sequence(
+        sequence = encoding.validate_protein_sequence(
             sequence,
             allow_empty=False,
             uppercase=True,

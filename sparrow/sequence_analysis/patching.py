@@ -7,7 +7,7 @@ protein sequences using NARDINI-style semantics.
 import numpy as np
 
 from sparrow import sparrow_exceptions
-from sparrow.tools import general_tools
+from sparrow.properties import encoding
 
 
 def _bridge_positions(positions, interruption):
@@ -67,7 +67,7 @@ def patch_fraction(
     if min_adjacent_pair_count < 0:
         raise sparrow_exceptions.CalculationException("min_adjacent_pair_count must be >= 0")
 
-    sequence = general_tools.validate_protein_sequence(
+    sequence = encoding.validate_protein_sequence(
         sequence,
         allow_empty=True,
         uppercase=True,
@@ -77,7 +77,7 @@ def patch_fraction(
     if len(sequence) == 0:
         return 0.0
 
-    selector = general_tools.normalize_residue_selector(
+    selector = encoding.normalize_residue_selector(
         residue_selector,
         selector_name="residue_selector",
         exception_cls=sparrow_exceptions.CalculationException,
@@ -89,7 +89,7 @@ def patch_fraction(
     )
     motif = None
     if adjacent_pair_pattern is not None:
-        motif = general_tools.normalize_residue_selector(
+        motif = encoding.normalize_residue_selector(
             adjacent_pair_pattern,
             selector_name="adjacent_pair_pattern",
             exception_cls=sparrow_exceptions.CalculationException,

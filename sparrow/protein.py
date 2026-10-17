@@ -16,6 +16,7 @@ from sparrow.data import amino_acids
 # compiled code's single-precision arithmetic, and more accurate where they
 # differ - see sparrow.patterning.vectorized and its test module.
 from sparrow.patterning import vectorized as patterning_metrics
+from sparrow.properties import encoding
 from sparrow.sequence_analysis import (
     elm,
     patching,
@@ -24,7 +25,7 @@ from sparrow.sequence_analysis import (
     sequence_complexity,
 )
 from sparrow.sequence_analysis.plaac.plaac import score_sequence as plaac_score_sequence
-from sparrow.tools import general_tools, track_tools, utilities
+from sparrow.tools import track_tools, utilities
 from sparrow.visualize import sequence_visuals
 
 __all__ = ["Protein"]
@@ -72,10 +73,10 @@ class Protein:
         # If validation is needed...
         if validate:
             s = s.upper()
-            if general_tools.is_valid_protein_sequence(s) is False:
+            if encoding.is_valid_protein_sequence(s) is False:
                 fixed = protfasta_utilities.convert_to_valid(s)
 
-                if general_tools.is_valid_protein_sequence(fixed) is False:
+                if encoding.is_valid_protein_sequence(fixed) is False:
                     raise sparrow_exceptions.SparrowException(f"Invalid amino acid in {fixed}")
 
                 self.__seq = fixed
@@ -301,9 +302,10 @@ class Protein:
         Returns the default sequence hydropathy decoration (SHD) parameter,
         a hydrophobicity-patterning metric defined by Zheng et al. (2020).
 
-        Hydrophobicity values use the default (normalized Kyte-Doolittle) scale;
-        use :meth:`compute_SHD_custom` to supply your own. Calculated on first
-        access and cached.
+        Hydrophobicity values use the HPS model's hydropathy scale
+        (:data:`sparrow.data.amino_acids.AA_hydro_HPS`), which is what SHD was
+        defined with; use :meth:`compute_SHD_custom` to supply your own.
+        Calculated on first access and cached.
 
         Returns
         -------
@@ -779,7 +781,7 @@ class Protein:
             Float that is positive
 
         """
-        residues = general_tools.normalize_residue_selector(
+        residues = encoding.normalize_residue_selector(
             target_residues,
             selector_name="target_residues",
             exception_cls=sparrow_exceptions.ProteinException,
@@ -928,7 +930,7 @@ class Protein:
 
         See Also
         --------
-        SHD : SHD computed with the default (normalized Kyte-Doolittle) scale.
+        SHD : SHD computed with the default (HPS hydropathy) scale.
 
         References
         ----------

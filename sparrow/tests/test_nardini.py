@@ -932,10 +932,10 @@ def test_nonstandard_residue_still_raises_a_clear_error():
 
     The per-sequence seed is derived from the sequence text before the residues
     have been validated. Encoding it as ASCII made a non-standard character raise
-    UnicodeEncodeError instead of sparrow's "no NARDINI type" message.
+    UnicodeEncodeError instead of sparrow's "non-standard residue" message.
     """
     for sequence in ["MEEK\u00c5KSSSTTTQQQ", "MEEKXKSSSTTTQQQ"]:
-        with pytest.raises(SparrowException, match="no NARDINI type"):
+        with pytest.raises(SparrowException, match="non-standard residue"):
             nardini_vectors({"bad": sequence}, num_scrambles=50, seed=1)
 
 

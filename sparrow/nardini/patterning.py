@@ -84,6 +84,7 @@ from sparrow.nardini.groups import (
     get_typeset,
     patterning_feature_names,
 )
+from sparrow.properties import encoding
 from sparrow.sparrow_exceptions import SparrowException
 
 __all__ = [
@@ -188,27 +189,20 @@ def encode_types(sequence, typeset=DEFAULT_TYPESET):
     Raises
     ------
     sparrow.sparrow_exceptions.SparrowException
-        If the sequence contains a residue not present in the grouping.
+        If the sequence contains anything other than the 20 standard amino acids
+        (see :func:`sparrow.properties.encoding.residue_codes`).
     """
     groups = get_typeset(typeset)
 
-    lookup = np.full(128, -1, dtype=np.int8)
+    # residue code -> type index. get_typeset has already checked the grouping is
+    # an exact partition of the 20 amino acids, so every residue gets a type.
+    type_of_residue = np.full(encoding.NUM_RESIDUES, encoding.NOT_A_RESIDUE, dtype=np.int8)
     for index, residues in enumerate(groups.values()):
         for residue in residues:
-            lookup[ord(residue)] = index
+            type_of_residue[encoding.RESIDUES.index(residue)] = index
+    assert np.all(type_of_residue != encoding.NOT_A_RESIDUE), "typeset is not a partition"
 
-    codes = np.frombuffer(sequence.encode("ascii", errors="replace"), dtype=np.uint8)
-    labels = lookup[codes]
-
-    if np.any(labels < 0):
-        bad = sorted({sequence[i] for i in np.where(labels < 0)[0]})
-        raise SparrowException(
-            f"Sequence contains residue(s) with no NARDINI type: {bad}. "
-            "NARDINI requires the 20 standard amino acids; strip or convert "
-            "non-standard residues first (e.g. Protein(seq, validate=True))."
-        )
-
-    return labels
+    return type_of_residue[encoding.residue_codes(sequence)]
 
 
 def type_fractions(labels, num_types):
@@ -519,13 +513,13 @@ def _alternative_values(codes, groups, pairs, evaluated, backend, blob_size):
         if backend == "kappa":
             # an empty group2 makes kappa_x a binary (group i vs rest) statistic
             group2 = [] if i == j else group_lists[j]
-            ternary = vec.ternarize_winged_batch(codes, group_lists[i], group2, blob_size)
+            ternary = encoding.ternarize_winged_batch(codes, group_lists[i], group2, blob_size)
             kappa = vec.kappa_from_ternary_batch(ternary, blob_size, 1, group2_present=len(group2) > 0)
             # kappa_x reports -1 when undefined; that means "not scored"
             values[:, feature] = np.where(kappa < 0, 0.0, kappa)
         else:
             targets = group_lists[i] if i == j else sorted(set(group_lists[i]) | set(group_lists[j]))
-            values[:, feature] = vec.iwd_batch(vec._membership_lookup(targets)[codes])
+            values[:, feature] = vec.iwd_batch(encoding.membership_lookup(targets)[codes])
 
     return values
 

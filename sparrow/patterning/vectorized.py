@@ -56,6 +56,13 @@ SHD collapses to prefix sums (``O(n)`` instead of ``O(n^2)``).
 import numpy as np
 
 from sparrow import sparrow_exceptions
+from sparrow.data import amino_acids
+from sparrow.properties.encoding import (
+    ascii_codes,
+    membership_lookup,
+    ternarize_winged,
+    ternarize_winged_batch,
+)
 
 # shuffles are generated in blocks so memory stays bounded regardless of count
 _PERMUTATION_BLOCK = 512
@@ -84,65 +91,6 @@ __all__ = [
 # =====================================================================
 # shared helpers
 # =====================================================================
-
-
-def _as_byte_array(sequence):
-    """Return a sequence as a uint8 array of its ASCII codes."""
-    return np.frombuffer(sequence.encode("ascii"), dtype=np.uint8)
-
-
-def _membership_lookup(residues):
-    """Return a 256-entry boolean lookup table for a residue collection."""
-    table = np.zeros(256, dtype=bool)
-    for residue in residues:
-        table[ord(residue)] = True
-    return table
-
-
-def ternarize_winged(sequence, group1, group2, window_size):
-    """Encode a sequence as a ternary array padded with non-contributing wings.
-
-    Reproduces the ``ternarize`` step inside the Cython ``kappa_x``: positions
-    holding a ``group1`` residue become ``+1``, ``group2`` residues become
-    ``-1``, everything else ``0``. The array is padded with ``window_size`` zeros
-    at each end, which is what lets clusters at the termini contribute to the
-    patterning as much as those in the middle.
-
-    If ``group2`` is empty the encoding becomes binary: every residue not in
-    ``group1`` is treated as ``-1``.
-
-    Parameters
-    ----------
-    sequence : str
-        Amino acid sequence.
-    group1 : list or str
-        Residues forming the first group. Must be non-empty.
-    group2 : list or str
-        Residues forming the second group. May be empty, see above.
-    window_size : int
-        Window size, which also sets the wing width.
-
-    Returns
-    -------
-    numpy.ndarray
-        ``int8`` array of length ``2 * window_size + len(sequence)``.
-    """
-    codes = _as_byte_array(sequence)
-    length = codes.size
-
-    ternary = np.zeros(2 * window_size + length, dtype=np.int8)
-    core = ternary[window_size : window_size + length]
-
-    in_group1 = _membership_lookup(group1)[codes]
-
-    if len(group2) == 0:
-        # binary mode: everything that is not group1 is group2
-        core[:] = np.where(in_group1, 1, -1)
-    else:
-        in_group2 = _membership_lookup(group2)[codes]
-        core[:] = np.where(in_group1, 1, np.where(in_group2, -1, 0))
-
-    return ternary
 
 
 def _window_sums(indicator, window_size, dtype=None):
@@ -304,12 +252,12 @@ def calculate_sigma(sequence, group1, group2):
     >>> round(calculate_sigma("EEEEKKKK", ["E"], ["K"]), 6)
     0.0
     """
-    codes = _as_byte_array(sequence)
+    codes = ascii_codes(sequence)
     if codes.size == 0:
         return 0.0
 
-    count_1 = int(np.count_nonzero(_membership_lookup(group1)[codes]))
-    count_2 = int(np.count_nonzero(_membership_lookup(group2)[codes]))
+    count_1 = int(np.count_nonzero(membership_lookup(group1)[codes]))
+    count_2 = int(np.count_nonzero(membership_lookup(group2)[codes]))
 
     if count_1 + count_2 == 0:
         return 0.0
@@ -341,13 +289,13 @@ def calculate_delta(sequence, group1, group2, window_size):
     float
         Delta, a non-negative float.
     """
-    codes = _as_byte_array(sequence)
+    codes = ascii_codes(sequence)
     length = codes.size
 
     sigma = calculate_sigma(sequence, group1, group2)
 
-    in_1 = _membership_lookup(group1)[codes].astype(np.int64)
-    in_2 = _membership_lookup(group2)[codes].astype(np.int64)
+    in_1 = membership_lookup(group1)[codes].astype(np.int64)
+    in_2 = membership_lookup(group2)[codes].astype(np.int64)
 
     count_a = _window_sums(in_1, window_size)
     count_b = _window_sums(in_2, window_size)
@@ -453,44 +401,6 @@ def kappa_x(sequence, group1, group2, window_size, flatten=0):
         return -1.0
 
     return float(_kappa_from_ternary(ternary, window_size, flatten))
-
-
-def ternarize_winged_batch(codes, group1, group2, window_size):
-    """Ternarize a stack of equal-length sequences at once.
-
-    The batch analogue of :func:`ternarize_winged`, taking pre-encoded ASCII
-    codes so callers scoring many features over the same scramble set can encode
-    once and reuse.
-
-    Parameters
-    ----------
-    codes : numpy.ndarray
-        ``uint8`` array of shape ``(n_sequences, length)`` of ASCII codes.
-    group1, group2 : list or str
-        Residue groups; ``group2`` may be empty for binary mode.
-    window_size : int
-        Window size, which also sets the wing width.
-
-    Returns
-    -------
-    numpy.ndarray
-        ``int8`` array of shape ``(n_sequences, 2 * window_size + length)``.
-    """
-    codes = np.atleast_2d(codes)
-    n_sequences, length = codes.shape
-
-    ternary = np.zeros((n_sequences, 2 * window_size + length), dtype=np.int8)
-    core = ternary[:, window_size : window_size + length]
-
-    in_group1 = _membership_lookup(group1)[codes]
-
-    if len(group2) == 0:
-        core[:] = np.where(in_group1, 1, -1)
-    else:
-        in_group2 = _membership_lookup(group2)[codes]
-        core[:] = np.where(in_group1, 1, np.where(in_group2, -1, 0))
-
-    return ternary
 
 
 def kappa_from_ternary_batch(ternary, window_size, flatten=0, group2_present=True):
@@ -604,7 +514,7 @@ def kappa_x_batch(sequences, group1, group2, window_size, flatten=0):
     if window_size > lengths.pop():
         return np.full(len(sequences), -1.0, dtype=np.float64)
 
-    codes = np.stack([_as_byte_array(s) for s in sequences])
+    codes = np.stack([ascii_codes(s) for s in sequences])
     ternary = ternarize_winged_batch(codes, group1, group2, window_size)
 
     return kappa_from_ternary_batch(ternary, window_size, flatten, group2_present=len(group2) > 0)
@@ -630,11 +540,11 @@ def binary_asymmetry(sequence, group):
     float
         The asymmetry, between 0 and 1.
     """
-    codes = _as_byte_array(sequence)
+    codes = ascii_codes(sequence)
     if codes.size == 0:
         return 0.0
 
-    n_positive = int(np.count_nonzero(_membership_lookup(group)[codes]))
+    n_positive = int(np.count_nonzero(membership_lookup(group)[codes]))
     fraction = n_positive / codes.size
     return float((fraction - (1.0 - fraction)) ** 2)
 
@@ -718,8 +628,8 @@ def patterning_percentile(sequence, group, window_size, count, seed, return_dist
     # +1 / -1 encoding with no wings. For a two-class split this makes the
     # generic _asymmetry helper reduce exactly to (f - (1 - f))^2, so the same
     # windowing machinery used elsewhere in this module applies unchanged.
-    codes = _as_byte_array(sequence)
-    binary = np.where(_membership_lookup(group)[codes], 1, -1).astype(np.int8)
+    codes = ascii_codes(sequence)
+    binary = np.where(membership_lookup(group)[codes], 1, -1).astype(np.int8)
 
     n_positive = int(np.count_nonzero(binary == 1))
     sigma = _asymmetry(n_positive, length - n_positive, float(length))
@@ -828,11 +738,11 @@ def calculate_average_inverse_distance_from_sequence(sequence, target_residues):
     >>> bool(clustered > spread)
     True
     """
-    codes = _as_byte_array(sequence)
+    codes = ascii_codes(sequence)
     if codes.size == 0:
         return 0.0
 
-    mask = _membership_lookup(target_residues)[codes]
+    mask = membership_lookup(target_residues)[codes]
     return iwd_from_binary_mask(mask)
 
 
@@ -918,14 +828,14 @@ def calculate_average_inverse_distance_charge(linear_NCPR, sequence, charge):
     float
         The charge-weighted IWD, a non-negative float.
     """
-    codes = _as_byte_array(sequence)
+    codes = ascii_codes(sequence)
     ncpr = np.asarray(linear_NCPR, dtype=np.float64)
 
     if charge == "-":
-        selected = _membership_lookup("DE")[codes]
+        selected = membership_lookup("DE")[codes]
         wanted_sign = -1.0
     else:
-        selected = _membership_lookup("RK")[codes]
+        selected = membership_lookup("RK")[codes]
         wanted_sign = 1.0
 
     positions = np.flatnonzero(selected)
@@ -969,19 +879,19 @@ def calculate_average_bivariate_inverse_distance_charge(linear_NCPR, sequence):
         The bivariate charge-weighted IWD, a non-negative float. Returns 0.0 if
         the sequence lacks either charge type.
     """
-    codes = _as_byte_array(sequence)
+    codes = ascii_codes(sequence)
     ncpr = np.asarray(linear_NCPR, dtype=np.float64)
 
-    negative_positions = np.flatnonzero(_membership_lookup("DE")[codes])
-    positive_positions = np.flatnonzero(_membership_lookup("RK")[codes])
+    negative_positions = np.flatnonzero(membership_lookup("DE")[codes])
+    positive_positions = np.flatnonzero(membership_lookup("RK")[codes])
 
     if negative_positions.size == 0 or positive_positions.size == 0:
         return 0.0
 
     # a residue only carries its charge if the local environment agrees in sign
     masked = np.zeros_like(ncpr)
-    is_negative = _membership_lookup("DE")[codes] & (ncpr < 0)
-    is_positive = _membership_lookup("RK")[codes] & (ncpr > 0)
+    is_negative = membership_lookup("DE")[codes] & (ncpr < 0)
+    is_positive = membership_lookup("RK")[codes] & (ncpr > 0)
     masked[is_negative] = ncpr[is_negative]
     masked[is_positive] = ncpr[is_positive]
 
@@ -995,30 +905,9 @@ def calculate_average_bivariate_inverse_distance_charge(linear_NCPR, sequence):
 # sequence charge / hydropathy decoration
 # =====================================================================
 
-#: Normalized Kyte-Doolittle hydrophobicity used by :func:`compute_shd` when no
-#: scale is supplied. Matches ``sparrow.patterning.scd``.
-DEFAULT_HYDRO_DICT = {
-    "A": 0.730,
-    "R": 0.000,
-    "N": 0.432,
-    "D": 0.378,
-    "C": 0.595,
-    "Q": 0.514,
-    "E": 0.459,
-    "G": 0.649,
-    "H": 0.514,
-    "I": 0.973,
-    "L": 0.973,
-    "K": 0.514,
-    "M": 0.838,
-    "F": 1.000,
-    "P": 1.000,
-    "S": 0.595,
-    "T": 0.676,
-    "W": 0.946,
-    "Y": 0.865,
-    "V": 0.892,
-}
+#: The HPS model's residue hydropathy, used by :func:`compute_shd` when no scale
+#: is supplied. See :data:`sparrow.data.amino_acids.AA_hydro_HPS`.
+DEFAULT_HYDRO_DICT = amino_acids.AA_hydro_HPS
 
 
 def compute_scd_x(sequence, group1=("E", "D"), group2=("R", "K")):
@@ -1051,7 +940,7 @@ def compute_scd_x(sequence, group1=("E", "D"), group2=("R", "K")):
     >>> bool(blocky < mixed)
     True
     """
-    codes = _as_byte_array(sequence)
+    codes = ascii_codes(sequence)
     length = codes.size
     if length < 2:
         return 0.0
@@ -1097,7 +986,7 @@ def compute_shd(seq, hydro_dict=None):
         Amino acid sequence.
     hydro_dict : dict, optional
         Mapping from residue to hydrophobicity. Defaults to
-        :data:`DEFAULT_HYDRO_DICT` (normalized Kyte-Doolittle).
+        :data:`DEFAULT_HYDRO_DICT`, the HPS model's hydropathy scale.
 
     Returns
     -------

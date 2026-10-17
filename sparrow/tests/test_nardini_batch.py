@@ -197,7 +197,7 @@ def test_start_method_does_not_change_anything(enough_to_parallelize):
 
 def test_bad_sequence_raises_by_default(small):
     broken = dict(small)
-    broken["bad"] = "MEEEKKKXXXSSSTTT"  # X has no NARDINI type
+    broken["bad"] = "MEEEKKKXXXSSSTTT"  # X is not a standard residue
 
     with pytest.raises(SparrowException, match="Could not compute"):
         nardini_proteins(broken, **OPTIONS)
