@@ -190,7 +190,9 @@ Windowed tracks with one value per residue -- ideal for plotting (see
    p.linear_property_profile("hydropathy-kyte-1982", window_size=9)  # AAindex
 
 The 500+ AAindex scales usable with ``linear_property_profile`` are catalogued in
-:doc:`properties`.
+:doc:`properties`. For a whole list of sequences, the same profiles come from
+:mod:`sparrow.properties.profiles`, which these methods call (see
+:doc:`sequence_analysis`).
 
 Domains, motifs & isoforms
 --------------------------

@@ -49,7 +49,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from sparrow.data import amino_acids
-from sparrow.properties import encoding
+from sparrow.properties import encoding, profiles
 from sparrow.properties.composition import Batch, as_counts
 from sparrow.properties.windows import window_sums
 from sparrow.sparrow_exceptions import PatterningException, SparrowException
@@ -747,30 +747,9 @@ def iwd(
 #: charge-weighted IWD.
 CHARGE_IWD_WINDOW = 8
 
-# which residue codes are positive or negative, and the formal charge of each
+# which residue codes are positive and which negative
 _IS_POSITIVE = encoding.residue_membership(amino_acids.POS)
 _IS_NEGATIVE = encoding.residue_membership(amino_acids.NEG)
-_FORMAL_CHARGE = _IS_POSITIVE.astype(np.int64) - _IS_NEGATIVE.astype(np.int64)
-
-
-def _local_ncpr(codes: NDArray[np.int8], window_size: int) -> NDArray[np.float64]:
-    """Local net charge per residue at every position, with the ends extended.
-
-    The NCPR of each window, placed at the window's centre, with the first and
-    last values copied out to the ends so there is one value per residue.
-    """
-    length = codes.size
-    if length < window_size:
-        raise SparrowException("Windowsize [%i] is larger than sequence [%i]" % (window_size, length))
-
-    per_window = window_sums(_FORMAL_CHARGE[codes], window_size) / window_size
-
-    front = window_size // 2
-    back = length - front - per_window.size
-    profile: NDArray[np.float64] = np.concatenate(
-        [np.full(front, per_window[0]), per_window, np.full(back, per_window[-1])]
-    )
-    return profile
 
 
 def _pairwise_inverse_distance_sums(positions: NDArray[np.intp]) -> NDArray[np.float64]:
@@ -782,9 +761,11 @@ def _pairwise_inverse_distance_sums(positions: NDArray[np.intp]) -> NDArray[np.f
     return sums
 
 
-def _charged_iwd_of(codes: NDArray[np.int8], charge: str, window_size: int) -> float:
-    """Charge-weighted IWD of one sequence's positive or negative residues."""
-    ncpr = _local_ncpr(codes, window_size)
+def _charged_iwd_of(codes: NDArray[np.int8], ncpr: NDArray[np.float64], charge: str) -> float:
+    """Charge-weighted IWD of one sequence's positive or negative residues.
+
+    ``ncpr`` is the sequence's local net charge per residue at every position.
+    """
     if charge == "-":
         selected = _IS_NEGATIVE[codes]
         wanted_sign = -1.0
@@ -823,7 +804,9 @@ def iwd_charged_weighted(
     charge : {'-', '+'}
         ``'-'`` for the clustering of D and E, ``'+'`` for R and K.
     window_size : int, optional
-        Window for the local NCPR. Default 8.
+        Window for the local NCPR, which is
+        :func:`~sparrow.properties.profiles.net_charge_profile` with its ends
+        extended. Default 8.
 
     Returns
     -------
@@ -840,18 +823,21 @@ def iwd_charged_weighted(
     if charge not in ("-", "+"):
         raise PatterningException(f"charge must be '-' or '+', not {charge!r}")
     batch = encoding.encode_batch(sequences)
+    local_ncpr = profiles.net_charge_profile(batch, window_size, end_mode=profiles.EXTEND_ENDS)
     return np.array(
         [
-            _charged_iwd_of(batch.codes[batch.offsets[i] : batch.offsets[i + 1]], charge, window_size)
+            _charged_iwd_of(batch.codes[batch.offsets[i] : batch.offsets[i + 1]], local_ncpr[i], charge)
             for i in range(len(batch))
         ],
         dtype=np.float64,
     )
 
 
-def _bivariate_charged_iwd_of(codes: NDArray[np.int8], window_size: int) -> float:
-    """Charge-weighted IWD between one sequence's positive and negative residues."""
-    ncpr = _local_ncpr(codes, window_size)
+def _bivariate_charged_iwd_of(codes: NDArray[np.int8], ncpr: NDArray[np.float64]) -> float:
+    """Charge-weighted IWD between one sequence's positive and negative residues.
+
+    ``ncpr`` is the sequence's local net charge per residue at every position.
+    """
     is_negative = _IS_NEGATIVE[codes]
     is_positive = _IS_POSITIVE[codes]
     negative_positions = np.flatnonzero(is_negative)
@@ -886,7 +872,9 @@ def bivariate_iwd_charged_weighted(
     sequences : str, sequence of str, or EncodedBatch
         The batch.
     window_size : int, optional
-        Window for the local NCPR. Default 8.
+        Window for the local NCPR, which is
+        :func:`~sparrow.properties.profiles.net_charge_profile` with its ends
+        extended. Default 8.
 
     Returns
     -------
@@ -900,9 +888,10 @@ def bivariate_iwd_charged_weighted(
         If a sequence is shorter than ``window_size``.
     """
     batch = encoding.encode_batch(sequences)
+    local_ncpr = profiles.net_charge_profile(batch, window_size, end_mode=profiles.EXTEND_ENDS)
     return np.array(
         [
-            _bivariate_charged_iwd_of(batch.codes[batch.offsets[i] : batch.offsets[i + 1]], window_size)
+            _bivariate_charged_iwd_of(batch.codes[batch.offsets[i] : batch.offsets[i + 1]], local_ncpr[i])
             for i in range(len(batch))
         ],
         dtype=np.float64,

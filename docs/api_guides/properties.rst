@@ -27,6 +27,17 @@ Quick start
 ``linear_sequence_profile`` (``window_size``, ``end_mode``, ``smooth``); only
 ``mode`` differs -- here it selects an AAindex property.
 
+For many sequences at once, :func:`sparrow.properties.profiles.scale_profile`
+takes the index's values directly:
+
+.. code-block:: python
+
+   from sparrow.data import aaindex
+   from sparrow.properties import profiles
+
+   scale = aaindex.get_property_values("hydropathy-kyte-1982")
+   hydropathy = profiles.scale_profile(sequences, scale, window_size=9)  # one per sequence
+
 Choosing an index (identifiers)
 -------------------------------
 

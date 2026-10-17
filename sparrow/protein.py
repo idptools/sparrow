@@ -11,17 +11,34 @@ from protfasta import utilities as protfasta_utilities
 from sparrow import sparrow_exceptions
 from sparrow.data import amino_acids
 
-from sparrow.properties import charge, composition, encoding, patches, patterning
+from sparrow.properties import charge, composition, encoding, patches, patterning, profiles
 from sparrow.sequence_analysis import (
     elm,
     phospho_isoforms,
     sequence_complexity,
 )
 from sparrow.sequence_analysis.plaac.plaac import score_sequence as plaac_score_sequence
-from sparrow.tools import track_tools, utilities
+from sparrow.tools import utilities
 from sparrow.visualize import sequence_visuals
 
 __all__ = ["Protein"]
+
+# The analyses linear_sequence_profile offers, each a batch property that
+# sparrow.properties.profiles.window_profile scores over every window at once.
+_LINEAR_PROFILE_MODES = {
+    "FCR": composition.fraction_charged,
+    "NCPR": composition.net_charge_per_residue,
+    "aromatic": composition.fraction_aromatic,
+    "aliphatic": composition.fraction_aliphatic,
+    "polar": composition.fraction_polar,
+    "proline": composition.fraction_proline,
+    "positive": composition.fraction_positive,
+    "negative": composition.fraction_negative,
+    "hydrophobicity": composition.hydrophobicity,
+    "seg-complexity": composition.seg_complexity,
+    # every window has the same length, so kappa scores them all as one array
+    "kappa": patterning.kappa,
+}
 
 
 class Protein:
@@ -1090,28 +1107,12 @@ class Protein:
             Per-position track values corresponding to the requested mode.
         """
 
-        utilities.validate_keyword_option(
-            mode,
-            [
-                "FCR",
-                "NCPR",
-                "aromatic",
-                "aliphatic",
-                "polar",
-                "proline",
-                "positive",
-                "negative",
-                "hydrophobicity",
-                "seg-complexity",
-                "kappa",
-            ],
-            "mode",
-        )
+        utilities.validate_keyword_option(mode, list(_LINEAR_PROFILE_MODES), "mode")
 
-        # validated here (rather than only inside build_track) so the error names
-        # the offending keyword, matching linear_composition_profile /
-        # linear_property_profile
-        utilities.validate_keyword_option(end_mode, ["extend-ends", "zero-ends", ""], "end_mode")
+        # validated here (rather than only inside sparrow.properties.profiles) so
+        # the error names the offending keyword, matching
+        # linear_composition_profile / linear_property_profile
+        utilities.validate_keyword_option(end_mode, list(profiles.END_MODES), "end_mode")
 
         if smooth is not None:
             name = "%s-%i-%s-%i" % (mode, window_size, end_mode, smooth)
@@ -1119,9 +1120,13 @@ class Protein:
             name = "%s-%i-%s" % (mode, window_size, end_mode)
 
         if name not in self.__linear_profiles:
-            self.__linear_profiles[name] = track_tools.predefined_linear_track(
-                self.__seq, mode, window_size, end_mode, smooth
-            )
+            self.__linear_profiles[name] = profiles.window_profile(
+                self.__encoded_sequence(),
+                _LINEAR_PROFILE_MODES[mode],
+                window_size=window_size,
+                end_mode=end_mode,
+                smooth=smooth,
+            )[0]
 
         return self.__linear_profiles[name]
 
@@ -1166,7 +1171,7 @@ class Protein:
             Per-position local density of the residues in ``composition_list``.
         """
 
-        utilities.validate_keyword_option(end_mode, ["extend-ends", "zero-ends", ""], "end_mode")
+        utilities.validate_keyword_option(end_mode, list(profiles.END_MODES), "end_mode")
 
         # we sort the composition list to unify how it is saved for memoization
         try:
@@ -1186,13 +1191,16 @@ class Protein:
         )
 
         if name not in self.__linear_profiles:
-            self.__linear_profiles[name] = track_tools.linear_track_composition(
-                self.__seq,
-                composition_list,
+            # residues that are not standard amino acids are ignored rather than
+            # rejected, as compute_residue_fractions does
+            residues = [residue for residue in composition_list if residue in encoding.RESIDUE_INDEX]
+            self.__linear_profiles[name] = profiles.fraction_profile(
+                self.__encoded_sequence(),
+                residues,
                 window_size=window_size,
                 end_mode=end_mode,
                 smooth=smooth,
-            )
+            )[0]
 
         return self.__linear_profiles[name]
 
@@ -1257,7 +1265,7 @@ class Protein:
         """
         from sparrow.data import aaindex
 
-        utilities.validate_keyword_option(end_mode, ["extend-ends", "zero-ends", ""], "end_mode")
+        utilities.validate_keyword_option(end_mode, list(profiles.END_MODES), "end_mode")
 
         # resolve the requested index (raises SparrowException if unknown)
         metadata = aaindex.get_property_metadata(mode)
@@ -1281,9 +1289,13 @@ class Protein:
         )
 
         if name not in self.__linear_profiles:
-            self.__linear_profiles[name] = track_tools.linear_track_property(
-                self.__seq, value_map, window_size, end_mode, smooth
-            )
+            self.__linear_profiles[name] = profiles.scale_profile(
+                self.__encoded_sequence(),
+                value_map,
+                window_size=window_size,
+                end_mode=end_mode,
+                smooth=smooth,
+            )[0]
 
         return self.__linear_profiles[name]
 

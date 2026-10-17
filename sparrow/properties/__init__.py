@@ -25,4 +25,7 @@ Modules
 :mod:`~sparrow.properties.patterning`
     How residues are arranged: kappa, delta, the patterning percentile, IWD,
     SCD and SHD.
+:mod:`~sparrow.properties.profiles`
+    Linear profiles: any of these properties along a sequence, one window at
+    a time.
 """

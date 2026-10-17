@@ -75,6 +75,26 @@ The patch metrics used by NARDINI+ are batch functions too, in
    a_patch = patch_fraction(sequences, "A")      # one fraction per sequence
    rg_patch = rg_patch_fraction(sequences)
 
+Linear Profiles
+---------------
+
+The windowed profiles behind ``Protein.linear_sequence_profile`` and its
+relatives are batch functions in :mod:`sparrow.properties.profiles`, each
+returning one profile per sequence.
+:func:`~sparrow.properties.profiles.window_profile` profiles any batch property:
+every window of every sequence is handed to the property function as one batch.
+
+.. code-block:: python
+
+   from sparrow.properties import composition, patterning, profiles
+
+   sequences = ["MEEEKKKKSSSTTTDDDQQQQNNNN", "GRGRGGYGGRGGYGGSRGGYGG"]
+
+   fcr = profiles.window_profile(sequences, composition.fraction_charged, window_size=8)
+   kappa = profiles.window_profile(sequences, patterning.kappa, window_size=12)
+   qn = profiles.fraction_profile(sequences, ["Q", "N"], window_size=8)
+   ncpr = profiles.net_charge_profile(sequences, window_size=7, end_mode="")
+
 Protein vs Functional API
 -------------------------
 
@@ -102,6 +122,8 @@ Key function entry points:
 * :func:`sparrow.properties.encoding.scale_values`
 * :func:`sparrow.properties.patches.patch_fraction`
 * :func:`sparrow.properties.patches.rg_patch_fraction`
+* :func:`sparrow.properties.profiles.window_profile`
+* :func:`sparrow.properties.profiles.fraction_profile`
 
 Sequence properties
 -------------------
@@ -123,4 +145,7 @@ compositional features, so the two cannot disagree. Every function takes a batch
    :members:
 
 .. automodule:: sparrow.properties.patches
+   :members:
+
+.. automodule:: sparrow.properties.profiles
    :members:

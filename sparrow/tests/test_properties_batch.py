@@ -4,10 +4,12 @@ Each takes a batch and returns an array with one entry (or row) per sequence, an
 a sequence gets exactly the same answer - to the last bit - whether it is computed
 alone or as part of a batch. That is what lets ``Protein`` call these functions
 with a batch of one and still agree with ``sparrow.nardini``, which calls them
-with thousands.
+with thousands. The profiles return one profile per sequence instead, and are
+held to the same standard.
 
 ``test_every_batch_function_is_covered`` fails when a public function is added to
-one of these modules without an entry in ``CALLS``, so nothing escapes the check.
+one of these modules without an entry in ``CALLS`` or ``PROFILE_CALLS``, so
+nothing escapes the check.
 """
 
 import inspect
@@ -16,7 +18,7 @@ import numpy as np
 import pytest
 
 from sparrow.data import amino_acids
-from sparrow.properties import charge, composition, encoding, patches, patterning
+from sparrow.properties import charge, composition, encoding, patches, patterning, profiles
 
 BATCH = [
     "MEEEKKKKSSSTTTDDDQQQQNNNNGGG",
@@ -67,13 +69,27 @@ CALLS = {
     "patterning.shd": patterning.shd,
 }
 
+#: Window the profiles are taken over.
+PROFILE_WINDOW = 8
+
+#: Every profile function, called with representative arguments. Each returns a
+#: list with one profile per sequence.
+PROFILE_CALLS = {
+    "profiles.window_profile": lambda batch: profiles.window_profile(batch, patterning.kappa, PROFILE_WINDOW),
+    "profiles.fraction_profile": lambda batch: profiles.fraction_profile(batch, "QNS", PROFILE_WINDOW, "zero-ends"),
+    "profiles.net_charge_profile": lambda batch: profiles.net_charge_profile(batch, PROFILE_WINDOW, ""),
+    "profiles.scale_profile": lambda batch: profiles.scale_profile(
+        batch, amino_acids.AA_hydro_KD_normalized, PROFILE_WINDOW, smooth=5
+    ),
+}
+
 #: Functions that reject sequences shorter than their window, mapped to the
 #: shortest sequence they accept; they are given only sequences that long.
 MINIMUM_LENGTH = {
     "patterning.patterning_percentile": 5,
     "patterning.iwd_charged_weighted": patterning.CHARGE_IWD_WINDOW,
     "patterning.bivariate_iwd_charged_weighted": patterning.CHARGE_IWD_WINDOW,
-}
+} | {name: PROFILE_WINDOW for name in PROFILE_CALLS}
 
 #: Functions that read characters rather than residue codes, and so do not take
 #: an EncodedBatch.
@@ -99,7 +115,13 @@ NOT_BATCH_FUNCTIONS = {
     "patterning.iwd_from_masks",
 }
 
-MODULES = {"composition": composition, "charge": charge, "patches": patches, "patterning": patterning}
+MODULES = {
+    "composition": composition,
+    "charge": charge,
+    "patches": patches,
+    "patterning": patterning,
+    "profiles": profiles,
+}
 
 
 def batch_for(name):
@@ -113,7 +135,8 @@ def test_every_batch_function_is_covered():
             if not inspect.isfunction(getattr(module, name)) and not inspect.isclass(getattr(module, name)):
                 continue
             key = f"{short_name}.{name}"
-            assert key in CALLS or key in NOT_BATCH_FUNCTIONS, f"{key} is not covered by the batch test"
+            covered = key in CALLS or key in PROFILE_CALLS or key in NOT_BATCH_FUNCTIONS
+            assert covered, f"{key} is not covered by the batch test"
 
 
 @pytest.mark.parametrize("name", sorted(CALLS))
@@ -159,3 +182,51 @@ def test_an_encoded_batch_gives_the_same_answer(name):
 @pytest.mark.parametrize("name", sorted(CALLS))
 def test_a_bare_string_is_a_batch_of_one(name):
     np.testing.assert_array_equal(CALLS[name](BATCH[0]), CALLS[name]([BATCH[0]]))
+
+
+# -- profiles --------------------------------------------------------------
+
+
+def assert_same_profiles(observed, expected):
+    assert len(observed) == len(expected)
+    for one, other in zip(observed, expected):
+        np.testing.assert_array_equal(one, other)
+
+
+@pytest.mark.parametrize("name", sorted(PROFILE_CALLS))
+def test_profiles_give_one_profile_per_sequence(name):
+    batch = batch_for(name)
+    result = PROFILE_CALLS[name](batch)
+    assert isinstance(result, list)
+    assert len(result) == len(batch)
+    for profile in result:
+        assert isinstance(profile, np.ndarray)
+        assert profile.dtype == np.float64
+        assert profile.ndim == 1
+
+
+@pytest.mark.parametrize("name", sorted(PROFILE_CALLS))
+def test_profile_batch_matches_one_sequence_at_a_time(name):
+    sequences = batch_for(name)
+    one_at_a_time = [PROFILE_CALLS[name]([sequence])[0] for sequence in sequences]
+    assert_same_profiles(PROFILE_CALLS[name](sequences), one_at_a_time)
+
+
+@pytest.mark.parametrize("name", sorted(PROFILE_CALLS))
+def test_a_large_profile_batch_matches_one_sequence_at_a_time(name):
+    """Large enough that numpy iterates, buffers and reduces it differently."""
+    sequences = batch_for(name)
+    repeats = 300
+    one_at_a_time = [PROFILE_CALLS[name]([sequence])[0] for sequence in sequences]
+    assert_same_profiles(PROFILE_CALLS[name](sequences * repeats), one_at_a_time * repeats)
+
+
+@pytest.mark.parametrize("name", sorted(PROFILE_CALLS))
+def test_an_encoded_batch_gives_the_same_profiles(name):
+    sequences = batch_for(name)
+    assert_same_profiles(PROFILE_CALLS[name](encoding.encode_batch(sequences)), PROFILE_CALLS[name](sequences))
+
+
+@pytest.mark.parametrize("name", sorted(PROFILE_CALLS))
+def test_a_bare_string_is_a_batch_of_one_profile(name):
+    assert_same_profiles(PROFILE_CALLS[name](BATCH[0]), PROFILE_CALLS[name]([BATCH[0]]))

@@ -112,6 +112,7 @@ if MOCK:
         "sparrow.properties.charge",
         "sparrow.properties.patches",
         "sparrow.properties.windows",
+        "sparrow.properties.profiles",
         "sparrow.properties.patterning",
     ]
     autodoc_mock_imports = []
