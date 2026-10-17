@@ -1,7 +1,8 @@
 """pH-dependent charge and the isoelectric point.
 
-Both use Henderson-Hasselbalch with the EMBOSS side-chain pKa values
-(:data:`sparrow.data.amino_acids.AA_PKA`), treating K, R and H as bases and E, D,
+Both use Henderson-Hasselbalch with the side-chain pKa values in
+:data:`sparrow.data.amino_acids.AA_PKA` - the EMBOSS values, except lysine at
+10.0 rather than 10.8, as in localCIDER - treating K, R and H as bases and E, D,
 Y and C as acids. The termini are not included. This reproduces localCIDER's
 ``get_isoelectric_point()``, including its convention of normalizing the charge
 by the number of titratable residues.

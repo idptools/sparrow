@@ -67,11 +67,17 @@ sparrow is currently installed directly from the repository:
    # with uv
    uv pip install git+https://github.com/idptools/sparrow.git
 
-To install a specific tagged release, append ``@<tag>``:
+To install a specific release instead, append its tag, as listed on the
+`tags page <https://github.com/idptools/sparrow/tags>`_:
 
 .. code-block:: bash
 
-   pip install git+https://github.com/idptools/sparrow.git@1.0.0
+   pip install git+https://github.com/idptools/sparrow.git@<tag>
+
+sparrow takes its version from these tags when it is built, so
+``sparrow.__version__`` tells you which one you have; between releases it also
+names the commit, for example ``0.2.2+97.gc0df3a3``. This documentation was built
+from sparrow |release|.
 
 Install for development
 ^^^^^^^^^^^^^^^^^^^^^^^

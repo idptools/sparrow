@@ -8,6 +8,7 @@ from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 from pathlib import Path
 
+import versioningit
 from sphinx.ext.autodoc.mock import mock
 from sphinx.util import logging
 
@@ -23,10 +24,19 @@ project = "sparrow"
 author = "Alex Holehouse, Ryan Emenecker, Jeffrey Lotthammer"
 copyright = f"2020-{datetime.now().year}, {author}"
 
+# The version comes from the git tags through versioningit - the same source as
+# sparrow.__version__ - so the docs always name the commit they were built from.
+# Read the Docs does not install sparrow, so the installed package's metadata is
+# only a fallback, for a copy of the docs built outside a git checkout.
+DISTRIBUTION_NAME = "idptools-sparrow"
 try:
-    release = _pkg_version("sparrow")
-except PackageNotFoundError:
-    release = "0.0.0"
+    release = versioningit.get_version(ROOT)
+except Exception as error:
+    try:
+        release = _pkg_version(DISTRIBUTION_NAME)
+    except PackageNotFoundError:
+        release = "unknown"
+    logger.warning("versioningit could not read the version (%s); using %s", error, release)
 version = ".".join(release.split(".")[:2])
 
 # -- General configuration ---------------------------------------------------
@@ -128,10 +138,48 @@ nitpicky = False
 todo_include_todos = True
 suppress_warnings = [
     "autodoc.mocked_object",
-    "ref",
+    # Sphinx 9 warns when a type word in a docstring ("sequence of str") matches
+    # several documented attributes of that name (Protein.sequence, ELM.sequence,
+    # ...). It is a word, not a link, so the ambiguity is harmless; a reference
+    # that resolves to nothing is a different warning and is still reported.
+    "ref.python",
     "bibtex.duplicate_citation",
     "bibtex.duplicate_label",
 ]
+
+# numpy-style docstrings describe types in prose ("int, optional", "sequence of
+# str", "{'raise', 'skip'}"), and napoleon turns each word into a cross-reference.
+# None of these name an object, so the strict build (-n) ignores them, along with
+# third-party types that have no intersphinx inventory here. Any other unresolved
+# reference is a broken link, and the strict build reports it.
+_TYPE_PROSE = [
+    r"optional",
+    r"default .*",
+    r"sequence",
+    r"iterable",
+    r"mapping",
+    r"callable",
+    r"array_like",
+    r"arrays?",
+    r"str to .*",
+    r".* object",
+    r"numpy dtype",
+    # the pieces of a set of allowed values, such as {'raise', 'skip'}
+    r"\{.*",
+    r".*\}",
+    r"'.*'",
+    r'".*"',
+]
+_UNDOCUMENTED_EXTERNAL_TYPES = [
+    r"NDArray",
+    r"np\..*",
+    r"numpy\..*",
+    r"pandas\..*",
+    r"torch\..*",
+    r"pyfamsa\..*",
+    r"Alignment",
+]
+nitpick_ignore_regex = [("py:class", pattern) for pattern in _TYPE_PROSE + _UNDOCUMENTED_EXTERNAL_TYPES]
 
 # -- Options for sphinxcontrib-bibtex ---------------------------------------
 

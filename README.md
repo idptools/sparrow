@@ -2,8 +2,7 @@
 
 **S**equence **PAR**ameters for **R**egi**O**ns in **W**indows — a lightweight, object-oriented toolkit for analyzing and predicting features of protein sequences, with a particular focus on intrinsically disordered regions (IDRs).
 
-**Current version is 1.0.x (June 2026)** 
-
+[![Latest release](https://img.shields.io/github/v/tag/idptools/sparrow?sort=semver&label=release)](https://github.com/idptools/sparrow/tags)
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-261230.svg)](https://github.com/astral-sh/ruff)
@@ -327,8 +326,7 @@ plugins are easy to add (see the developer guides in the documentation).
 
 ## Changelog
 
-The full version history is in [CHANGELOG.md](CHANGELOG.md). The latest release
-is **1.0.0**.
+The full version history is in [CHANGELOG.md](CHANGELOG.md), and the releases are listed on the [tags page](https://github.com/idptools/sparrow/tags). An installed copy reports its own version as `sparrow.__version__`, which is set from the git tags when it is built.
 
 ## License
 

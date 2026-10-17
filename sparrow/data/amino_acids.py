@@ -238,8 +238,10 @@ AA_PPII_HILSER = {
 }
 
 #: Side-chain pKa values for the titratable residues, as used for pH-dependent
-#: charge and isoelectric-point calculations. These are the EMBOSS values, and
-#: match those used by localCIDER.
+#: charge and isoelectric-point calculations. These are the EMBOSS values except
+#: for lysine, which is 10.0 rather than EMBOSS's 10.8: the whole table matches
+#: localCIDER, and the bundled NARDINI+ backgrounds and GIN centroids were built
+#: with it, so the NARDINI ``'Iso point'`` feature depends on it.
 AA_PKA = {"C": 8.5, "Y": 10.1, "H": 6.5, "E": 4.1, "D": 3.9, "K": 10.0, "R": 12.5}
 
 # The titratable residues of AA_PKA, split by the charge they carry when ionized.

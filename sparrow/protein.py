@@ -491,7 +491,9 @@ class Protein:
         Estimated isoelectric point (pI) of the sequence.
 
         Found by bisecting on pH until the mean charge of the titratable side
-        chains reaches zero, using the EMBOSS side-chain pKa values. Termini are
+        chains reaches zero, using the side-chain pKa values in
+        :data:`sparrow.data.amino_acids.AA_PKA` (EMBOSS's, except lysine at 10.0
+        rather than 10.8). Termini are
         not included, matching localCIDER's ``get_isoelectric_point()``. A sequence
         with no titratable residues returns 7.0. Calculated on first access and
         cached.
@@ -586,7 +588,9 @@ class Protein:
         """
         Mean charge of the titratable side chains at a given pH.
 
-        Henderson-Hasselbalch with the EMBOSS side-chain pKa values, treating
+        Henderson-Hasselbalch with the side-chain pKa values in
+        :data:`sparrow.data.amino_acids.AA_PKA` (EMBOSS's, except lysine at 10.0
+        rather than 10.8), treating
         K/R/H as bases and E/D/Y/C as acids. Termini are not included, so this is
         not the same quantity as :attr:`NCPR` (which counts formal charges and
         assumes full ionization).

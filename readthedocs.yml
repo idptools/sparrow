@@ -4,6 +4,10 @@ build:
   tools:
     python: "3.11"
   jobs:
+    post_checkout:
+      # the docs take their version from the git tags (versioningit), which a
+      # shallow clone does not have
+      - git fetch --unshallow --tags || true
     pre_build:
       - export SPARROW_DOC_BUILD=1
 python:

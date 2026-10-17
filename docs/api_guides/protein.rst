@@ -87,10 +87,11 @@ Charge & charge patterning
    p.charge_at_pH(5.5)                       # mean titratable charge at any pH
 
 ``FCR`` and ``NCPR`` count *formal* charges and assume full ionization.
-``charge_at_pH`` instead applies Henderson-Hasselbalch with the EMBOSS side-chain
-pKa values, so it also sees H, Y and C, and it is the quantity
+``charge_at_pH`` instead applies Henderson-Hasselbalch with side-chain pKa values
+(:data:`~sparrow.data.amino_acids.AA_PKA`: the EMBOSS values, except lysine at
+10.0 rather than 10.8), so it also sees H, Y and C, and it is the quantity
 ``isoelectric_point`` bisects to zero. Termini are not included in either, matching
-localCIDER.
+localCIDER, whose pKa values these are.
 
 Hydrophobicity
 --------------
