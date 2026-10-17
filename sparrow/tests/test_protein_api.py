@@ -3,8 +3,7 @@
 import pytest
 
 from sparrow import Protein
-from sparrow.patterning import kappa as kappa_module
-from sparrow.properties import composition
+from sparrow.properties import composition, patterning
 from sparrow.sparrow_exceptions import ProteinException, SparrowException
 
 SEQ = "MEEEKKKKSSSTTTDDDQQQQNNNNGGGGRRRRDDDD"
@@ -47,8 +46,8 @@ def test_kappa_in_unit_range(protein):
 
 
 def test_kappa_default_matches_window_average(protein):
-    k5 = kappa_module.kappa_x(SEQ, ["R", "K"], ["E", "D"], 5, 1)
-    k6 = kappa_module.kappa_x(SEQ, ["R", "K"], ["E", "D"], 6, 1)
+    k5 = patterning.kappa_x(SEQ, ["R", "K"], ["E", "D"], 5, True)[0]
+    k6 = patterning.kappa_x(SEQ, ["R", "K"], ["E", "D"], 6, True)[0]
     assert protein.kappa == pytest.approx((k5 + k6) / 2)
 
 

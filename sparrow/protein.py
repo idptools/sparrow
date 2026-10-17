@@ -16,7 +16,7 @@ from sparrow.data import amino_acids
 # compiled code's single-precision arithmetic, and more accurate where they
 # differ - see sparrow.patterning.vectorized and its test module.
 from sparrow.patterning import vectorized as patterning_metrics
-from sparrow.properties import charge, composition, encoding, patches
+from sparrow.properties import charge, composition, encoding, patches, patterning
 from sparrow.sequence_analysis import (
     elm,
     phospho_isoforms,
@@ -279,12 +279,7 @@ class Protein:
         """
 
         if self.__kappa is None:
-            if len(self.sequence) < 6:
-                self.__kappa = -1
-            else:
-                k5 = patterning_metrics.kappa_x(self.sequence, ["R", "K"], ["E", "D"], 5, 1)
-                k6 = patterning_metrics.kappa_x(self.sequence, ["R", "K"], ["E", "D"], 6, 1)
-                self.__kappa = (k5 + k6) / 2
+            self.__kappa = float(patterning.kappa(self.__encoded_sequence())[0])
 
         return self.__kappa
 
@@ -766,14 +761,10 @@ class Protein:
 
         # after set up, calculate kappa_x
         if kappa_x_name not in self.__kappa_x:
-            if flatten:
-                self.__kappa_x[kappa_x_name] = patterning_metrics.kappa_x(
-                    self.sequence, list(group1), list(group2), window_size, 1
-                )
-            else:
-                self.__kappa_x[kappa_x_name] = patterning_metrics.kappa_x(
-                    self.sequence, list(group1), list(group2), window_size, 0
-                )
+            value = patterning.kappa_x(
+                self.__encoded_sequence(), list(group1), list(group2), window_size, bool(flatten)
+            )
+            self.__kappa_x[kappa_x_name] = float(value[0])
 
         return self.__kappa_x[kappa_x_name]
 

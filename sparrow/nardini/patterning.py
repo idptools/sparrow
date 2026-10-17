@@ -64,11 +64,13 @@ The residue groupings are exact partitions of the 20 amino acids, so a sequence
 reduces to an array of integer type labels. Scrambling is then a permutation of
 that label array, and all window counts for all types follow from one cumulative
 sum. This makes the calculation a few hundred times faster than the loop-based
-reference implementation while producing identical numbers, which matters because
-the published protocol uses 100,000 scrambles per sequence.
+reference implementation while agreeing with it to rounding error, which matters
+because the published protocol uses 100,000 scrambles per sequence.
 
-The ``'kappa'`` and ``'iwd'`` backends get the same treatment through
-:mod:`sparrow.patterning.vectorized`, which scores a whole block of scrambles per
+Omega and the pair features are both Das & Pappu's delta, computed from the
+window counts by :func:`sparrow.properties.patterning.window_delta` - the same
+function behind ``kappa_x``, ``delta`` and ``patterning_percentile``. The
+``'kappa'`` and ``'iwd'`` backends also score a whole block of scrambles per
 call, so all three backends cost about the same.
 
 Whatever the backend, the observed sequence is scored as a block of one by the
@@ -85,6 +87,8 @@ from sparrow.nardini.groups import (
     patterning_feature_names,
 )
 from sparrow.properties import encoding
+from sparrow.properties.patterning import asymmetry, kappa_from_ternary, window_delta
+from sparrow.properties.windows import label_window_counts
 from sparrow.sparrow_exceptions import SparrowException
 
 __all__ = [
@@ -224,61 +228,28 @@ def type_fractions(labels, num_types):
     return counts / labels.size
 
 
-def _window_counts(labels_2d, num_types, blob_size, types=None):
-    """Sliding-window counts of every type, for a batch of label arrays.
-
-    Parameters
-    ----------
-    labels_2d : numpy.ndarray
-        Integer array of shape ``(n_sequences, length)``.
-    num_types : int
-        Number of residue types.
-    blob_size : int
-        Window size.
-    types : sequence of int, optional
-        Only count these residue types, in this order. Default None (all of
-        them). Restricting to the types some evaluated feature actually refers
-        to is worth real time on the scramble path, where this runs thousands of
-        times.
-
-    Returns
-    -------
-    numpy.ndarray
-        Array of shape ``(n_sequences, n_types, n_windows)`` of counts, where
-        ``n_types`` is ``num_types`` (or ``len(types)``) and ``n_windows`` is
-        ``length - blob_size + 1``: one window per run of ``blob_size``
-        consecutive residues, and no partial window at the end (see the module
-        docstring for why).
-    """
-    n_seqs, length = labels_2d.shape
-    wanted = range(num_types) if types is None else list(types)
-
-    # A window count is the difference of two prefix sums over an indicator of
-    # "is this position type t". Done one type at a time rather than one-hotting
-    # every type at once: it reuses a single (n_seqs, length + 1) buffer instead
-    # of allocating an (n_seqs, num_types, length) cube, and it lets the caller
-    # skip types no evaluated feature refers to. int16 is ample - a count cannot
-    # exceed the sequence length - and halves the memory traffic of int32.
-    out = np.empty((n_seqs, len(wanted), length - blob_size + 1), dtype=np.int16)
-    prefix = np.zeros((n_seqs, length + 1), dtype=np.int16)
-
-    for slot, residue_type in enumerate(wanted):
-        np.cumsum(labels_2d == residue_type, axis=1, out=prefix[:, 1:])
-        np.subtract(prefix[:, blob_size:], prefix[:, :-blob_size], out=out[:, slot, :])
-
-    return out
-
-
-def _asymmetries_from_counts(counts, fractions, pair_index, blob_size, mask=None, slot_of=None):
+def _asymmetries_from_counts(counts, type_counts, pair_index, blob_size, mask=None, slot_of=None):
     """Compute all patterning features from precomputed window counts.
+
+    Both statistics are Das & Pappu's delta, computed by
+    :func:`sparrow.properties.patterning.window_delta` - the same function behind
+    ``kappa_x`` and ``patterning_percentile`` - from the counts of the two groups
+    being compared:
+
+    * **omega** compares type ``i`` with every other residue. A window of ``b``
+      residues holding ``c`` of type ``i`` has ``a - b = c - (b - c) = 2c - b``
+      and ``a + b = b``.
+    * a **pair** compares type ``i`` with type ``j``: ``a - b = c_i - c_j`` and
+      ``a + b = c_i + c_j``.
 
     Parameters
     ----------
     counts : numpy.ndarray
-        Window counts of shape ``(n_sequences, num_types, n_windows)``.
-    fractions : numpy.ndarray
-        Whole-sequence type fractions, shape ``(num_types,)``. Scrambling
-        preserves composition, so one set of fractions applies to every row.
+        Window counts of shape ``(n_sequences, n_types, n_windows)``, from
+        :func:`sparrow.properties.windows.label_window_counts`.
+    type_counts : numpy.ndarray
+        Whole-sequence count of each residue type, shape ``(num_types,)``.
+        Scrambling preserves composition, so one set applies to every row.
     pair_index : list of tuple
         ``(i, j)`` type-index pairs in canonical feature order.
     blob_size : int
@@ -298,9 +269,11 @@ def _asymmetries_from_counts(counts, fractions, pair_index, blob_size, mask=None
     """
     n_seqs = counts.shape[0]
     out = np.zeros((n_seqs, len(pair_index)), dtype=np.float64)
+    length = int(np.sum(type_counts))
 
-    # window fractions
-    frac_windows = counts / float(blob_size)
+    # the asymmetry arithmetic is done in float64, which holds these counts
+    # exactly; converting once here saves converting per feature
+    window_counts = counts.astype(np.float64)
 
     # `counts` may cover only some types, in which case slot_of maps a type index
     # onto its row. Without it, the type index is the row.
@@ -316,32 +289,18 @@ def _asymmetries_from_counts(counts, fractions, pair_index, blob_size, mask=None
 
         if i == j:
             # omega: one type against everything else
-            f = fractions[i]
-            sigma_all = (f - (1.0 - f)) ** 2
-            window = frac_windows[:, row(i), :]
-            sigma_window = (window - (1.0 - window)) ** 2
+            whole = asymmetry(2 * type_counts[i] - length, length, float(length))
+            in_window = window_counts[:, row(i), :]
+            out[:, feature] = window_delta(2.0 * in_window - blob_size, float(blob_size), blob_size, whole)
         else:
-            # kappa: type i against type j
-            f1, f2 = fractions[i], fractions[j]
-            denominator = f1 + f2
-            if denominator == 0:
+            # pair: type i against type j
+            if type_counts[i] + type_counts[j] == 0:
                 # cannot happen for gated features, but keep it defined
                 continue
-            sigma_all = (f1 - f2) ** 2 / denominator
-
-            c1 = frac_windows[:, row(i), :]
-            c2 = frac_windows[:, row(j), :]
-            total = c1 + c2
-            sigma_window = np.zeros_like(total)
-            nonzero = total > 0
-            np.divide(
-                (c1 - c2) ** 2,
-                total,
-                out=sigma_window,
-                where=nonzero,
-            )
-
-        out[:, feature] = np.mean((sigma_window - sigma_all) ** 2, axis=1)
+            whole = asymmetry(type_counts[i] - type_counts[j], type_counts[i] + type_counts[j], float(length))
+            in_i = window_counts[:, row(i), :]
+            in_j = window_counts[:, row(j), :]
+            out[:, feature] = window_delta(in_i - in_j, in_i + in_j, blob_size, whole)
 
     return out
 
@@ -414,7 +373,8 @@ def _encode_arrangement(sequence, labels, backend):
 
     The ``'nardini'`` statistic depends only on which *type* sits at each
     position, so permuting the type labels is equivalent to permuting the
-    residues. The ``'kappa'`` and ``'iwd'`` routines take residue codes.
+    residues. The ``'kappa'`` and ``'iwd'`` routines take residue codes
+    (:func:`sparrow.properties.encoding.residue_codes`).
 
     Parameters
     ----------
@@ -428,11 +388,11 @@ def _encode_arrangement(sequence, labels, backend):
     Returns
     -------
     numpy.ndarray
-        1D ``int8`` type labels, or ``uint8`` ASCII codes.
+        1D ``int8`` type labels, or ``int8`` residue codes.
     """
     if backend == "nardini":
         return labels
-    return np.frombuffer(sequence.encode("ascii"), dtype=np.uint8)
+    return encoding.residue_codes(sequence)
 
 
 def _nardini_values(labels_2d, num_types, fractions, pairs, evaluated, blob_size):
@@ -469,21 +429,25 @@ def _nardini_values(labels_2d, num_types, fractions, pairs, evaluated, blob_size
     for slot, residue_type in enumerate(needed_types):
         slot_of[residue_type] = slot
 
-    counts = _window_counts(labels_2d, num_types, blob_size, types=needed_types)
-    return _asymmetries_from_counts(counts, fractions, pairs, blob_size, mask=evaluated, slot_of=slot_of)
+    # every arrangement is a permutation of the same sequence, so any row gives
+    # the whole-sequence type counts
+    type_counts = np.bincount(labels_2d[0], minlength=num_types)
+    counts = label_window_counts(labels_2d, needed_types, blob_size)
+    return _asymmetries_from_counts(counts, type_counts, pairs, blob_size, mask=evaluated, slot_of=slot_of)
 
 
 def _alternative_values(codes, groups, pairs, evaluated, backend, blob_size):
     """``'kappa'`` or ``'iwd'`` values for a block of residue-code arrays.
 
-    Uses the vectorized NumPy implementations in
-    :mod:`sparrow.patterning.vectorized` - the same code behind
-    ``Protein.kappa`` and the IWD methods - which score a whole block per call.
+    kappa comes from :func:`sparrow.properties.patterning.kappa_from_ternary` -
+    the same code behind ``Protein.kappa`` and ``kappa_x`` - and IWD from the
+    batch IWD behind the ``Protein`` IWD methods. Both score a whole block per
+    call.
 
     Parameters
     ----------
     codes : numpy.ndarray
-        ``uint8`` ASCII codes of shape ``(n_arrangements, length)``.
+        Residue codes of shape ``(n_arrangements, length)``.
     groups : collections.OrderedDict
         The residue grouping.
     pairs : list of tuple
@@ -514,12 +478,12 @@ def _alternative_values(codes, groups, pairs, evaluated, backend, blob_size):
             # an empty group2 makes kappa_x a binary (group i vs rest) statistic
             group2 = [] if i == j else group_lists[j]
             ternary = encoding.ternarize_winged_batch(codes, group_lists[i], group2, blob_size)
-            kappa = vec.kappa_from_ternary_batch(ternary, blob_size, 1, group2_present=len(group2) > 0)
+            kappa = kappa_from_ternary(ternary, blob_size, flatten=True, group2_present=len(group2) > 0)
             # kappa_x reports -1 when undefined; that means "not scored"
             values[:, feature] = np.where(kappa < 0, 0.0, kappa)
         else:
             targets = group_lists[i] if i == j else sorted(set(group_lists[i]) | set(group_lists[j]))
-            values[:, feature] = vec.iwd_batch(encoding.membership_lookup(targets)[codes])
+            values[:, feature] = vec.iwd_batch(encoding.residue_membership(targets)[codes])
 
     return values
 

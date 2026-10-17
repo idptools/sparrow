@@ -203,11 +203,14 @@ def test_scramble_scoring_matches_reference():
     rng = random.Random(3)
     scrambles = ["".join(rng.sample(SMARCC2_LIKE, len(SMARCC2_LIKE))) for _ in range(25)]
 
+    from sparrow.properties.windows import label_window_counts
+
     labels = np.stack([P.encode_types(s) for s in scrambles])
     fractions = P.type_fractions(P.encode_types(SMARCC2_LIKE), 8)
+    type_counts = np.bincount(P.encode_types(SMARCC2_LIKE), minlength=8)
     pairs = P._pair_index(8)
-    counts = P._window_counts(labels, 8, 5)
-    got = P._asymmetries_from_counts(counts, fractions, pairs, 5)
+    counts = label_window_counts(labels, range(8), 5)
+    got = P._asymmetries_from_counts(counts, type_counts, pairs, 5)
     got[:, ~P._evaluated_mask(fractions, pairs, 0.10)] = 0.0
 
     for row, scramble in enumerate(scrambles):
@@ -231,7 +234,9 @@ def test_windows_are_the_complete_windows_only():
     sequence = "EEEEEKKKKK"
     blob_size = 5
 
-    counts = P._window_counts(P.encode_types(sequence)[None, :], 8, blob_size)
+    from sparrow.properties.windows import label_window_counts
+
+    counts = label_window_counts(P.encode_types(sequence)[None, :], range(8), blob_size)
     assert counts.shape == (1, 8, len(sequence) - blob_size + 1)
 
     window_asymmetries = np.array([1.0, 0.36, 0.04, 0.04, 0.36, 1.0])
@@ -417,8 +422,8 @@ def test_alternative_backends_are_the_sparrow_statistics(sequence):
     """'kappa' and 'iwd' must be sparrow's own kappa_x and IWD, feature by feature.
 
     The backends score whole blocks of arrangements with the batch routines in
-    sparrow.patterning.vectorized. This checks them against the single-sequence
-    functions behind Protein.kappa and the IWD methods. A diagonal feature is one
+    sparrow.properties. This checks them against the sequence-level functions
+    behind Protein.kappa and the IWD methods. A diagonal feature is one
     type against the rest (kappa_x with an empty second group, or the IWD of that
     type); an off-diagonal one is one type against another (kappa_x of the pair,
     or the IWD of their union). Unevaluated features must be exactly zero.
@@ -428,6 +433,7 @@ def test_alternative_backends_are_the_sparrow_statistics(sequence):
     single-sequence one loops over pairs, so the two agree to rounding only.
     """
     from sparrow.patterning import vectorized as vec
+    from sparrow.properties import patterning
 
     groups = [sorted(residues) for residues in TYPES_8.values()]
     fractions = [sum(sequence.count(residue) for residue in group) / len(sequence) for group in groups]
@@ -442,7 +448,7 @@ def test_alternative_backends_are_the_sparrow_statistics(sequence):
             assert iwd[feature] == 0.0
             continue
 
-        expected_kappa = vec.kappa_x(sequence, groups[i], [] if i == j else groups[j], 5, 1)
+        expected_kappa = patterning.kappa_x(sequence, groups[i], [] if i == j else groups[j], 5, flatten=True)[0]
         targets = groups[i] if i == j else sorted(set(groups[i]) | set(groups[j]))
         expected_iwd = vec.calculate_average_inverse_distance_from_sequence(sequence, targets)
 

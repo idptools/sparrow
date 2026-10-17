@@ -1,12 +1,11 @@
-from sparrow import sparrow_exceptions, protein
-from sparrow.properties import composition, encoding
+from sparrow import sparrow_exceptions
+from sparrow.properties import composition, encoding, patterning
 from scipy.signal import savgol_filter
 import numpy as np
 
-# Profile modes that depend only on the composition of each window. Every window
-# is scored at once by the batch function in sparrow.properties - the same one
-# behind the Protein property of the same name - rather than by building a
-# Protein per window.
+# Profile modes, each scored for every window at once by the batch function in
+# sparrow.properties - the same one behind the Protein property of the same
+# name - rather than by building a Protein per window.
 _COMPOSITION_TRACKS = {
     "FCR": composition.fraction_charged,
     "NCPR": composition.net_charge_per_residue,
@@ -18,6 +17,8 @@ _COMPOSITION_TRACKS = {
     "negative": composition.fraction_negative,
     "hydrophobicity": composition.hydrophobicity,
     "seg-complexity": composition.seg_complexity,
+    # every window has the same length, so kappa scores them all as one array
+    "kappa": patterning.kappa,
 }
 
 
@@ -95,13 +96,6 @@ def predefined_linear_track(seq, mode, window_size, end_mode, smooth=None):
 
     if mode in _COMPOSITION_TRACKS:
         return _build_track_from_batch(seq, _COMPOSITION_TRACKS[mode], window_size, end_mode, smooth)
-
-    if mode == "kappa":
-
-        def FX(s):
-            return protein.Protein(s).kappa
-
-        return build_track(seq, FX, window_size, end_mode, smooth)
 
     raise sparrow_exceptions.SparrowException("Invalid mode passed to linear track: %s" % (mode))
 

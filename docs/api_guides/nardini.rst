@@ -322,7 +322,7 @@ on the same Das & Pappu window asymmetry, but they stop at different points:
   statistic, and it is *unnormalized*.
 * ``'kappa'`` z-scores **kappa**, which is that same delta divided by
   ``delta_max``: the delta of the most segregated arrangement of the same
-  composition. This is sparrow's :func:`~sparrow.patterning.kappa.kappa_x`,
+  composition. This is sparrow's :func:`~sparrow.properties.patterning.kappa_x`,
   bounded 0-1.
 
 **The normalization itself changes nothing.** ``delta_max`` depends only on

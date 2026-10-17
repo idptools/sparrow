@@ -108,8 +108,6 @@ if MOCK:
         "IPython",
         "protfasta",
         "sparrow.patterning.iwd",
-        "sparrow.patterning.kappa",
-        "sparrow.patterning.patterning",
         "sparrow.patterning.scd",
         "sparrow.patterning.vectorized",
     ]

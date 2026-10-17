@@ -1,14 +1,16 @@
 Patterning Metrics
 ==================
 
-These APIs provide direct access to sparrow's patterning metrics outside
-``Protein`` methods, and are suitable for functional workflows.
+These APIs give direct access to sparrow's patterning metrics outside
+``Protein`` methods. They are **pure Python** -- vectorized NumPy, with no
+compiled extensions and no compiler needed.
 
-They live under ``sparrow.patterning`` and are **pure Python** -- vectorized
-NumPy, with no compiled extensions and no compiler needed. Earlier releases
-implemented them in Cython; the module names and signatures are unchanged, so
-existing code keeps working. See :ref:`patterning-vectorized` for what changed
-and by how much.
+The windowed-asymmetry statistics -- kappa, delta, sigma and the patterning
+percentile -- live in :mod:`sparrow.properties.patterning`, which is also where
+NARDINI's omega and pair features are computed: they are all Das & Pappu's
+delta, from one function. Every function there takes a batch of sequences and
+returns one value per sequence. The inverse-weighted distance, SCD and SHD are
+still in ``sparrow.patterning`` for now.
 
 Public Functions Covered
 ------------------------
@@ -17,27 +19,29 @@ Public Functions Covered
    :toctree: generated
    :nosignatures:
 
-   sparrow.patterning.kappa.calculate_sigma
-   sparrow.patterning.kappa.calculate_delta
-   sparrow.patterning.kappa.kappa_x
+   sparrow.properties.patterning.sigma
+   sparrow.properties.patterning.delta
+   sparrow.properties.patterning.kappa_x
+   sparrow.properties.patterning.kappa
+   sparrow.properties.patterning.patterning_percentile
    sparrow.patterning.iwd.calculate_average_inverse_distance_from_sequence
    sparrow.patterning.iwd.calculate_average_inverse_distance_charge
    sparrow.patterning.iwd.calculate_average_bivariate_inverse_distance_charge
-   sparrow.patterning.patterning.patterning_percentile
 
 Examples
 --------
 
-Binary/ternary patterning with ``kappa_x``:
+Binary/ternary patterning with ``kappa_x``, for as many sequences as you like:
 
 .. code-block:: python
 
-   from sparrow.patterning.kappa import kappa_x
+   from sparrow.properties.patterning import kappa, kappa_x
 
-   seq = "MEEEKKKKSSSTTTDDD"
+   sequences = ["MEEEKKKKSSSTTTDDD", "EKEKEKEKEKEKEKEKEK"]
 
-   charge_kappa = kappa_x(seq, ["E", "D"], ["K", "R"], window_size=6, flatten=1)
-   binary_kappa = kappa_x(seq, ["Q", "N"], [], window_size=6, flatten=1)
+   charge_kappa = kappa(sequences)                                  # as Protein.kappa
+   custom = kappa_x(sequences, ["E", "D"], ["K", "R"], window_size=6, flatten=True)
+   binary = kappa_x(sequences, ["Q", "N"], [], window_size=6, flatten=True)
 
 Inverse-weighted distance examples:
 
@@ -61,45 +65,40 @@ Patterning percentile from binary grouping:
 
 .. code-block:: python
 
-   from sparrow.patterning.patterning import patterning_percentile
+   from sparrow.properties.patterning import patterning_percentile
 
-   seq = "QQQQAAAQQQQAAAQQQQ"
-   percentile = patterning_percentile(seq, ["Q"], window_size=6, count=200, seed=1)
+   percentiles = patterning_percentile(["QQQQAAAQQQQAAAQQQQ"], ["Q"], window_size=6, count=200, seed=1)
 
 Interpretation and Edge Cases
 -----------------------------
 
 * ``kappa_x`` returns ``-1`` for non-computable inputs (for example, sequence too
   short for window size, or missing required residues).
-* ``window_size`` must be at least 2 for ``kappa_x`` and ``patterning_percentile``.
-* For ``kappa_x``, use ``flatten=1`` if you want values capped at 1.
+* ``delta`` returns NaN for a sequence shorter than the window, which has no
+  windows to average.
+* ``window_size`` must be at least 2 for ``kappa_x`` and ``patterning_percentile``,
+  and ``patterning_percentile`` rejects any sequence shorter than the window.
+* For ``kappa_x``, use ``flatten=True`` if you want values capped at 1.
+* A sequence gets the same value -- to the last bit -- whether it is scored
+  alone or in a batch. Sequences of the same length are scored together as one
+  array, and each patterning percentile reseeds its shuffles from ``seed``.
 
 .. _patterning-vectorized:
 
 Where the implementations live
 ------------------------------
 
-All of the above are implemented in :mod:`sparrow.patterning.vectorized`. The
-``kappa``, ``iwd``, ``scd`` and ``patterning`` modules are thin re-exports of it,
-so both import paths give you exactly the same functions:
+The kappa family is implemented in :mod:`sparrow.properties.patterning`; IWD,
+SCD and SHD in :mod:`sparrow.patterning.vectorized`, with ``iwd`` and ``scd``
+as thin re-exports of it. Both score whole stacks at once, which is what makes
+scramble-based null distributions cheap:
 
 .. code-block:: python
 
    from sparrow.patterning import vectorized as vec
+   from sparrow.properties import encoding, patterning
 
-   vec.kappa_x("MEEEKKKKSSSTTTDDD", ["E", "D"], ["K", "R"], 5, 1)
-   vec.calculate_average_inverse_distance_from_sequence("QQQAAAQQQ", ["Q"])
-   vec.compute_scd_x("MEEEKKKKSSSTTTDDD")
-   vec.compute_shd("MEEEKKKKSSSTTTDDD")
-   vec.patterning_percentile("QQQQAAAAQQQQ", ["Q"], 5, 1000, seed=1)
-
-It also adds **batch** entry points with no Cython equivalent, which score a
-whole stack of sequences in one pass. These are what make scramble-based null
-distributions cheap:
-
-.. code-block:: python
-
-   vec.kappa_x_batch(list_of_scrambles, ["E", "D"], ["K", "R"], 5, 1)
+   patterning.kappa_from_ternary(encoding.ternarize_winged_batch(codes, ["E", "D"], ["K", "R"], 5), 5)
    vec.iwd_batch(stack_of_binary_masks)
 
 Why it is often faster
@@ -193,6 +192,20 @@ Installation notes
   ``kappa.cpython-*.so`` would shadow ``kappa.py`` and silently keep running the
   old compiled code.
 
+Reference: ``sparrow.properties.patterning``
+--------------------------------------------
+
+.. automodule:: sparrow.properties.patterning
+   :members:
+   :no-index:
+
+Reference: ``sparrow.properties.windows``
+-----------------------------------------
+
+.. automodule:: sparrow.properties.windows
+   :members:
+   :no-index:
+
 Reference: ``sparrow.patterning.vectorized``
 --------------------------------------------
 
@@ -200,20 +213,8 @@ Reference: ``sparrow.patterning.vectorized``
    :members:
    :no-index:
 
-Reference: ``sparrow.patterning.kappa``
----------------------------------------
-
-.. automodule:: sparrow.patterning.kappa
-   :no-index:
-
 Reference: ``sparrow.patterning.iwd``
 -------------------------------------
 
 .. automodule:: sparrow.patterning.iwd
-   :no-index:
-
-Reference: ``sparrow.patterning.patterning``
---------------------------------------------
-
-.. automodule:: sparrow.patterning.patterning
    :no-index:

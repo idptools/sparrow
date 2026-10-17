@@ -43,6 +43,7 @@ __all__ = [
     "normalize_residue_selector",
     "ascii_codes",
     "membership_lookup",
+    "residue_membership",
     "residue_codes",
     "as_batch",
     "EncodedBatch",
@@ -278,6 +279,35 @@ def membership_lookup(residues: Iterable[str]) -> NDArray[np.bool_]:
     return table
 
 
+def residue_membership(residues: Iterable[str]) -> NDArray[np.bool_]:
+    """A 20-entry table that is True at the residue code of each residue.
+
+    The residue-code counterpart of :func:`membership_lookup`: indexing it with
+    :func:`residue_codes` gives a per-position membership mask in one step.
+
+    Parameters
+    ----------
+    residues : iterable of str
+        The residues to mark.
+
+    Returns
+    -------
+    numpy.ndarray
+        Boolean array of length :data:`NUM_RESIDUES`.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If a residue is not one of the 20 standard amino acids.
+    """
+    table = np.zeros(NUM_RESIDUES, dtype=bool)
+    for residue in residues:
+        if residue not in RESIDUE_INDEX:
+            raise SparrowException(f"{residue!r} is not one of the 20 standard amino acids")
+        table[RESIDUE_INDEX[residue]] = True
+    return table
+
+
 def residue_codes(sequence: str) -> NDArray[np.int8]:
     """A sequence as residue codes: each residue's index in :data:`RESIDUES`.
 
@@ -380,6 +410,37 @@ class EncodedBatch:
         """Which sequence each position of :attr:`codes` belongs to."""
         owner: NDArray[np.int64] = np.repeat(np.arange(self.lengths.size, dtype=np.int64), self.lengths)
         return owner
+
+    def by_length(self) -> list[tuple[NDArray[np.int64], NDArray[np.int8]]]:
+        """The batch split into groups of sequences that share a length.
+
+        Calculations that run along a sequence - windows, pairwise distances -
+        are vectorized over a group as a ``(k, length)`` array. Grouping by exact
+        length rather than padding to a common one means every sequence is
+        reduced exactly as it would be on its own, so its value does not depend
+        on what else is in the batch.
+
+        Returns
+        -------
+        list of tuple
+            One ``(indices, codes)`` pair per distinct length, shortest first:
+            the positions of those sequences in the batch, and their residue
+            codes as an ``int8`` array of shape ``(len(indices), length)``.
+        """
+        if self.lengths.size == 1:
+            # one sequence is one group, and needs no sorting
+            return [(np.zeros(1, dtype=np.int64), self.codes[None, :])]
+
+        order = np.argsort(self.lengths, kind="stable")
+        boundaries = np.flatnonzero(np.diff(self.lengths[order])) + 1
+        groups = []
+        for indices in np.split(order, boundaries):
+            if indices.size == 0:
+                continue
+            length = int(self.lengths[indices[0]])
+            positions = self.offsets[indices][:, None] + np.arange(length)
+            groups.append((indices.astype(np.int64), self.codes[positions]))
+        return groups
 
 
 def encode_batch(sequences: str | Sequence[str] | EncodedBatch) -> EncodedBatch:
@@ -519,27 +580,27 @@ def ternarize_winged(
     numpy.ndarray
         ``int8`` array of length ``2 * window_size + len(sequence)``.
     """
-    stack = ternarize_winged_batch(ascii_codes(sequence)[None, :], group1, group2, window_size)
+    stack = ternarize_winged_batch(residue_codes(sequence)[None, :], group1, group2, window_size)
     ternary: NDArray[np.int8] = stack[0]
     return ternary
 
 
 def ternarize_winged_batch(
-    codes: NDArray[np.uint8],
+    codes: NDArray[np.int8],
     group1: Sequence[str],
     group2: Sequence[str],
     window_size: int,
 ) -> NDArray[np.int8]:
     """Ternarize a stack of equal-length sequences at once.
 
-    The batch form of :func:`ternarize_winged`. It takes ASCII codes rather than
-    strings so that a caller scoring many features over the same scrambles can
-    encode once and reuse the codes.
+    The batch form of :func:`ternarize_winged`. It takes residue codes rather
+    than strings so that a caller scoring many features over the same scrambles
+    can encode once and reuse the codes.
 
     Parameters
     ----------
     codes : numpy.ndarray
-        ``uint8`` ASCII codes of shape ``(n_sequences, length)``.
+        Residue codes (:func:`residue_codes`) of shape ``(n_sequences, length)``.
     group1, group2 : sequence of str
         Residue groups; ``group2`` may be empty for the binary encoding.
     window_size : int
@@ -556,13 +617,13 @@ def ternarize_winged_batch(
     ternary = np.zeros((n_sequences, 2 * window_size + length), dtype=np.int8)
     core = ternary[:, window_size : window_size + length]
 
-    in_group1 = membership_lookup(group1)[codes]
+    in_group1 = residue_membership(group1)[codes]
 
     if len(group2) == 0:
         # binary: everything that is not group1 is group2
         core[:] = np.where(in_group1, 1, -1)
     else:
-        in_group2 = membership_lookup(group2)[codes]
+        in_group2 = residue_membership(group2)[codes]
         core[:] = np.where(in_group1, 1, np.where(in_group2, -1, 0))
 
     return ternary

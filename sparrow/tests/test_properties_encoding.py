@@ -146,7 +146,7 @@ def test_ternarize_winged_with_no_second_group_is_binary():
 def test_ternarize_winged_batch_matches_one_at_a_time():
     sequences = ["EKGEDR", "RRKKEE", "GSGSGS"]
     batch = encoding.ternarize_winged_batch(
-        np.stack([encoding.ascii_codes(s) for s in sequences]), ["E", "D"], ["R", "K"], 3
+        np.stack([encoding.residue_codes(s) for s in sequences]), ["E", "D"], ["R", "K"], 3
     )
     for row, sequence in zip(batch, sequences):
         assert row.tolist() == encoding.ternarize_winged(sequence, ["E", "D"], ["R", "K"], 3).tolist()
