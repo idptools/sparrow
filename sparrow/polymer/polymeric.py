@@ -22,7 +22,7 @@ import numpy as np
 from numpy.typing import NDArray
 
 from sparrow.polymer import analytical_frc, nudep_saw, saw, zheng2020
-from sparrow.tools.utilities import validate_keyword_option, warn_renamed
+from sparrow.tools.utilities import copy_of, validate_keyword_option, warn_renamed
 
 if TYPE_CHECKING:
     from sparrow.protein import Protein
@@ -152,7 +152,7 @@ class Polymeric:
         key = (function, *arguments)
         if recompute or key not in self.__precomputed:
             self.__precomputed[key] = function(self.__protein.sequence, *arguments)
-        return self.__precomputed[key]
+        return copy_of(self.__precomputed[key])
 
     ##########################  ALBATROSS PREDICTIONS  ##########################
 

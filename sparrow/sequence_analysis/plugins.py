@@ -34,6 +34,8 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
+from sparrow.tools.utilities import copy_of
+
 if TYPE_CHECKING:  # pragma: no cover - only for type checking
     from sparrow import Protein
 
@@ -80,7 +82,9 @@ class PluginWrapper:
         Returns
         -------
         Any
-            Result returned by the plugin's ``calculate`` method (cached).
+            Result returned by the plugin's ``calculate`` method. It is cached,
+            and each call hands back a copy, so changing it cannot change what a
+            later call returns.
         """
         # Create hashable cache key for args and kwargs. If any argument value is
         # unhashable (e.g. a numpy array, list, or dict) fall back to computing
@@ -94,7 +98,7 @@ class PluginWrapper:
         if cache_key not in self.cache_dict[self.name]:
             self.cache_dict[self.name][cache_key] = self.plugin_instance.calculate(*args, **kwargs)
 
-        return self.cache_dict[self.name][cache_key]
+        return copy_of(self.cache_dict[self.name][cache_key])
 
 
 class PluginManager:

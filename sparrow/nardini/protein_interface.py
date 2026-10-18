@@ -65,6 +65,7 @@ from sparrow.nardini.patterning import (
     DEFAULT_NUM_SCRAMBLES,
 )
 from sparrow.sparrow_exceptions import SparrowException
+from sparrow.tools.utilities import copy_of
 
 __all__ = ["ProteinNardini"]
 
@@ -364,7 +365,8 @@ class ProteinNardini:
 
         result = self._patterning_result(num_scrambles, seed, typeset, blob_size, min_fraction, backend)
         values = result.raw_patterning[0] if raw else result.patterning_zscores[0]
-        return FeatureVector(values, result.patterning_feature_names, label="patterning")
+        # values is a row of the cached result, so the vector gets a copy of it
+        return FeatureVector(copy_of(values), result.patterning_feature_names, label="patterning")
 
     def composition(self, background=DEFAULT_REFERENCE, raw=False):
         """Return only the compositional half of the NARDINI+ vector.
@@ -400,7 +402,7 @@ class ProteinNardini:
 
         key = (_background_key(background), bool(raw))
         if key in self.__composition_cache:
-            return self.__composition_cache[key]
+            return copy_of(self.__composition_cache[key])
 
         values = composition_values(self.__protein.sequence)
         raw_array = [values[name] for name in COMPOSITION_FEATURE_NAMES]
@@ -412,7 +414,7 @@ class ProteinNardini:
             vector = FeatureVector(resolved.zscores(values), COMPOSITION_FEATURE_NAMES, label="composition")
 
         self.__composition_cache[key] = vector
-        return vector
+        return copy_of(vector)
 
     # .................................................................
     #

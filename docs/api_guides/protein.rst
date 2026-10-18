@@ -4,7 +4,9 @@ The Protein Object
 :class:`sparrow.protein.Protein` is the one object you need. Create it from a
 sequence and read everything off it -- parameters, properties, deep-learning
 predictions, polymer dimensions, and visualizations. Values are computed lazily
-on first access and cached, so you only pay for what you use.
+on first access and cached, so you only pay for what you use. Each call hands
+back its own copy, so you can change a returned list or array without changing
+what the next call returns.
 
 This page lists **everything you can do with a protein, organized by what you
 want to compute**. The deep-learning predictors and polymer-model properties are

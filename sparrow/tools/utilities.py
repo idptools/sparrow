@@ -1,6 +1,7 @@
+import copy
 import warnings
 from collections.abc import Hashable, Mapping
-from typing import Any
+from typing import Any, TypeVar
 
 import numpy as np
 
@@ -9,6 +10,11 @@ from sparrow.sparrow_exceptions import SparrowException
 # How far up the stack a renamed-name warning points: past warn_renamed and the
 # __getattr__ that calls it, to the code that used the old name
 _RENAMED_WARNING_STACKLEVEL = 3
+
+# Results that cannot be changed in place, which a cache can hand back as they are
+_IMMUTABLE_TYPES = (bool, int, float, complex, str, bytes, type(None), np.generic)
+
+Result = TypeVar("Result")
 
 
 def validate_keyword_option(keyword, allowed_vals, keyword_name, error_message=None):
@@ -84,6 +90,31 @@ def cache_key(*parts: Any) -> tuple[Hashable, ...]:
         When the key is used, if an argument is of some other unhashable type.
     """
     return tuple(_hashable(part) for part in parts)
+
+
+def copy_of(value: Result) -> Result:
+    """A copy of a cached result, which the caller can change without changing the cache.
+
+    ``Protein`` and its accessors cache each result and hand back a copy of it
+    on every call - the first included - so that changing a returned list or
+    array in place cannot change what a later call returns. A number, a string
+    or None cannot be changed in place, so it is handed back as it is; anything
+    else is copied with :func:`copy.deepcopy`, so a list of arrays is copied
+    all the way down.
+
+    Parameters
+    ----------
+    value : Any
+        The cached result.
+
+    Returns
+    -------
+    Any
+        ``value`` itself if it cannot be changed in place, otherwise a copy of it.
+    """
+    if isinstance(value, _IMMUTABLE_TYPES):
+        return value
+    return copy.deepcopy(value)
 
 
 def _hashable(value: Any) -> Hashable:

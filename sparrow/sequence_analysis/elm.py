@@ -104,6 +104,12 @@ class ELM:
         # same motif. A start moved by an indel would count as a different one.
         return hash(self._motif_key())
 
+    def __deepcopy__(self, memo):
+        # A match is frozen and every field is a string or a number, so it can
+        # never change and is its own copy, as a string is. Protein.elms copies
+        # the set it hands back, and this keeps that to the cost of a new set.
+        return self
+
 
 def _residue_from_hgvs(code: str, hgvs_notation: str) -> str:
     """One-letter code of a residue written in HGVS notation, one- or three-letter."""

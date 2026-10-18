@@ -178,7 +178,7 @@ class Protein:
         if "molecular_weight" not in self.__results:
             self.__results["molecular_weight"] = float(composition.molecular_weight(self.__counts())[0])
 
-        return self.__results["molecular_weight"]
+        return utilities.copy_of(self.__results["molecular_weight"])
 
     # .................................................................
     #
@@ -202,7 +202,7 @@ class Protein:
                 zip(encoding.RESIDUES, composition.amino_acid_fractions(self.__counts())[0].tolist())
             )
 
-        return self.__results["amino_acid_fractions"]
+        return utilities.copy_of(self.__results["amino_acid_fractions"])
 
     # .................................................................
     #
@@ -220,7 +220,7 @@ class Protein:
         """
         if "FCR" not in self.__results:
             self.__results["FCR"] = float(composition.fraction_charged(self.__counts())[0])
-        return self.__results["FCR"]
+        return utilities.copy_of(self.__results["FCR"])
 
     # .................................................................
     #
@@ -239,7 +239,7 @@ class Protein:
         if "fraction_positive" not in self.__results:
             self.__results["fraction_positive"] = float(composition.fraction_positive(self.__counts())[0])
 
-        return self.__results["fraction_positive"]
+        return utilities.copy_of(self.__results["fraction_positive"])
 
     # .................................................................
     #
@@ -257,7 +257,7 @@ class Protein:
         if "fraction_negative" not in self.__results:
             self.__results["fraction_negative"] = float(composition.fraction_negative(self.__counts())[0])
 
-        return self.__results["fraction_negative"]
+        return utilities.copy_of(self.__results["fraction_negative"])
 
     # .................................................................
     #
@@ -276,7 +276,7 @@ class Protein:
         if "NCPR" not in self.__results:
             self.__results["NCPR"] = float(composition.net_charge_per_residue(self.__counts())[0])
 
-        return self.__results["NCPR"]
+        return utilities.copy_of(self.__results["NCPR"])
 
     # .................................................................
     #
@@ -308,7 +308,7 @@ class Protein:
         if "kappa" not in self.__results:
             self.__results["kappa"] = float(patterning.kappa(self.__encoded_sequence())[0])
 
-        return self.__results["kappa"]
+        return utilities.copy_of(self.__results["kappa"])
 
     @property
     def SCD(self):
@@ -336,7 +336,7 @@ class Protein:
                 patterning.scd(self.__encoded_sequence(), group1=["E", "D"], group2=["R", "K"])[0]
             )
 
-        return self.__results["SCD"]
+        return utilities.copy_of(self.__results["SCD"])
 
     @property
     def SHD(self):
@@ -363,7 +363,7 @@ class Protein:
         if "SHD" not in self.__results:
             self.__results["SHD"] = float(patterning.shd(self.__seq)[0])
 
-        return self.__results["SHD"]
+        return utilities.copy_of(self.__results["SHD"])
 
     # .................................................................
     #
@@ -382,7 +382,7 @@ class Protein:
         if "fraction_aromatic" not in self.__results:
             self.__results["fraction_aromatic"] = float(composition.fraction_aromatic(self.__counts())[0])
 
-        return self.__results["fraction_aromatic"]
+        return utilities.copy_of(self.__results["fraction_aromatic"])
 
     # .................................................................
     #
@@ -401,7 +401,7 @@ class Protein:
         if "fraction_aliphatic" not in self.__results:
             self.__results["fraction_aliphatic"] = float(composition.fraction_aliphatic(self.__counts())[0])
 
-        return self.__results["fraction_aliphatic"]
+        return utilities.copy_of(self.__results["fraction_aliphatic"])
 
     # .................................................................
     #
@@ -420,7 +420,7 @@ class Protein:
         if "fraction_polar" not in self.__results:
             self.__results["fraction_polar"] = float(composition.fraction_polar(self.__counts())[0])
 
-        return self.__results["fraction_polar"]
+        return utilities.copy_of(self.__results["fraction_polar"])
 
     # .................................................................
     #
@@ -437,7 +437,7 @@ class Protein:
         if "fraction_proline" not in self.__results:
             self.__results["fraction_proline"] = self.amino_acid_fractions["P"]
 
-        return self.__results["fraction_proline"]
+        return utilities.copy_of(self.__results["fraction_proline"])
 
     # .................................................................
     #
@@ -459,7 +459,7 @@ class Protein:
         if "hydrophobicity" not in self.__results:
             self.__results["hydrophobicity"] = float(composition.hydrophobicity(self.__counts())[0])
 
-        return self.__results["hydrophobicity"]
+        return utilities.copy_of(self.__results["hydrophobicity"])
 
     # .................................................................
     #
@@ -482,7 +482,7 @@ class Protein:
                 composition.fraction_chain_expanding(self.__counts())[0]
             )
 
-        return self.__results["fraction_chain_expanding"]
+        return utilities.copy_of(self.__results["fraction_chain_expanding"])
 
     # .................................................................
     #
@@ -505,7 +505,7 @@ class Protein:
                 composition.fraction_disorder_promoting(self.__counts())[0]
             )
 
-        return self.__results["fraction_disorder_promoting"]
+        return utilities.copy_of(self.__results["fraction_disorder_promoting"])
 
     # .................................................................
     #
@@ -534,7 +534,7 @@ class Protein:
         if "isoelectric_point" not in self.__results:
             self.__results["isoelectric_point"] = float(charge.isoelectric_point(self.__counts())[0])
 
-        return self.__results["isoelectric_point"]
+        return utilities.copy_of(self.__results["isoelectric_point"])
 
     # .................................................................
     #
@@ -556,7 +556,7 @@ class Protein:
         if "PPII_propensity" not in self.__results:
             self.__results["PPII_propensity"] = float(composition.polyproline_II_propensity(self.__counts())[0])
 
-        return self.__results["PPII_propensity"]
+        return utilities.copy_of(self.__results["PPII_propensity"])
 
     # .................................................................
     #
@@ -582,7 +582,7 @@ class Protein:
         if "RK_ratio" not in self.__results:
             self.__results["RK_ratio"] = float(composition.log_residue_ratio(self.__counts(), "R", "K")[0])
 
-        return self.__results["RK_ratio"]
+        return utilities.copy_of(self.__results["RK_ratio"])
 
     # .................................................................
     #
@@ -604,7 +604,7 @@ class Protein:
         if "ED_ratio" not in self.__results:
             self.__results["ED_ratio"] = float(composition.log_residue_ratio(self.__counts(), "E", "D")[0])
 
-        return self.__results["ED_ratio"]
+        return utilities.copy_of(self.__results["ED_ratio"])
 
     # .................................................................
     #
@@ -643,7 +643,7 @@ class Protein:
         if key not in self.__results:
             self.__results[key] = float(charge.charge_at_pH(self.__counts(), pH=pH, normalize=normalize)[0])
 
-        return self.__results[key]
+        return utilities.copy_of(self.__results[key])
 
     # .................................................................
     #
@@ -664,7 +664,7 @@ class Protein:
         if "complexity" not in self.__results:
             self.__results["complexity"] = float(composition.seg_complexity(self.__counts())[0])
 
-        return self.__results["complexity"]
+        return utilities.copy_of(self.__results["complexity"])
 
     # .................................................................
     #
@@ -702,7 +702,7 @@ class Protein:
         if key not in self.__results:
             self.__results[key] = float(composition.fraction_in_set(self.__counts(), residues)[0])
 
-        return self.__results[key]
+        return utilities.copy_of(self.__results[key])
 
     # .................................................................
     #
@@ -816,7 +816,7 @@ class Protein:
             )
             self.__results[key] = float(value[0])
 
-        return self.__results[key]
+        return utilities.copy_of(self.__results[key])
 
     # .................................................................
     #
@@ -854,7 +854,7 @@ class Protein:
         if key not in self.__results:
             self.__results[key] = float(patterning.iwd(self.__encoded_sequence(), residues)[0])
 
-        return self.__results[key]
+        return utilities.copy_of(self.__results[key])
 
     # .................................................................
     #
@@ -911,7 +911,7 @@ class Protein:
             )
             self.__results[key] = float(fraction[0])
 
-        return self.__results[key]
+        return utilities.copy_of(self.__results[key])
 
     # .................................................................
     #
@@ -954,7 +954,7 @@ class Protein:
         if key not in self.__results:
             self.__results[key] = float(patterning.scd(self.__encoded_sequence(), group1=group1, group2=group2)[0])
 
-        return self.__results[key]
+        return utilities.copy_of(self.__results[key])
 
     # .................................................................
     #
@@ -993,7 +993,7 @@ class Protein:
         if key not in self.__results:
             self.__results[key] = float(patterning.shd(self.__seq, hydropathy=hydro_dict)[0])
 
-        return self.__results[key]
+        return utilities.copy_of(self.__results[key])
 
     # .................................................................
     #
@@ -1033,7 +1033,7 @@ class Protein:
         if key not in self.__results:
             self.__results[key] = float(patterning.iwd_charged_weighted(self.__encoded_sequence(), charge)[0])
 
-        return self.__results[key]
+        return utilities.copy_of(self.__results[key])
 
     # .................................................................
     #
@@ -1057,7 +1057,7 @@ class Protein:
                 patterning.bivariate_iwd_charged_weighted(self.__encoded_sequence())[0]
             )
 
-        return self.__results["compute_bivariate_iwd_charged_weighted"]
+        return utilities.copy_of(self.__results["compute_bivariate_iwd_charged_weighted"])
 
     ## .................................................................
     ##
@@ -1105,7 +1105,7 @@ class Protein:
                 phosphosites=phosphosites,
             )
 
-        return self.__results[key]
+        return utilities.copy_of(self.__results[key])
 
     # .................................................................
     #
@@ -1175,7 +1175,7 @@ class Protein:
                 smooth=smooth,
             )[0]
 
-        return self.__results[key]
+        return utilities.copy_of(self.__results[key])
 
     # .................................................................
     #
@@ -1250,7 +1250,7 @@ class Protein:
                 smooth=smooth,
             )[0]
 
-        return self.__results[key]
+        return utilities.copy_of(self.__results[key])
 
     # .................................................................
     #
@@ -1346,7 +1346,7 @@ class Protein:
                 smooth=smooth,
             )[0]
 
-        return self.__results[key]
+        return utilities.copy_of(self.__results[key])
 
     # .................................................................
     #
@@ -1397,7 +1397,7 @@ class Protein:
                     self.sequence, **kwargs
                 )
 
-        return self.__results[key]
+        return utilities.copy_of(self.__results[key])
 
     def plaac_prion_like_domains(self, simple=True, **kwargs):
         """Extract prion-like domains (PLDs) from the sequence using the PLAAC algorithm.
@@ -1486,7 +1486,7 @@ class Protein:
         if simple:
             return [[r.prd_seq, r.prd_start - 1, r.prd_end] for r in result.prd_regions]
 
-        return result
+        return utilities.copy_of(result)
 
     def show_sequence(
         self,
@@ -1723,7 +1723,7 @@ class Protein:
         """
         if "elms" not in self.__results:
             self.__results["elms"] = elm.find_all_elms(self.sequence)
-        return self.__results["elms"]
+        return utilities.copy_of(self.__results["elms"])
 
     @property
     def sequence(self):

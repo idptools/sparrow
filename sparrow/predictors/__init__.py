@@ -29,7 +29,7 @@ import numpy as np
 
 from sparrow.data.configs import MIN_LENGTH_ALBATROSS_RE_RG
 from sparrow.sparrow_exceptions import SparrowException
-from sparrow.tools.utilities import cache_key, validate_keyword_option
+from sparrow.tools.utilities import cache_key, copy_of, validate_keyword_option
 
 # The ALBATROSS polymer-dimension methods, each with the network it runs, by the
 # name batch_predict knows the network by. Each prediction is cached under the
@@ -153,7 +153,7 @@ class Predictor:
                 self.__protein.sequence
             )
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     # .................................................................
     #
@@ -203,7 +203,7 @@ class Predictor:
 
         selector = cache_key("dssp_helicity", mode, threshold, minimum_helical_length)
         if selector in self.__precomputed:
-            return self.__precomputed[selector]
+            return copy_of(self.__precomputed[selector])
 
         if self.__dssp_predictor_object is None:
             from .dssp.dssp_predictor import DSSPPredictor
@@ -225,7 +225,7 @@ class Predictor:
             )
 
         self.__precomputed[selector] = result
-        return result
+        return copy_of(result)
 
     # .................................................................
     #
@@ -273,7 +273,7 @@ class Predictor:
 
         selector = cache_key("dssp_coil", mode, threshold, minimum_coil_length)
         if selector in self.__precomputed:
-            return self.__precomputed[selector]
+            return copy_of(self.__precomputed[selector])
 
         if self.__dssp_predictor_object is None:
             from .dssp.dssp_predictor import DSSPPredictor
@@ -295,7 +295,7 @@ class Predictor:
             )
 
         self.__precomputed[selector] = result
-        return result
+        return copy_of(result)
 
     # .................................................................
     #
@@ -343,7 +343,7 @@ class Predictor:
 
         selector = cache_key("dssp_extended", mode, threshold, minimum_extended_length)
         if selector in self.__precomputed:
-            return self.__precomputed[selector]
+            return copy_of(self.__precomputed[selector])
 
         if self.__dssp_predictor_object is None:
             from .dssp.dssp_predictor import DSSPPredictor
@@ -365,7 +365,7 @@ class Predictor:
             )
 
         self.__precomputed[selector] = result
-        return result
+        return copy_of(result)
 
     # .................................................................
     #
@@ -406,7 +406,7 @@ class Predictor:
                 )
             )
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     # .................................................................
     #
@@ -442,7 +442,7 @@ class Predictor:
                 self.__protein.sequence
             )
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     # .................................................................
     #
@@ -477,7 +477,7 @@ class Predictor:
                 self.__protein.sequence
             )
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     # .................................................................
     #
@@ -513,7 +513,7 @@ class Predictor:
                 self.__protein.sequence
             )
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     # .................................................................
     #
@@ -542,7 +542,7 @@ class Predictor:
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = meta.predict_disorder_domains(self.__protein.sequence, return_numpy=False)
 
-        return self.__precomputed[selector].disorder
+        return copy_of(self.__precomputed[selector].disorder)
 
     # .................................................................
     #
@@ -674,7 +674,7 @@ class Predictor:
             self.__precomputed[selector] = meta.predict_disorder_domains(self.__protein.sequence, return_numpy=False)
 
         if return_boundaries:
-            return self.__precomputed[selector].disordered_domain_boundaries
+            return copy_of(self.__precomputed[selector].disordered_domain_boundaries)
 
         # this is where we construct our binary mask - may be a more efficient way to do this, but I think this scales
         # as O(n*m) where n=number of residues in sequence and m is number domains and given m is typically < 10 this
@@ -731,7 +731,7 @@ class Predictor:
                 normalized=True,
             )
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     # .................................................................
     #
@@ -937,7 +937,7 @@ class Predictor:
             else:
                 self.__precomputed[selector] = self.__pscore_predictor_object.predict_pscore(self.__protein.sequence)
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     # .................................................................
     #
@@ -1012,7 +1012,7 @@ class Predictor:
                     self.__protein.sequence, raw_values=True
                 )
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     # .................................................................
     #
@@ -1087,7 +1087,7 @@ class Predictor:
                     self.__protein.sequence, raw_values=True
                 )
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     # .................................................................
     #
@@ -1162,7 +1162,7 @@ class Predictor:
                     self.__protein.sequence, raw_values=True
                 )
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     def radius_of_gyration(self, use_scaled=True, recompute=False, safe=True):
         """
@@ -1215,7 +1215,7 @@ class Predictor:
 
         # a prediction already made, here or by sparrow.batch, needs no network
         if selector in self.__precomputed and not recompute:
-            return self.__precomputed[selector]
+            return copy_of(self.__precomputed[selector])
 
         if selector == "scaled_rg":
             if self.__scaled_rg_predictor_object is None:
@@ -1239,7 +1239,7 @@ class Predictor:
             if selector not in self.__precomputed or recompute is True:
                 self.__precomputed[selector] = self.__rg_predictor_object.predict_rg(self.__protein.sequence)
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     def end_to_end_distance(self, use_scaled=True, recompute=False, safe=True):
         """
@@ -1292,7 +1292,7 @@ class Predictor:
 
         # a prediction already made, here or by sparrow.batch, needs no network
         if selector in self.__precomputed and not recompute:
-            return self.__precomputed[selector]
+            return copy_of(self.__precomputed[selector])
 
         if selector == "scaled_re":
             if self.__scaled_re_predictor_object is None:
@@ -1316,7 +1316,7 @@ class Predictor:
             if selector not in self.__precomputed or recompute is True:
                 self.__precomputed[selector] = self.__re_predictor_object.predict_re(self.__protein.sequence)
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     def asphericity(self, recompute=False):
         """
@@ -1339,7 +1339,7 @@ class Predictor:
 
         # a prediction already made, here or by sparrow.batch, needs no network
         if selector in self.__precomputed and not recompute:
-            return self.__precomputed[selector]
+            return copy_of(self.__precomputed[selector])
 
         if self.__asphericity_predictor_object is None:
             from .asphericity.asphericity_predictor import AsphericityPredictor
@@ -1351,7 +1351,7 @@ class Predictor:
                 self.__protein.sequence
             )
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     def prefactor(self, recompute=False):
         """
@@ -1374,7 +1374,7 @@ class Predictor:
 
         # a prediction already made, here or by sparrow.batch, needs no network
         if selector in self.__precomputed and not recompute:
-            return self.__precomputed[selector]
+            return copy_of(self.__precomputed[selector])
 
         if self.__prefactor_predictor_object is None:
             from .prefactor.prefactor_predictor import PrefactorPredictor
@@ -1384,7 +1384,7 @@ class Predictor:
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = self.__prefactor_predictor_object.predict_prefactor(self.__protein.sequence)
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     def scaling_exponent(self, recompute=False):
         """
@@ -1407,7 +1407,7 @@ class Predictor:
 
         # a prediction already made, here or by sparrow.batch, needs no network
         if selector in self.__precomputed and not recompute:
-            return self.__precomputed[selector]
+            return copy_of(self.__precomputed[selector])
 
         if self.__scaling_exponent_predictor_object is None:
             from .scaling_exponent.scaling_exponent_predictor import (
@@ -1421,7 +1421,7 @@ class Predictor:
                 self.__protein.sequence
             )
 
-        return self.__precomputed[selector]
+        return copy_of(self.__precomputed[selector])
 
     # .................................................................
     #

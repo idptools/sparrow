@@ -1,5 +1,6 @@
 """Comprehensive tests for Protein methods, properties, caching, and errors."""
 
+import numpy as np
 import pytest
 
 from sparrow import Protein
@@ -85,14 +86,34 @@ def test_compute_iwd_charged_weighted_signs(protein):
 # -- caching ---------------------------------------------------------------
 
 
-def test_amino_acid_fractions_cached(protein):
-    assert protein.amino_acid_fractions is protein.amino_acid_fractions
+def test_amino_acid_fractions_cached(protein, monkeypatch):
+    calls = []
+    real_amino_acid_fractions = composition.amino_acid_fractions
+
+    def counting_amino_acid_fractions(counts):
+        calls.append(counts)
+        return real_amino_acid_fractions(counts)
+
+    monkeypatch.setattr(composition, "amino_acid_fractions", counting_amino_acid_fractions)
+    assert protein.amino_acid_fractions == protein.amino_acid_fractions
+    assert len(calls) == 1
 
 
-def test_linear_profile_cached(protein):
+def test_linear_profile_cached(protein, monkeypatch):
+    from sparrow.properties import profiles
+
+    calls = []
+    real_window_profile = profiles.window_profile
+
+    def counting_window_profile(*args, **kwargs):
+        calls.append(args)
+        return real_window_profile(*args, **kwargs)
+
+    monkeypatch.setattr(profiles, "window_profile", counting_window_profile)
     a = protein.linear_sequence_profile("NCPR", window_size=6)
     b = protein.linear_sequence_profile("NCPR", window_size=6)
-    assert a is b
+    assert np.array_equal(a, b)
+    assert len(calls) == 1
 
 
 def test_accessors_are_reused(protein):
