@@ -60,6 +60,7 @@ All notable changes to SPARROW are documented here.
 
 * `pyproject.toml` declared the licence as `CC-NC-ND`, contradicting `LICENSE`, the README and the badge, which all say MIT. It now says MIT too, so an installed copy's metadata agrees with the licence it ships with.
 * Two bundled components are MIT-licensed by their own authors and now ship their licence notices beside them, as MIT requires and as neither did before: the PLAAC port (`sparrow/sequence_analysis/plaac/LICENSE.TXT`) and the NARDINI+ / GIN reference data (`sparrow/data/nardini/LICENSE-GIN`).
+* The copyright line in `LICENSE` names the sparrow authors, 2020-2026, rather than a single author and year.
 * The GIN authors have confirmed that their MIT licence also covers the NARDINI+ Colab notebook and the Google Sheets it reads, which the bundled tables come from and the test oracles in `test_nardini.py` and `test_nardini_gin.py` are transcribed from. `sparrow/data/nardini/SOURCES.md` records this.
 
 ### Fixed — the documentation builds in full on Read the Docs, and every example runs
