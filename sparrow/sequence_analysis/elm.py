@@ -22,12 +22,25 @@ From a :class:`~sparrow.protein.Protein`, ``Protein.elms`` gives the matches
 """
 
 import functools
+import numbers
 import re
 from dataclasses import dataclass
 from typing import Set, Tuple, Union
 
 import sparrow
+from sparrow.data import amino_acids
 from sparrow.sparrow_exceptions import SparrowException
+
+# The residues a substitution may introduce: the 20 standard amino acids
+_STANDARD_RESIDUES = frozenset(amino_acids.VALID_AMINO_ACIDS)
+
+# Three-letter codes as HGVS writes them ('Ser'), mapped to one-letter codes
+_HGVS_THREE_LETTER = {code.capitalize(): letter for code, letter in amino_acids.AA_THREE_TO_ONE.items()}
+
+# A protein substitution in HGVS notation: p.S7A or p.Ser7Ala, optionally in the
+# parentheses HGVS uses for a predicted consequence, p.(Ser7Ala). A residue is a
+# three-letter code or a single letter.
+_HGVS_SUBSTITUTION = re.compile(r"^p\.(\()?([A-Z][a-z]{2}|[A-Za-z])(\d+)([A-Z][a-z]{2}|[A-Za-z])(?(1)\))$")
 
 
 @dataclass(frozen=True)
@@ -73,26 +86,51 @@ class ELM:
     end: int
     sequence: str
 
+    def _motif_key(self):
+        """What makes two matches the same motif; see the class Notes."""
+        return (self.regex, self.functional_site_name, self.start)
+
     def __eq__(self, other):
         # let Python fall back to the reflected operation / identity comparison
         # rather than raising AttributeError on unrelated types
         if not isinstance(other, ELM):
             return NotImplemented
-
-        if self.start > other.end or self.end < other.start:
-            return False
-
-        # Only compare regex patterns for equality - all regexes for ELMs are unique - we could also check functional site names?
-        return self.regex == other.regex
+        return self._motif_key() == other._motif_key()
 
     def __hash__(self):
-        # I THINK this works since we're basically saying we dont CARE about sequences if they're the same or not
-        # this will let us do set differences and intersections
-        # Does restrict motif to starting at the same position though which we know these could be diff spots from indels
-        # This is fine for point mutation comparison, but this could probably be generalized.
-        # don't want just look for "in the sequence" because their might be
-        # multiple occurences of the same motif and motif positioning may matter.
-        return hash((self.regex, self.functional_site_name, self.start))
+        # Equality and hash use the same key, which sets need. The matched
+        # residues and the end are left out on purpose: a match that a point
+        # substitution changes, but that still starts in the same place, is the
+        # same motif. A start moved by an indel would count as a different one.
+        return hash(self._motif_key())
+
+
+def _residue_from_hgvs(code: str, hgvs_notation: str) -> str:
+    """One-letter code of a residue written in HGVS notation, one- or three-letter."""
+    residue = _HGVS_THREE_LETTER.get(code) if len(code) == 3 else code.upper()
+    if residue not in _STANDARD_RESIDUES:
+        raise SparrowException(
+            f"{hgvs_notation!r}: {code!r} is not one of the 20 standard amino acids. Only substitutions between "
+            "standard amino acids are supported (not stop codons, '=' or unknown residues)."
+        )
+    return residue
+
+
+def _parse_substitution(hgvs_notation: str) -> Tuple[int, str, str]:
+    """Read an HGVS protein substitution into (0-indexed position, wild type, mutant)."""
+    match = _HGVS_SUBSTITUTION.match(hgvs_notation)
+    if match is None:
+        raise SparrowException(
+            f"{hgvs_notation!r} is not an HGVS protein substitution. Write it as 'p.S7A' or 'p.Ser7Ala' (1-indexed "
+            "position), optionally in parentheses as 'p.(Ser7Ala)'."
+        )
+    _, wild_type_code, position_text, mutant_code = match.groups()
+    position = int(position_text)
+    if position < 1:
+        raise SparrowException(f"{hgvs_notation!r}: HGVS positions start at 1, not {position}")
+    wild_type = _residue_from_hgvs(wild_type_code, hgvs_notation)
+    mutant = _residue_from_hgvs(mutant_code, hgvs_notation)
+    return position - 1, wild_type, mutant
 
 
 def parse_hgvs(hgvs_notation: str) -> Tuple:
@@ -101,47 +139,34 @@ def parse_hgvs(hgvs_notation: str) -> Tuple:
     Parameters
     ----------
     hgvs_notation : str
-        A substitution in one-letter HGVS protein notation, such as ``'p.S7A'``,
-        with a 1-indexed position. Only one-letter codes are read correctly: the
-        mutant residue is taken to be the last character, so three-letter
-        notation such as ``'p.Ser7Val'`` is misread (as ``L``). The wild-type
-        residue is not checked against any sequence.
+        A substitution in HGVS protein notation with a 1-indexed position, in
+        one-letter (``'p.S7A'``) or three-letter (``'p.Ser7Ala'``) codes,
+        optionally in the parentheses HGVS uses for a predicted consequence
+        (``'p.(Ser7Ala)'``). Both residues must be standard amino acids.
 
     Returns
     -------
     tuple of (int, str)
-        The position, converted to 0-indexed, and the mutant residue in upper
-        case.
+        The position, converted to 0-indexed, and the mutant residue as a
+        one-letter code. The wild-type residue is checked against the sequence
+        by :func:`compute_lost_elms` and its relatives, which know it.
 
     Raises
     ------
     sparrow.sparrow_exceptions.SparrowException
-        If the notation does not start with ``'p.'``, or its position is below 1.
-    ValueError
-        If the notation holds no position.
+        If the notation is not a substitution in that form, its position is
+        below 1, or either residue is not a standard amino acid (a stop codon,
+        ``=`` or an unknown residue).
 
     Examples
     --------
     >>> parse_hgvs("p.S7A")
     (6, 'A')
+    >>> parse_hgvs("p.Ser7Val")
+    (6, 'V')
     """
-    if not hgvs_notation.startswith("p."):
-        raise SparrowException("Invalid HGVS notation. Must start with 'p.'")
-
-    parts = hgvs_notation.split("p.")
-    if len(parts) < 2:
-        raise SparrowException("Invalid HGVS notation. Must be in the form p.xxx")
-
-    # Extract the position and amino acids
-    position = int("".join(filter(str.isdigit, parts[1])))  # shift indexing to 0
-    if position <= 0:
-        raise SparrowException(
-            f"Invalid position in HGVS notation, must be a 1 indexed integer greater than 0. Received {position}"
-        )
-    mutation = parts[1][-1]
-
-    # position shifted to 0 index
-    return position - 1, mutation.upper()
+    position, _, mutant = _parse_substitution(hgvs_notation)
+    return position, mutant
 
 
 def read_elm_table(file: str) -> Tuple[list, list]:
@@ -254,12 +279,23 @@ def _elm_class_records() -> tuple:
     return tuple(records)
 
 
+def _match_spans(regex: str, sequence: str) -> list:
+    """(start, end) of every match of a pattern, overlapping matches included.
+
+    :func:`re.finditer` alone reports non-overlapping matches, so a match that
+    starts inside an earlier one is never seen. Searching for the pattern inside a
+    lookahead instead tries every start position: the lookahead consumes nothing,
+    and its group (group 1, since it opens first) holds the match starting there.
+    """
+    return [(match.start(1), match.end(1)) for match in re.finditer(f"(?=({regex}))", sequence)]
+
+
 def find_all_elms(sequence: str) -> Set[ELM]:
     """Every match of every bundled ELM class in a sequence.
 
-    Each class's regular expression is searched with :func:`re.finditer`, which
-    returns *non-overlapping* matches: where two matches of the same class
-    overlap, only the first is reported.
+    Each class's regular expression is tried at every start position, so matches
+    of the same class that overlap are all reported - one per start position,
+    the one the regular expression finds there.
 
     Parameters
     ----------
@@ -285,8 +321,7 @@ def find_all_elms(sequence: str) -> Set[ELM]:
         elm_description,
         elm_probability,
     ) in _elm_class_records():
-        match_indices = [(m.start(0), m.end(0)) for m in re.finditer(regex, sequence)]
-        for start, end in match_indices:
+        for start, end in _match_spans(regex, sequence):
             elm = ELM(
                 regex,
                 elm_class,
@@ -301,6 +336,62 @@ def find_all_elms(sequence: str) -> Set[ELM]:
     return set(elms)
 
 
+def _wild_type_and_mutant(target_protein, query):
+    """The wild-type Protein and its point mutant, once the substitution is checked.
+
+    Parameters
+    ----------
+    target_protein : sparrow.protein.Protein or str
+        The wild-type protein, or its sequence.
+    query : tuple of (int, str) or str
+        ``(position, mutant_residue)`` with a 0-indexed position, or an HGVS
+        substitution (see :func:`parse_hgvs`).
+
+    Returns
+    -------
+    tuple of (sparrow.protein.Protein, sparrow.protein.Protein)
+        The wild type and the mutant.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If the substitution cannot be read, its position is outside the
+        sequence, the mutant residue is not a standard amino acid, or an HGVS
+        substitution's wild-type residue is not the one in the sequence.
+    """
+    if isinstance(target_protein, str):
+        target_protein = sparrow.Protein(target_protein)
+    sequence = target_protein.sequence
+
+    if isinstance(query, str):
+        position, wild_type, mutant = _parse_substitution(query)
+    else:
+        try:
+            position, mutant = query
+        except (TypeError, ValueError):
+            raise SparrowException(
+                f"A substitution is (position, mutant_residue) or an HGVS string such as 'p.S7A', not {query!r}"
+            ) from None
+        wild_type = None
+        if not isinstance(position, numbers.Integral) or isinstance(position, bool):
+            raise SparrowException(f"The position of a substitution must be an integer, not {position!r}")
+        if not isinstance(mutant, str) or mutant.upper() not in _STANDARD_RESIDUES:
+            raise SparrowException(f"The mutant residue must be one of the 20 standard amino acids, not {mutant!r}")
+        mutant = mutant.upper()
+
+    if not 0 <= position < len(sequence):
+        raise SparrowException(
+            f"Substitution {query!r} is at 0-indexed position {position}, outside a sequence of length {len(sequence)}"
+        )
+    if wild_type is not None and sequence[position] != wild_type:
+        raise SparrowException(
+            f"{query!r} expects {wild_type} at position {position + 1}, but the sequence has {sequence[position]} there"
+        )
+
+    mutant_sequence = sequence[:position] + mutant + sequence[position + 1 :]
+    return target_protein, sparrow.Protein(mutant_sequence)
+
+
 def compute_lost_elms(target_protein, query: Union[Tuple[int, str], str]) -> Set:
     """ELM matches a point substitution destroys.
 
@@ -310,21 +401,26 @@ def compute_lost_elms(target_protein, query: Union[Tuple[int, str], str]) -> Set
         The wild-type protein, or its sequence.
     query : tuple of (int, str) or str
         The substitution: either ``(position, mutant_residue)`` with a 0-indexed
-        position, or one-letter HGVS notation such as ``'p.S7A'``, whose position
-        is 1-indexed (see :func:`parse_hgvs`).
+        position, or HGVS notation such as ``'p.S7A'`` or ``'p.Ser7Ala'``, whose
+        position is 1-indexed and whose wild-type residue must match the
+        sequence (see :func:`parse_hgvs`).
 
     Returns
     -------
     set of ELM
         The wild-type matches (``Protein.elms``) the mutant does not have.
 
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If the substitution cannot be read, lies outside the sequence, names a
+        non-standard residue, or names a wild-type residue the sequence does not
+        have there.
+
     Notes
     -----
-    Matches are compared as described under :class:`ELM`. Because
-    :func:`find_all_elms` reports only non-overlapping matches of each class, a
-    wild-type match can hide an overlapping one; if the substitution removes the
-    first, the hidden one is reported as gained by :func:`compute_gained_elms`
-    even though the wild type has it too.
+    Matches are compared as described under :class:`ELM`, so a motif counts as
+    lost when no match of its class starts at the same position in the mutant.
 
     Examples
     --------
@@ -332,24 +428,8 @@ def compute_lost_elms(target_protein, query: Union[Tuple[int, str], str]) -> Set
     >>> sorted(motif.identifier for motif in lost)
     ['DOC_WW_Pin1_4', 'MOD_DYRK1A_RPxSP_1', 'MOD_GSK3_1', 'MOD_ProDKin_1']
     """
-
-    if isinstance(target_protein, str):
-        target_protein = sparrow.Protein(target_protein)
-
-    if isinstance(query, str):
-        position, mutation = parse_hgvs(query)
-    else:
-        position, mutation = query
-
-    mutant_protein = sparrow.Protein(
-        target_protein.sequence[:position] + mutation + target_protein.sequence[position + 1 :]
-    )
-
-    wt_elms = target_protein.elms
-    mutant_elms = mutant_protein.elms
-    lost_elms = wt_elms - mutant_elms
-
-    return lost_elms
+    wild_type, mutant = _wild_type_and_mutant(target_protein, query)
+    return wild_type.elms - mutant.elms
 
 
 def compute_gained_elms(target_protein, query: Union[Tuple[int, str], str]) -> Set:
@@ -360,35 +440,20 @@ def compute_gained_elms(target_protein, query: Union[Tuple[int, str], str]) -> S
     target_protein : sparrow.protein.Protein or str
         The wild-type protein, or its sequence.
     query : tuple of (int, str) or str
-        The substitution: either ``(position, mutant_residue)`` with a 0-indexed
-        position, or one-letter HGVS notation such as ``'p.S7A'``, whose position
-        is 1-indexed (see :func:`parse_hgvs`).
+        The substitution, as for :func:`compute_lost_elms`.
 
     Returns
     -------
     set of ELM
-        The mutant's matches the wild type does not have. See the Notes of
-        :func:`compute_lost_elms` for when a match the wild type already has can
-        appear here.
+        The mutant's matches the wild type does not have.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        As for :func:`compute_lost_elms`.
     """
-
-    if isinstance(target_protein, str):
-        target_protein = sparrow.Protein(target_protein)
-
-    if isinstance(query, str):
-        position, mutation = parse_hgvs(query)
-    else:
-        position, mutation = query
-
-    mutant_protein = sparrow.Protein(
-        target_protein.sequence[:position] + mutation + target_protein.sequence[position + 1 :]
-    )
-
-    wt_elms = target_protein.elms
-    mutant_elms = mutant_protein.elms
-    gained_elms = mutant_elms - wt_elms
-
-    return gained_elms
+    wild_type, mutant = _wild_type_and_mutant(target_protein, query)
+    return mutant.elms - wild_type.elms
 
 
 def compute_retained_elms(target_protein, query: Union[Tuple[int, str], str]) -> Set:
@@ -399,30 +464,18 @@ def compute_retained_elms(target_protein, query: Union[Tuple[int, str], str]) ->
     target_protein : sparrow.protein.Protein or str
         The wild-type protein, or its sequence.
     query : tuple of (int, str) or str
-        The substitution: either ``(position, mutant_residue)`` with a 0-indexed
-        position, or one-letter HGVS notation such as ``'p.S7A'``, whose position
-        is 1-indexed (see :func:`parse_hgvs`).
+        The substitution, as for :func:`compute_lost_elms`.
 
     Returns
     -------
     set of ELM
         The matches the wild type and the mutant share. A match whose residues
         change but which still matches at the same start counts as retained.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        As for :func:`compute_lost_elms`.
     """
-    if isinstance(target_protein, str):
-        target_protein = sparrow.Protein(target_protein)
-
-    if isinstance(query, str):
-        position, mutation = parse_hgvs(query)
-    else:
-        position, mutation = query
-
-    mutant_protein = sparrow.Protein(
-        target_protein.sequence[:position] + mutation + target_protein.sequence[position + 1 :]
-    )
-
-    wt_elms = target_protein.elms
-    mutant_elms = mutant_protein.elms
-    retained_elms = wt_elms & mutant_elms
-
-    return retained_elms
+    wild_type, mutant = _wild_type_and_mutant(target_protein, query)
+    return wild_type.elms & mutant.elms

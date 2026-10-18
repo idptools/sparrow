@@ -54,26 +54,26 @@ every class:
 
 A match is a candidate, not evidence of a functional site: many ELM patterns are
 short enough to match by chance, and each class's ``probability`` says how likely
-that is. ``p.elms`` is a set, computed once and cached.
+that is. ``p.elms`` is a set, computed once and cached. Each class is tried at
+every start position, so matches of one class that overlap are all reported.
 
-To see what a point substitution does to the motifs, give it in one-letter HGVS
-notation (1-indexed) or as a ``(position, residue)`` tuple (0-indexed):
+To see what a point substitution does to the motifs, give it in HGVS notation
+(1-indexed, one- or three-letter codes) or as a ``(position, residue)`` tuple
+(0-indexed):
 
 .. code-block:: python
 
    from sparrow.sequence_analysis.elm import compute_gained_elms, compute_lost_elms, compute_retained_elms
 
-   lost = compute_lost_elms(p, "p.S7A")       # the same as compute_lost_elms(p, (6, "A"))
+   lost = compute_lost_elms(p, "p.S7A")       # or "p.Ser7Ala", or (6, "A")
    sorted(motif.identifier for motif in lost)
    # ['DOC_WW_Pin1_4', 'MOD_DYRK1A_RPxSP_1', 'MOD_GSK3_1', 'MOD_ProDKin_1']
 
-Two matches are the same motif when they have the same regular expression,
-functional site and start position. Each class is matched with
-:func:`re.finditer`, which reports only non-overlapping matches, so a match can
-hide an overlapping one of the same class; when a substitution removes the first,
-the hidden one is reported as *gained* even though the wild type has it too. In
-the example above, ``compute_gained_elms(p, "p.S7A")`` returns three such
-uncovered matches.
+An HGVS substitution's wild-type residue is checked against the sequence, so
+``"p.K7A"`` raises here, where position 7 is S. Two matches are the same motif
+when they have the same regular expression, functional site and start position,
+so a motif is lost when no match of its class starts in the same place in the
+mutant, and every motif lost or gained covers the substituted residue.
 
 If you use these annotations, please cite the ELM resource: Kumar M, et al.
 ELM -- the Eukaryotic Linear Motif resource -- 2024 update. *Nucleic Acids Res.*
