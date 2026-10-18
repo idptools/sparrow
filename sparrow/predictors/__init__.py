@@ -29,7 +29,7 @@ import numpy as np
 
 from sparrow.data.configs import MIN_LENGTH_ALBATROSS_RE_RG
 from sparrow.sparrow_exceptions import SparrowException
-from sparrow.tools.utilities import validate_keyword_option
+from sparrow.tools.utilities import cache_key, validate_keyword_option
 
 
 class Predictor:
@@ -148,9 +148,8 @@ class Predictor:
         Value = 0 : non-helical
         Value = 1 : helical
 
-        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. Note
-        that because several options are available for dssp helicity predictions we
-        do not offer a recompute option and we always recompute.
+        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. Each
+        result is cached for its mode, threshold and minimum length.
 
         Parameters
         --------------
@@ -185,28 +184,31 @@ class Predictor:
         # ensure a valid keyword was passed
         validate_keyword_option(mode, ["class", "probability", "both"], "mode")
 
+        selector = cache_key("dssp_helicity", mode, threshold, minimum_helical_length)
+        if selector in self.__precomputed:
+            return self.__precomputed[selector]
+
         if self.__dssp_predictor_object is None:
             from .dssp.dssp_predictor import DSSPPredictor
 
             self.__dssp_predictor_object = DSSPPredictor()
 
         if mode == "class":
-            return self.__dssp_predictor_object.predict_helicity_smart(
-                self.__protein.sequence,
-                threshold=threshold,
-                minlen=minimum_helical_length,
+            result = self.__dssp_predictor_object.predict_helicity_smart(
+                self.__protein.sequence, threshold=threshold, minlen=minimum_helical_length
             )
-
         elif mode == "probability":
-            return self.__dssp_predictor_object.predict_helical_probability(self.__protein.sequence)
-
-        elif mode == "both":
-            return self.__dssp_predictor_object.predict_helicity_smart(
+            result = self.__dssp_predictor_object.predict_helical_probability(self.__protein.sequence)
+        else:
+            result = self.__dssp_predictor_object.predict_helicity_smart(
                 self.__protein.sequence,
                 threshold=threshold,
                 minlen=minimum_helical_length,
                 return_probability=True,
             )
+
+        self.__precomputed[selector] = result
+        return result
 
     # .................................................................
     #
@@ -215,9 +217,8 @@ class Predictor:
         Prediction as to whethere a residue will be found in a coil-state or not (i.e.
         not a helix or an extended/beta structure).
 
-        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. Note
-        that because several options are available for dssp predictions, we
-        do not offer a recompute option and we always recompute.
+        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. Each
+        result is cached for its mode, threshold and minimum length.
 
         Parameters
         --------------
@@ -253,26 +254,31 @@ class Predictor:
         # ensure a valid keyword was passed
         validate_keyword_option(mode, ["class", "probability", "both"], "mode")
 
+        selector = cache_key("dssp_coil", mode, threshold, minimum_coil_length)
+        if selector in self.__precomputed:
+            return self.__precomputed[selector]
+
         if self.__dssp_predictor_object is None:
             from .dssp.dssp_predictor import DSSPPredictor
 
             self.__dssp_predictor_object = DSSPPredictor()
 
         if mode == "class":
-            return self.__dssp_predictor_object.predict_coil_smart(
+            result = self.__dssp_predictor_object.predict_coil_smart(
                 self.__protein.sequence, threshold=threshold, minlen=minimum_coil_length
             )
-
         elif mode == "probability":
-            return self.__dssp_predictor_object.predict_coil_probability(self.__protein.sequence)
-
-        elif mode == "both":
-            return self.__dssp_predictor_object.predict_coil_smart(
+            result = self.__dssp_predictor_object.predict_coil_probability(self.__protein.sequence)
+        else:
+            result = self.__dssp_predictor_object.predict_coil_smart(
                 self.__protein.sequence,
                 threshold=threshold,
                 minlen=minimum_coil_length,
                 return_probability=True,
             )
+
+        self.__precomputed[selector] = result
+        return result
 
     # .................................................................
     #
@@ -281,9 +287,8 @@ class Predictor:
         Prediction as to whethere a residue will be found in an extended/beta-state or not (i.e.
         not a helix or a coil region).
 
-        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. Note
-        that because several options are available for dssp predictions, we
-        do not offer a recompute option and we always recompute.
+        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. Each
+        result is cached for its mode, threshold and minimum length.
 
         Parameters
         --------------
@@ -319,28 +324,31 @@ class Predictor:
         # ensure a valid keyword was passed
         validate_keyword_option(mode, ["class", "probability", "both"], "mode")
 
+        selector = cache_key("dssp_extended", mode, threshold, minimum_extended_length)
+        if selector in self.__precomputed:
+            return self.__precomputed[selector]
+
         if self.__dssp_predictor_object is None:
             from .dssp.dssp_predictor import DSSPPredictor
 
             self.__dssp_predictor_object = DSSPPredictor()
 
         if mode == "class":
-            return self.__dssp_predictor_object.predict_extended_smart(
-                self.__protein.sequence,
-                threshold=threshold,
-                minlen=minimum_extended_length,
+            result = self.__dssp_predictor_object.predict_extended_smart(
+                self.__protein.sequence, threshold=threshold, minlen=minimum_extended_length
             )
-
         elif mode == "probability":
-            return self.__dssp_predictor_object.predict_extended_probability(self.__protein.sequence)
-
-        elif mode == "both":
-            return self.__dssp_predictor_object.predict_extended_smart(
+            result = self.__dssp_predictor_object.predict_extended_probability(self.__protein.sequence)
+        else:
+            result = self.__dssp_predictor_object.predict_extended_smart(
                 self.__protein.sequence,
                 threshold=threshold,
                 minlen=minimum_extended_length,
                 return_probability=True,
             )
+
+        self.__precomputed[selector] = result
+        return result
 
     # .................................................................
     #

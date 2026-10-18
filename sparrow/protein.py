@@ -96,37 +96,19 @@ class Protein:
         else:
             self.__seq = s.upper()
 
-        # all sequence parameters are initialized as unset class variables
+        # every value this protein has computed: a property's under its name, a
+        # method's under its name and arguments
+        self.__results = {}
+
+        # the sequence encoded and counted once, shared by every property
         self.__encoded = None
         self.__residue_counts = None
-        self.__aa_fracts = None
-        self.__FCR = None
-        self.__NCPR = None
-        self.__hydrophobicity = None
-        self.__aro = None
-        self.__ali = None
-        self.__polar = None
-        self.__IDP_check = None
-        self.__f_positive = None
-        self.__f_negative = None
-        self.__complexity = None
-        self.__kappa = None
-        self.__scd = None
-        self.__shd = None
-        self.__kappa_x = {}
-        self.__linear_profiles = {}
-        self.__molecular_weight = None
-        self.__fraction_chain_expanding = None
-        self.__fraction_disorder_promoting = None
-        self.__isoelectric_point = None
-        self.__PPII_propensity = None
-        self.__RK_ratio = None
-        self.__ED_ratio = None
+
+        # the accessors, each made on first use
         self.__predictor_object = None
         self.__polymeric_object = None
         self.__plugin_object = None
         self.__nardini_object = None
-        self.__elms = None
 
     # .................................................................
     #
@@ -160,10 +142,10 @@ class Protein:
             Molecular weight in Daltons (Da).
         """
 
-        if self.__molecular_weight is None:
-            self.__molecular_weight = float(composition.molecular_weight(self.__counts())[0])
+        if "molecular_weight" not in self.__results:
+            self.__results["molecular_weight"] = float(composition.molecular_weight(self.__counts())[0])
 
-        return self.__molecular_weight
+        return self.__results["molecular_weight"]
 
     # .................................................................
     #
@@ -182,12 +164,12 @@ class Protein:
             values (each between 0 and 1; the values sum to 1).
         """
 
-        if self.__aa_fracts is None:
-            self.__aa_fracts = dict(
+        if "amino_acid_fractions" not in self.__results:
+            self.__results["amino_acid_fractions"] = dict(
                 zip(encoding.RESIDUES, composition.amino_acid_fractions(self.__counts())[0].tolist())
             )
 
-        return self.__aa_fracts
+        return self.__results["amino_acid_fractions"]
 
     # .................................................................
     #
@@ -203,9 +185,9 @@ class Protein:
             Float between 0 and 1
 
         """
-        if self.__FCR is None:
-            self.__FCR = float(composition.fraction_charged(self.__counts())[0])
-        return self.__FCR
+        if "FCR" not in self.__results:
+            self.__results["FCR"] = float(composition.fraction_charged(self.__counts())[0])
+        return self.__results["FCR"]
 
     # .................................................................
     #
@@ -221,10 +203,10 @@ class Protein:
             Float between 0 and 1
 
         """
-        if self.__f_positive is None:
-            self.__f_positive = float(composition.fraction_positive(self.__counts())[0])
+        if "fraction_positive" not in self.__results:
+            self.__results["fraction_positive"] = float(composition.fraction_positive(self.__counts())[0])
 
-        return self.__f_positive
+        return self.__results["fraction_positive"]
 
     # .................................................................
     #
@@ -239,10 +221,10 @@ class Protein:
         float
             Float between 0 and 1
         """
-        if self.__f_negative is None:
-            self.__f_negative = float(composition.fraction_negative(self.__counts())[0])
+        if "fraction_negative" not in self.__results:
+            self.__results["fraction_negative"] = float(composition.fraction_negative(self.__counts())[0])
 
-        return self.__f_negative
+        return self.__results["fraction_negative"]
 
     # .................................................................
     #
@@ -258,10 +240,10 @@ class Protein:
             Float between -1 and +1
         """
 
-        if self.__NCPR is None:
-            self.__NCPR = float(composition.net_charge_per_residue(self.__counts())[0])
+        if "NCPR" not in self.__results:
+            self.__results["NCPR"] = float(composition.net_charge_per_residue(self.__counts())[0])
 
-        return self.__NCPR
+        return self.__results["NCPR"]
 
     # .................................................................
     #
@@ -290,10 +272,10 @@ class Protein:
         compute_kappa_x : Generic kappa for arbitrary residue groups / windows.
         """
 
-        if self.__kappa is None:
-            self.__kappa = float(patterning.kappa(self.__encoded_sequence())[0])
+        if "kappa" not in self.__results:
+            self.__results["kappa"] = float(patterning.kappa(self.__encoded_sequence())[0])
 
-        return self.__kappa
+        return self.__results["kappa"]
 
     @property
     def SCD(self):
@@ -316,10 +298,12 @@ class Protein:
         configurational properties in charged polymers and proteins. J. Chem.
         Phys. 143, 085101 (2015).
         """
-        if self.__scd is None:
-            self.__scd = float(patterning.scd(self.__encoded_sequence(), group1=["E", "D"], group2=["R", "K"])[0])
+        if "SCD" not in self.__results:
+            self.__results["SCD"] = float(
+                patterning.scd(self.__encoded_sequence(), group1=["E", "D"], group2=["R", "K"])[0]
+            )
 
-        return self.__scd
+        return self.__results["SCD"]
 
     @property
     def SHD(self):
@@ -343,10 +327,10 @@ class Protein:
         Describe Conformational Preferences of Disordered Proteins. J. Phys.
         Chem. Lett. 11, 3408-3415 (2020).
         """
-        if self.__shd is None:
-            self.__shd = float(patterning.shd(self.__seq)[0])
+        if "SHD" not in self.__results:
+            self.__results["SHD"] = float(patterning.shd(self.__seq)[0])
 
-        return self.__shd
+        return self.__results["SHD"]
 
     # .................................................................
     #
@@ -362,10 +346,10 @@ class Protein:
             Float between 0 and 1
         """
 
-        if self.__aro is None:
-            self.__aro = float(composition.fraction_aromatic(self.__counts())[0])
+        if "fraction_aromatic" not in self.__results:
+            self.__results["fraction_aromatic"] = float(composition.fraction_aromatic(self.__counts())[0])
 
-        return self.__aro
+        return self.__results["fraction_aromatic"]
 
     # .................................................................
     #
@@ -381,10 +365,10 @@ class Protein:
             Float between 0 and 1
         """
 
-        if self.__ali is None:
-            self.__ali = float(composition.fraction_aliphatic(self.__counts())[0])
+        if "fraction_aliphatic" not in self.__results:
+            self.__results["fraction_aliphatic"] = float(composition.fraction_aliphatic(self.__counts())[0])
 
-        return self.__ali
+        return self.__results["fraction_aliphatic"]
 
     # .................................................................
     #
@@ -400,10 +384,10 @@ class Protein:
             Float between 0 and 1
         """
 
-        if self.__polar is None:
-            self.__polar = float(composition.fraction_polar(self.__counts())[0])
+        if "fraction_polar" not in self.__results:
+            self.__results["fraction_polar"] = float(composition.fraction_polar(self.__counts())[0])
 
-        return self.__polar
+        return self.__results["fraction_polar"]
 
     # .................................................................
     #
@@ -417,7 +401,10 @@ class Protein:
         float
             Float between 0 and 1
         """
-        return self.amino_acid_fractions["P"]
+        if "fraction_proline" not in self.__results:
+            self.__results["fraction_proline"] = self.amino_acid_fractions["P"]
+
+        return self.__results["fraction_proline"]
 
     # .................................................................
     #
@@ -436,10 +423,10 @@ class Protein:
         float
             Mean per-residue Kyte-Doolittle hydrophobicity.
         """
-        if self.__hydrophobicity is None:
-            self.__hydrophobicity = float(composition.hydrophobicity(self.__counts())[0])
+        if "hydrophobicity" not in self.__results:
+            self.__results["hydrophobicity"] = float(composition.hydrophobicity(self.__counts())[0])
 
-        return self.__hydrophobicity
+        return self.__results["hydrophobicity"]
 
     # .................................................................
     #
@@ -457,10 +444,12 @@ class Protein:
         float
             Fraction between 0 and 1.
         """
-        if self.__fraction_chain_expanding is None:
-            self.__fraction_chain_expanding = float(composition.fraction_chain_expanding(self.__counts())[0])
+        if "fraction_chain_expanding" not in self.__results:
+            self.__results["fraction_chain_expanding"] = float(
+                composition.fraction_chain_expanding(self.__counts())[0]
+            )
 
-        return self.__fraction_chain_expanding
+        return self.__results["fraction_chain_expanding"]
 
     # .................................................................
     #
@@ -478,10 +467,12 @@ class Protein:
         float
             Fraction between 0 and 1.
         """
-        if self.__fraction_disorder_promoting is None:
-            self.__fraction_disorder_promoting = float(composition.fraction_disorder_promoting(self.__counts())[0])
+        if "fraction_disorder_promoting" not in self.__results:
+            self.__results["fraction_disorder_promoting"] = float(
+                composition.fraction_disorder_promoting(self.__counts())[0]
+            )
 
-        return self.__fraction_disorder_promoting
+        return self.__results["fraction_disorder_promoting"]
 
     # .................................................................
     #
@@ -507,10 +498,10 @@ class Protein:
         --------
         charge_at_pH : The charge this bisects on, at a pH of your choosing.
         """
-        if self.__isoelectric_point is None:
-            self.__isoelectric_point = float(charge.isoelectric_point(self.__counts())[0])
+        if "isoelectric_point" not in self.__results:
+            self.__results["isoelectric_point"] = float(charge.isoelectric_point(self.__counts())[0])
 
-        return self.__isoelectric_point
+        return self.__results["isoelectric_point"]
 
     # .................................................................
     #
@@ -529,10 +520,10 @@ class Protein:
             Mean per-residue PPII propensity
             (:data:`sparrow.data.amino_acids.AA_PPII_HILSER`).
         """
-        if self.__PPII_propensity is None:
-            self.__PPII_propensity = float(composition.polyproline_II_propensity(self.__counts())[0])
+        if "PPII_propensity" not in self.__results:
+            self.__results["PPII_propensity"] = float(composition.polyproline_II_propensity(self.__counts())[0])
 
-        return self.__PPII_propensity
+        return self.__results["PPII_propensity"]
 
     # .................................................................
     #
@@ -555,10 +546,10 @@ class Protein:
         float
             ``log10((count(R) + 1) / (count(K) + 1))``.
         """
-        if self.__RK_ratio is None:
-            self.__RK_ratio = float(composition.log_residue_ratio(self.__counts(), "R", "K")[0])
+        if "RK_ratio" not in self.__results:
+            self.__results["RK_ratio"] = float(composition.log_residue_ratio(self.__counts(), "R", "K")[0])
 
-        return self.__RK_ratio
+        return self.__results["RK_ratio"]
 
     # .................................................................
     #
@@ -577,10 +568,10 @@ class Protein:
         float
             ``log10((count(E) + 1) / (count(D) + 1))``.
         """
-        if self.__ED_ratio is None:
-            self.__ED_ratio = float(composition.log_residue_ratio(self.__counts(), "E", "D")[0])
+        if "ED_ratio" not in self.__results:
+            self.__results["ED_ratio"] = float(composition.log_residue_ratio(self.__counts(), "E", "D")[0])
 
-        return self.__ED_ratio
+        return self.__results["ED_ratio"]
 
     # .................................................................
     #
@@ -595,7 +586,7 @@ class Protein:
         not the same quantity as :attr:`NCPR` (which counts formal charges and
         assumes full ionization).
 
-        Not cached, since it depends on ``pH`` and is cheap to recompute.
+        Calculated on first use for each ``pH`` and ``normalize``, and cached.
 
         Parameters
         ----------
@@ -615,7 +606,11 @@ class Protein:
         isoelectric_point : The pH at which this reaches zero.
         NCPR : Net charge per residue from formal charges.
         """
-        return float(charge.charge_at_pH(self.__counts(), pH=pH, normalize=normalize)[0])
+        key = utilities.cache_key("charge_at_pH", pH, normalize)
+        if key not in self.__results:
+            self.__results[key] = float(charge.charge_at_pH(self.__counts(), pH=pH, normalize=normalize)[0])
+
+        return self.__results[key]
 
     # .................................................................
     #
@@ -633,10 +628,10 @@ class Protein:
         float
             Compositional complexity of the sequence (>= 0).
         """
-        if self.__complexity is None:
-            self.__complexity = float(composition.seg_complexity(self.__counts())[0])
+        if "complexity" not in self.__results:
+            self.__results["complexity"] = float(composition.seg_complexity(self.__counts())[0])
 
-        return self.__complexity
+        return self.__results["complexity"]
 
     # .................................................................
     #
@@ -669,7 +664,12 @@ class Protein:
         residues = [residue for residue in residue_selector if residue in encoding.RESIDUES]
         if not residues:
             return 0.0
-        return float(composition.fraction_in_set(self.__counts(), residues)[0])
+
+        key = utilities.cache_key("compute_residue_fractions", residues)
+        if key not in self.__results:
+            self.__results[key] = float(composition.fraction_in_set(self.__counts(), residues)[0])
+
+        return self.__results[key]
 
     # .................................................................
     #
@@ -776,13 +776,14 @@ class Protein:
             kappa_x_name = group1 + "-" + group2 + str(window_size)
 
         # after set up, calculate kappa_x
-        if kappa_x_name not in self.__kappa_x:
+        key = ("compute_kappa_x", kappa_x_name)
+        if key not in self.__results:
             value = patterning.kappa_x(
                 self.__encoded_sequence(), list(group1), list(group2), window_size, bool(flatten)
             )
-            self.__kappa_x[kappa_x_name] = float(value[0])
+            self.__results[key] = float(value[0])
 
-        return self.__kappa_x[kappa_x_name]
+        return self.__results[key]
 
     # .................................................................
     #
@@ -816,7 +817,11 @@ class Protein:
             return_type="list",
         )
 
-        return float(patterning.iwd(self.__encoded_sequence(), residues)[0])
+        key = utilities.cache_key("compute_iwd", residues)
+        if key not in self.__results:
+            self.__results[key] = float(patterning.iwd(self.__encoded_sequence(), residues)[0])
+
+        return self.__results[key]
 
     # .................................................................
     #
@@ -854,15 +859,26 @@ class Protein:
         float
             Fraction of sequence positions covered by valid patch spans.
         """
-        fraction = patches.patch_fraction(
-            self.__encoded_sequence(),
-            residue_selector=residue_selector,
-            interruption=interruption,
-            min_target_count=min_target_count,
-            adjacent_pair_pattern=adjacent_pair_pattern,
-            min_adjacent_pair_count=min_adjacent_pair_count,
+        key = utilities.cache_key(
+            "compute_patch_fraction",
+            residue_selector,
+            interruption,
+            min_target_count,
+            adjacent_pair_pattern,
+            min_adjacent_pair_count,
         )
-        return float(fraction[0])
+        if key not in self.__results:
+            fraction = patches.patch_fraction(
+                self.__encoded_sequence(),
+                residue_selector=residue_selector,
+                interruption=interruption,
+                min_target_count=min_target_count,
+                adjacent_pair_pattern=adjacent_pair_pattern,
+                min_adjacent_pair_count=min_adjacent_pair_count,
+            )
+            self.__results[key] = float(fraction[0])
+
+        return self.__results[key]
 
     # .................................................................
     #
@@ -901,7 +917,11 @@ class Protein:
         Phys. 143, 085101 (2015).
         """
 
-        return float(patterning.scd(self.__encoded_sequence(), group1=group1, group2=group2)[0])
+        key = utilities.cache_key("compute_SCD_x", group1, group2)
+        if key not in self.__results:
+            self.__results[key] = float(patterning.scd(self.__encoded_sequence(), group1=group1, group2=group2)[0])
+
+        return self.__results[key]
 
     # .................................................................
     #
@@ -936,7 +956,11 @@ class Protein:
         Chem. Lett. 11, 3408-3415 (2020).
         """
 
-        return float(patterning.shd(self.__seq, hydropathy=hydro_dict)[0])
+        key = utilities.cache_key("compute_SHD_custom", hydro_dict)
+        if key not in self.__results:
+            self.__results[key] = float(patterning.shd(self.__seq, hydropathy=hydro_dict)[0])
+
+        return self.__results[key]
 
     # .................................................................
     #
@@ -972,7 +996,11 @@ class Protein:
                 f'Passed charge {charge} is not a valid option. Pass "-" for negative residues and "+" for positive residues.'
             )
 
-        return float(patterning.iwd_charged_weighted(self.__encoded_sequence(), charge)[0])
+        key = utilities.cache_key("compute_iwd_charged_weighted", charge)
+        if key not in self.__results:
+            self.__results[key] = float(patterning.iwd_charged_weighted(self.__encoded_sequence(), charge)[0])
+
+        return self.__results[key]
 
     # .................................................................
     #
@@ -991,7 +1019,12 @@ class Protein:
             A non-negative clustering value.
         """
 
-        return float(patterning.bivariate_iwd_charged_weighted(self.__encoded_sequence())[0])
+        if "compute_bivariate_iwd_charged_weighted" not in self.__results:
+            self.__results["compute_bivariate_iwd_charged_weighted"] = float(
+                patterning.bivariate_iwd_charged_weighted(self.__encoded_sequence())[0]
+            )
+
+        return self.__results["compute_bivariate_iwd_charged_weighted"]
 
     ## .................................................................
     ##
@@ -1030,12 +1063,16 @@ class Protein:
             List of phosphoisoform sequences for the selected mode, with
             phosphorylated residues replaced by ``'E'``.
         """
-        return phospho_isoforms.phosphoisoforms(
-            self,
-            mode=mode,
-            phospho_rate=phospho_rate,
-            phosphosites=phosphosites,
-        )
+        key = utilities.cache_key("generate_phosphoisoforms", mode, phospho_rate, phosphosites)
+        if key not in self.__results:
+            self.__results[key] = phospho_isoforms.phosphoisoforms(
+                self,
+                mode=mode,
+                phospho_rate=phospho_rate,
+                phosphosites=phosphosites,
+            )
+
+        return self.__results[key]
 
     # .................................................................
     #
@@ -1095,8 +1132,9 @@ class Protein:
         else:
             name = "%s-%i-%s" % (mode, window_size, end_mode)
 
-        if name not in self.__linear_profiles:
-            self.__linear_profiles[name] = profiles.window_profile(
+        key = ("linear_sequence_profile", name)
+        if key not in self.__results:
+            self.__results[key] = profiles.window_profile(
                 self.__encoded_sequence(),
                 _LINEAR_PROFILE_MODES[mode],
                 window_size=window_size,
@@ -1104,7 +1142,7 @@ class Protein:
                 smooth=smooth,
             )[0]
 
-        return self.__linear_profiles[name]
+        return self.__results[key]
 
     # .................................................................
     #
@@ -1166,11 +1204,12 @@ class Protein:
             + "smooth=%s" % (smooth)
         )
 
-        if name not in self.__linear_profiles:
+        key = ("linear_composition_profile", name)
+        if key not in self.__results:
             # residues that are not standard amino acids are ignored rather than
             # rejected, as compute_residue_fractions does
             residues = [residue for residue in composition_list if residue in encoding.RESIDUE_INDEX]
-            self.__linear_profiles[name] = profiles.fraction_profile(
+            self.__results[key] = profiles.fraction_profile(
                 self.__encoded_sequence(),
                 residues,
                 window_size=window_size,
@@ -1178,7 +1217,7 @@ class Protein:
                 smooth=smooth,
             )[0]
 
-        return self.__linear_profiles[name]
+        return self.__results[key]
 
     # .................................................................
     #
@@ -1264,8 +1303,9 @@ class Protein:
             smooth,
         )
 
-        if name not in self.__linear_profiles:
-            self.__linear_profiles[name] = profiles.scale_profile(
+        key = ("linear_property_profile", name)
+        if key not in self.__results:
+            self.__results[key] = profiles.scale_profile(
                 self.__encoded_sequence(),
                 value_map,
                 window_size=window_size,
@@ -1273,7 +1313,7 @@ class Protein:
                 smooth=smooth,
             )[0]
 
-        return self.__linear_profiles[name]
+        return self.__results[key]
 
     # .................................................................
     #
@@ -1314,10 +1354,17 @@ class Protein:
         [['QQQQQQQQQQ', 5, 15]]
         """
         utilities.validate_keyword_option(mode, ["holt", "holt-permissive"], "mode")
-        if mode == "holt":
-            return sequence_complexity.low_complexity_domains_holt(self.sequence, **kwargs)
-        if mode == "holt-permissive":
-            return sequence_complexity.low_complexity_domains_holt_permissive(self.sequence, **kwargs)
+
+        key = utilities.cache_key("low_complexity_domains", mode, kwargs)
+        if key not in self.__results:
+            if mode == "holt":
+                self.__results[key] = sequence_complexity.low_complexity_domains_holt(self.sequence, **kwargs)
+            else:
+                self.__results[key] = sequence_complexity.low_complexity_domains_holt_permissive(
+                    self.sequence, **kwargs
+                )
+
+        return self.__results[key]
 
     def plaac_prion_like_domains(self, simple=True, **kwargs):
         """Extract prion-like domains (PLDs) from the sequence using the PLAAC algorithm.
@@ -1397,12 +1444,16 @@ class Protein:
         >>> # a custom background requires alpha < 1.0
         >>> p.plaac_prion_like_domains(alpha=0.0, bg_freqs=my_freqs)  # doctest: +SKIP
         """
-        if simple:
-            tmp = plaac_score_sequence(self.sequence, **kwargs).prd_regions
-            return [[r.prd_seq, r.prd_start - 1, r.prd_end] for r in tmp]
+        # the full result is cached, so the simple and full forms share one PLAAC run
+        key = utilities.cache_key("plaac_prion_like_domains", kwargs)
+        if key not in self.__results:
+            self.__results[key] = plaac_score_sequence(self.sequence, **kwargs)
+        result = self.__results[key]
 
-        else:
-            return plaac_score_sequence(self.sequence, **kwargs)
+        if simple:
+            return [[r.prd_seq, r.prd_start - 1, r.prd_end] for r in result.prd_regions]
+
+        return result
 
     def show_sequence(
         self,
@@ -1637,9 +1688,9 @@ class Protein:
             All ELM annotations detected in the sequence.
 
         """
-        if self.__elms is None:
-            self.__elms = elm.find_all_elms(self.sequence)
-        return self.__elms
+        if "elms" not in self.__results:
+            self.__results["elms"] = elm.find_all_elms(self.sequence)
+        return self.__results["elms"]
 
     @property
     def sequence(self):

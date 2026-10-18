@@ -173,6 +173,9 @@ class ProteinNardini:
     def __init__(self, protein_obj):
         self.__protein = protein_obj
         self.__cache = {}
+        # composition needs no scrambles, so it is kept apart from the results
+        # above, which _patterning_result searches by their options
+        self.__composition_cache = {}
 
     # .................................................................
     #
@@ -367,7 +370,7 @@ class ProteinNardini:
         """Return only the compositional half of the NARDINI+ vector.
 
         54 features describing what the sequence is made of. Cheap - no
-        scrambling involved.
+        scrambling involved. Cached for each background and ``raw``.
 
         Parameters
         ----------
@@ -395,14 +398,21 @@ class ProteinNardini:
         )
         from sparrow.nardini.table import FeatureVector
 
+        key = (_background_key(background), bool(raw))
+        if key in self.__composition_cache:
+            return self.__composition_cache[key]
+
         values = composition_values(self.__protein.sequence)
         raw_array = [values[name] for name in COMPOSITION_FEATURE_NAMES]
 
         if raw or background is None:
-            return FeatureVector(raw_array, COMPOSITION_FEATURE_NAMES, label="composition (raw)")
+            vector = FeatureVector(raw_array, COMPOSITION_FEATURE_NAMES, label="composition (raw)")
+        else:
+            resolved = resolve_background(background)
+            vector = FeatureVector(resolved.zscores(values), COMPOSITION_FEATURE_NAMES, label="composition")
 
-        resolved = resolve_background(background)
-        return FeatureVector(resolved.zscores(values), COMPOSITION_FEATURE_NAMES, label="composition")
+        self.__composition_cache[key] = vector
+        return vector
 
     # .................................................................
     #
