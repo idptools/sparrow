@@ -31,7 +31,10 @@ class Polymeric:
             Primarily used to give access to PARROT trained predictor objects.
 
         p_of_r_resolution : float
-            Bin width for building the probability distributions, defined in Angstroms, by default 0.05.
+            Bin width for building the SAW and nu-dependent SAW probability
+            distributions, defined in Angstroms, by default 0.05. The AFRC
+            distributions always use afrc's own fixed 0.05 Angstrom grid,
+            because ``AnalyticalFRC`` does not take a bin width.
         """
         self.__protein = protein_obj
         self.__nudepsaw = None
@@ -208,7 +211,10 @@ class Polymeric:
         if self.__afrc is None:
             from afrc import AnalyticalFRC
 
-            self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
+            # AnalyticalFRC's second argument is adaptable_P_res, not a bin
+            # width: a bin width passed there switches on afrc's length-dependent
+            # grid (3.7N/500 Angstroms), so it is given by name
+            self.__afrc = AnalyticalFRC(self.__protein.sequence, adaptable_P_res=False)
 
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = self.__afrc.get_end_to_end_distribution()
@@ -244,7 +250,7 @@ class Polymeric:
         if self.__afrc is None:
             from afrc import AnalyticalFRC
 
-            self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
+            self.__afrc = AnalyticalFRC(self.__protein.sequence, adaptable_P_res=False)
 
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = self.__afrc.get_radius_of_gyration_distribution()
@@ -282,7 +288,7 @@ class Polymeric:
         if self.__afrc is None:
             from afrc import AnalyticalFRC
 
-            self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
+            self.__afrc = AnalyticalFRC(self.__protein.sequence, adaptable_P_res=False)
 
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = self.__afrc.get_mean_end_to_end_distance(calculation_mode=mode)
@@ -318,7 +324,7 @@ class Polymeric:
         if self.__afrc is None:
             from afrc import AnalyticalFRC
 
-            self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
+            self.__afrc = AnalyticalFRC(self.__protein.sequence, adaptable_P_res=False)
 
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = self.__afrc.get_mean_radius_of_gyration(calculation_mode=mode)
@@ -357,7 +363,7 @@ class Polymeric:
         if self.__afrc is None:
             from afrc import AnalyticalFRC
 
-            self.__afrc = AnalyticalFRC(self.__protein.sequence, self.__p_of_r_resolution)
+            self.__afrc = AnalyticalFRC(self.__protein.sequence, adaptable_P_res=False)
 
         if selector not in self.__precomputed or recompute is True:
             self.__precomputed[selector] = self.__afrc.get_internal_scaling(calculation_mode=mode)

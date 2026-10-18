@@ -73,3 +73,23 @@ def test_afrc_distributions_still_work(polymeric):
     """The afrc-backed siblings share the accessor pattern; pin them too."""
     _assert_is_distribution(polymeric.get_afrc_end_to_end_distribution())
     _assert_is_distribution(polymeric.get_afrc_radius_of_gyration_distribution())
+
+
+# afrc's fixed grid spacing, in Angstroms
+AFRC_GRID_SPACING_A = 0.05
+
+
+@pytest.mark.parametrize("length", [40, 400])
+def test_afrc_distributions_use_the_fixed_grid(length):
+    """The AFRC distributions are on afrc's fixed 0.05 A grid at any length.
+
+    sparrow used to pass its bin width as AnalyticalFRC's second argument, which
+    is adaptable_P_res, so the grid was 3.7N/500 A instead - 0.3 A at 40 residues
+    and 3 A at 400.
+    """
+    polymeric = Protein((SEQ * 10)[:length]).polymeric
+    for distances, _ in (
+        polymeric.get_afrc_end_to_end_distribution(),
+        polymeric.get_afrc_radius_of_gyration_distribution(),
+    ):
+        np.testing.assert_allclose(np.diff(distances), AFRC_GRID_SPACING_A)
