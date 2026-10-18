@@ -262,18 +262,18 @@ properties and distance distributions via ``protein.polymeric``.
    sparrow.polymer.Polymeric.predicted_re
    sparrow.polymer.Polymeric.predicted_asphericity
    sparrow.polymer.Polymeric.predicted_prefactor
-   sparrow.polymer.Polymeric.get_afrc_end_to_end_distribution
-   sparrow.polymer.Polymeric.get_afrc_radius_of_gyration_distribution
-   sparrow.polymer.Polymeric.get_mean_afrc_end_to_end_distance
-   sparrow.polymer.Polymeric.get_mean_afrc_radius_of_gyration
-   sparrow.polymer.Polymeric.get_afrc_internal_scaling
-   sparrow.polymer.Polymeric.get_predicted_nu_dep_end_to_end_distribution
-   sparrow.polymer.Polymeric.get_saw_end_to_end_distribution
-   sparrow.polymer.Polymeric.get_mean_saw_end_to_end_distance
-   sparrow.polymer.Polymeric.get_mean_saw_radius_of_gyration
-   sparrow.polymer.Polymeric.get_nudep_saw_end_to_end_distribution
-   sparrow.polymer.Polymeric.get_mean_nudep_saw_end_to_end_distance
-   sparrow.polymer.Polymeric.get_mean_nudep_saw_radius_of_gyration
+   sparrow.polymer.Polymeric.afrc_end_to_end_distribution
+   sparrow.polymer.Polymeric.afrc_radius_of_gyration_distribution
+   sparrow.polymer.Polymeric.mean_afrc_end_to_end_distance
+   sparrow.polymer.Polymeric.mean_afrc_radius_of_gyration
+   sparrow.polymer.Polymeric.afrc_internal_scaling
+   sparrow.polymer.Polymeric.predicted_nu_dep_end_to_end_distribution
+   sparrow.polymer.Polymeric.saw_end_to_end_distribution
+   sparrow.polymer.Polymeric.mean_saw_end_to_end_distance
+   sparrow.polymer.Polymeric.mean_saw_radius_of_gyration
+   sparrow.polymer.Polymeric.nudep_saw_end_to_end_distribution
+   sparrow.polymer.Polymeric.mean_nudep_saw_end_to_end_distance
+   sparrow.polymer.Polymeric.mean_nudep_saw_radius_of_gyration
    sparrow.polymer.Polymeric.empirical_nu
    sparrow.polymer.Polymeric.empirical_radius_of_gyration
 
@@ -282,10 +282,10 @@ properties and distance distributions via ``protein.polymeric``.
    p.predictor.radius_of_gyration()               # ALBATROSS Rg, in Angstroms
    p.predictor.radius_of_gyration(use_scaled=False)   # the non-scaled network
    p.polymeric.predicted_nu
-   re_distance, probability = p.polymeric.get_afrc_end_to_end_distribution()
+   re_distance, probability = p.polymeric.afrc_end_to_end_distribution()
 
    # analytical reference models, with tunable nu / prefactor
-   p.polymeric.get_mean_nudep_saw_radius_of_gyration(nu=0.55, prefactor=5.5)
+   p.polymeric.mean_nudep_saw_radius_of_gyration(nu=0.55, prefactor=5.5)
 
    # empirical relationships from the literature
    p.polymeric.empirical_nu()                     # Zheng et al. 2020
@@ -296,8 +296,23 @@ and those trained on the raw values. For sequences shorter than
 ``sparrow.data.configs.MIN_LENGTH_ALBATROSS_RE_RG`` (35 residues) the scaled
 network is used regardless, unless you pass ``safe=False``.
 
-(The full polymer-model surface is documented in the ``Polymeric`` reference at
-the bottom of this page.)
+Each polymer model is also a module of plain functions that take a sequence,
+which ``protein.polymeric`` calls and caches:
+
+.. code-block:: python
+
+   from sparrow.polymer import analytical_frc, nudep_saw, saw, zheng2020
+
+   analytical_frc.mean_radius_of_gyration(p.sequence)       # = p.polymeric.mean_afrc_radius_of_gyration()
+   nudep_saw.mean_radius_of_gyration(p.sequence, nu=0.55)   # = p.polymeric.mean_nudep_saw_radius_of_gyration(nu=0.55)
+   zheng2020.scaling_exponent(p.sequence)                   # = p.polymeric.empirical_nu()
+
+The ``Polymeric`` methods were called ``get_afrc_end_to_end_distribution`` and
+so on before they lost their ``get_`` prefix. The old names still work, with a
+``DeprecationWarning``, and will be removed in a future release.
+
+(The full polymer-model surface is documented in the ``Polymeric`` reference and
+the polymer-model references at the bottom of this page.)
 
 Predictions -- modification, localization & phase behavior
 ----------------------------------------------------------
@@ -433,6 +448,17 @@ Reached as ``protein.polymeric``.
 .. autoclass:: sparrow.polymer.Polymeric
    :members:
    :undoc-members:
+
+The polymer models
+------------------
+
+.. automodule:: sparrow.polymer.analytical_frc
+
+.. automodule:: sparrow.polymer.saw
+
+.. automodule:: sparrow.polymer.nudep_saw
+
+.. automodule:: sparrow.polymer.zheng2020
 
 Exceptions
 ----------

@@ -86,24 +86,24 @@ def test_empty_protein_has_defined_composition_properties():
 def test_nudep_saw_rg_varies_with_nu():
     """Cached polymer values must not leak across different nu values."""
     p = Protein(TEST_SEQ)
-    low = p.polymeric.get_mean_nudep_saw_radius_of_gyration(nu=0.40)
-    high = p.polymeric.get_mean_nudep_saw_radius_of_gyration(nu=0.60)
+    low = p.polymeric.mean_nudep_saw_radius_of_gyration(nu=0.40)
+    high = p.polymeric.mean_nudep_saw_radius_of_gyration(nu=0.60)
 
     assert low != pytest.approx(high)
 
     # and the first value is still retrievable (i.e. the cache is per-nu)
-    assert p.polymeric.get_mean_nudep_saw_radius_of_gyration(nu=0.40) == pytest.approx(low)
+    assert p.polymeric.mean_nudep_saw_radius_of_gyration(nu=0.40) == pytest.approx(low)
 
     # cross-check against a protein that only ever saw nu=0.6
     fresh = Protein(TEST_SEQ)
-    assert fresh.polymeric.get_mean_nudep_saw_radius_of_gyration(nu=0.60) == pytest.approx(high)
+    assert fresh.polymeric.mean_nudep_saw_radius_of_gyration(nu=0.60) == pytest.approx(high)
 
 
 def test_nudep_saw_re_varies_with_nu_and_prefactor():
     p = Protein(TEST_SEQ)
-    a = p.polymeric.get_mean_nudep_saw_end_to_end_distance(nu=0.45, prefactor=5.5)
-    b = p.polymeric.get_mean_nudep_saw_end_to_end_distance(nu=0.55, prefactor=5.5)
-    c = p.polymeric.get_mean_nudep_saw_end_to_end_distance(nu=0.45, prefactor=8.0)
+    a = p.polymeric.mean_nudep_saw_end_to_end_distance(nu=0.45, prefactor=5.5)
+    b = p.polymeric.mean_nudep_saw_end_to_end_distance(nu=0.55, prefactor=5.5)
+    c = p.polymeric.mean_nudep_saw_end_to_end_distance(nu=0.45, prefactor=8.0)
 
     assert a != pytest.approx(b)
     assert a != pytest.approx(c)
@@ -111,28 +111,28 @@ def test_nudep_saw_re_varies_with_nu_and_prefactor():
 
 def test_saw_values_vary_with_prefactor():
     p = Protein(TEST_SEQ)
-    assert p.polymeric.get_mean_saw_radius_of_gyration(prefactor=5.5) != pytest.approx(
-        p.polymeric.get_mean_saw_radius_of_gyration(prefactor=8.0)
+    assert p.polymeric.mean_saw_radius_of_gyration(prefactor=5.5) != pytest.approx(
+        p.polymeric.mean_saw_radius_of_gyration(prefactor=8.0)
     )
 
     p2 = Protein(TEST_SEQ)
-    assert p2.polymeric.get_mean_saw_end_to_end_distance(prefactor=5.5) != pytest.approx(
-        p2.polymeric.get_mean_saw_end_to_end_distance(prefactor=8.0)
+    assert p2.polymeric.mean_saw_end_to_end_distance(prefactor=5.5) != pytest.approx(
+        p2.polymeric.mean_saw_end_to_end_distance(prefactor=8.0)
     )
 
 
 def test_afrc_mean_rg_varies_with_mode():
     p = Protein(TEST_SEQ)
-    dist = p.polymeric.get_mean_afrc_radius_of_gyration(mode="distribution")
-    law = p.polymeric.get_mean_afrc_radius_of_gyration(mode="scaling law")
+    dist = p.polymeric.mean_afrc_radius_of_gyration(mode="distribution")
+    law = p.polymeric.mean_afrc_radius_of_gyration(mode="scaling law")
 
     assert dist != pytest.approx(law)
 
 
 def test_afrc_mean_re_varies_with_mode():
     p = Protein(TEST_SEQ)
-    law = p.polymeric.get_mean_afrc_end_to_end_distance(mode="scaling law")
-    dist = p.polymeric.get_mean_afrc_end_to_end_distance(mode="distribution")
+    law = p.polymeric.mean_afrc_end_to_end_distance(mode="scaling law")
+    dist = p.polymeric.mean_afrc_end_to_end_distance(mode="distribution")
 
     assert law != pytest.approx(dist)
 

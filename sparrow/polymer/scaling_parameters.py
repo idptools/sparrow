@@ -1,76 +1,45 @@
-from sparrow.properties import patterning
-import numpy as np
+"""Deprecated: the Zheng et al. (2020) estimates are now in :mod:`sparrow.polymer.zheng2020`.
+
+``compute_nu_zheng2020`` is :func:`sparrow.polymer.zheng2020.scaling_exponent` and
+``compute_rg_zheng2020`` is :func:`sparrow.polymer.zheng2020.radius_of_gyration`.
+Both old names still work, with a ``DeprecationWarning``, and will be removed in a
+future release, along with this module.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from sparrow.polymer import zheng2020
+from sparrow.tools.utilities import warn_renamed
+
+# old name -> the function in sparrow.polymer.zheng2020 that replaces it
+_RENAMED_FUNCTIONS = {
+    "compute_nu_zheng2020": "scaling_exponent",
+    "compute_rg_zheng2020": "radius_of_gyration",
+}
 
 
-def compute_nu_zheng2020(seq):
-    """
-    Function takes in a sequence and returns a calculate Nu scaling value
-    from Sequence Hydropathy Decoration (SHD) and Sequence Charge Decoration)
-
-    Nu = -0.0423×SHD + 0.0074×SCD+0.701
-
-    This equation for predicting nu is adopeted from Zheng et al. [1].
-
-    Parameters
-    ------------------
-    seq : str
-        Amino acid sequence (must be valid amino acids only)
-
-    Returns
-    ------------------
-    float
-        Returns the predict scalinge exponent (nu), a dimensionless
-        parameter which should fall between 0.33 and 0.6 (in theory).
-
-    References
-    ---------------
-    [1] Zheng, W., Dignon, G. L., Brown, M., Kim, Y. C. & Mittal, J.
-    Hydropathy Patterning Complements Charge Patterning to Describe
-    Conformational Preferences of Disordered Proteins. J. Phys.
-    Chem. Lett. (2020). doi:10.1021/acs.jpclett.0c00288
-
-    """
-
-    SHD = float(patterning.shd(seq)[0])
-    SCD = float(patterning.scd(seq)[0])
-
-    # calculate Nu from SHD and SCD
-    nu = (-0.0423 * SHD) + (0.0074 * SCD) + 0.701
-
-    return nu
-
-
-def compute_rg_zheng2020(seq):
-    """
-    Function that takes in an amino acid sequence and computes the
-    expected radius of gyration using the nu-dependent Rg as developed by
-    Zheng et al.
+def __getattr__(name: str) -> Any:
+    """Resolve a function's old name, with a ``DeprecationWarning``.
 
     Parameters
-    ------------------
-    seq : str
-        Amino acid sequence (must be valid amino acids only)
+    ----------
+    name : str
+        The attribute asked for.
 
     Returns
-    ------------------
-    float
-        Returns the predict radius of gyration in Angstorms
+    -------
+    Any
+        The function that replaces ``name``.
 
-    References
-    ---------------
-    [1] Zheng, W., Dignon, G. L., Brown, M., Kim, Y. C. & Mittal, J.
-    Hydropathy Patterning Complements Charge Patterning to Describe
-    Conformational Preferences of Disordered Proteins. J. Phys.
-    Chem. Lett. (2020). doi:10.1021/acs.jpclett.0c00288
+    Raises
+    ------
+    AttributeError
+        If ``name`` is not one of the renamed functions.
     """
-    nu = compute_nu_zheng2020(seq)
-
-    gamma = 1.1615
-    b = 5.5  # note in Angstroms instead of nanometers
-    N = len(seq)
-
-    numerator = gamma * (gamma + 1)
-
-    denominator = 2 * (gamma + 2 * nu) * (gamma + 2 * nu + 1)
-
-    return np.sqrt(numerator / denominator) * b * np.power(N, nu)
+    if name not in _RENAMED_FUNCTIONS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    new_name = _RENAMED_FUNCTIONS[name]
+    warn_renamed(f"{__name__}.{name}", f"{zheng2020.__name__}.{new_name}")
+    return getattr(zheng2020, new_name)

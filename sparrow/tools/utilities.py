@@ -1,4 +1,10 @@
+import warnings
+
 from sparrow.sparrow_exceptions import SparrowException
+
+# How far up the stack a renamed-name warning points: past warn_renamed and the
+# __getattr__ that calls it, to the code that used the old name
+_RENAMED_WARNING_STACKLEVEL = 3
 
 
 def validate_keyword_option(keyword, allowed_vals, keyword_name, error_message=None):
@@ -45,3 +51,31 @@ def validate_keyword_option(keyword, allowed_vals, keyword_name, error_message=N
             )
 
         raise SparrowException(error_message)
+
+
+def warn_renamed(old_name: str, new_name: str) -> None:
+    """Warn that a function or method has been renamed.
+
+    sparrow keeps an old name working for one release after a rename: the
+    module's or class's ``__getattr__``, which Python calls only for a name it
+    cannot otherwise find, calls this and then returns the renamed object. The
+    warning points at the code that used the old name.
+
+    Parameters
+    ----------
+    old_name : str
+        The old name, as the caller would have written it.
+    new_name : str
+        The name to use instead.
+
+    Returns
+    -------
+    None
+        No return value; issues a ``DeprecationWarning``.
+    """
+    warnings.warn(
+        f"{old_name} has been renamed {new_name}. The old name still works, but will be removed in a future "
+        "release of sparrow.",
+        DeprecationWarning,
+        stacklevel=_RENAMED_WARNING_STACKLEVEL,
+    )
