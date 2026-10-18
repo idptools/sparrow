@@ -16,6 +16,10 @@ Every entry retains its `description` and literature `reference` so that
 downstream code (e.g. sparrow linear-profile docstrings) can cite the source of
 each scale.
 
+## How sparrow uses them
+
+`sparrow/data/aaindex.py` reads `aaindex1.json` and gives each index a readable name, such as `hydropathy-kyte-1982`. `Protein.linear_property_profile` takes any of those names, so any AAindex1 index can be profiled along a sequence, and the profile functions in `sparrow.properties.profiles` take an index's values as a scale. The API guide on sequence properties (`docs/api_guides/properties.rst`) covers both. `aaindex2.json` and `aaindex3.json` are read only through the reader here, `sparrow.data.properties.load`; nothing else in sparrow reads them at present.
+
 ---
 
 ## Quick start
