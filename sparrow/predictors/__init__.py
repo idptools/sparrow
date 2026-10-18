@@ -31,6 +31,23 @@ from sparrow.data.configs import MIN_LENGTH_ALBATROSS_RE_RG
 from sparrow.sparrow_exceptions import SparrowException
 from sparrow.tools.utilities import cache_key, validate_keyword_option
 
+# The ALBATROSS polymer-dimension methods, each with the network it runs, by the
+# name batch_predict knows the network by. Each prediction is cached under the
+# name of the network that made it, so that sparrow.batch can store a prediction
+# batch_predict made where the method will look for it.
+ALBATROSS_NETWORKS = {
+    "radius_of_gyration": "rg",
+    "end_to_end_distance": "re",
+    "asphericity": "asphericity",
+    "prefactor": "prefactor",
+    "scaling_exponent": "scaling_exponent",
+}
+
+# The methods that also have a network trained on the value divided by sqrt(N),
+# named with this prefix, which they use by default
+SCALED_NETWORK_METHODS = ("radius_of_gyration", "end_to_end_distance")
+SCALED_NETWORK_PREFIX = "scaled_"
+
 
 class Predictor:
     """Programmatic access to sparrow's sequence-based predictors.
@@ -1192,13 +1209,15 @@ class Predictor:
 
         """
 
-        # if this is a short sequence and safe=True
-        if safe:
-            if len(self.__protein) < MIN_LENGTH_ALBATROSS_RE_RG:
-                use_scaled = True
+        # a sequence shorter than MIN_LENGTH_ALBATROSS_RE_RG uses the scaled
+        # network unless safe is False; see _network
+        selector = self._network("radius_of_gyration", use_scaled=use_scaled, safe=safe)
 
-        if use_scaled:
-            selector = "scaled_rg"
+        # a prediction already made, here or by sparrow.batch, needs no network
+        if selector in self.__precomputed and not recompute:
+            return self.__precomputed[selector]
+
+        if selector == "scaled_rg":
             if self.__scaled_rg_predictor_object is None:
                 from .scaled_rg.scaled_radius_of_gyration_predictor import (
                     ScaledRgPredictor,
@@ -1212,7 +1231,6 @@ class Predictor:
                 ) * np.sqrt(len(self.__protein.sequence))
 
         else:
-            selector = "rg"
             if self.__rg_predictor_object is None:
                 from .rg.radius_of_gyration_predictor import RgPredictor
 
@@ -1268,12 +1286,15 @@ class Predictor:
 
         """
 
-        if safe:
-            if len(self.__protein) < MIN_LENGTH_ALBATROSS_RE_RG:
-                use_scaled = True
+        # a sequence shorter than MIN_LENGTH_ALBATROSS_RE_RG uses the scaled
+        # network unless safe is False; see _network
+        selector = self._network("end_to_end_distance", use_scaled=use_scaled, safe=safe)
 
-        if use_scaled:
-            selector = "scaled_re"
+        # a prediction already made, here or by sparrow.batch, needs no network
+        if selector in self.__precomputed and not recompute:
+            return self.__precomputed[selector]
+
+        if selector == "scaled_re":
             if self.__scaled_re_predictor_object is None:
                 from .scaled_re.scaled_end_to_end_distance_predictor import (
                     ScaledRePredictor,
@@ -1287,7 +1308,6 @@ class Predictor:
                 ) * np.sqrt(len(self.__protein.sequence))
 
         else:
-            selector = "re"
             if self.__re_predictor_object is None:
                 from .e2e.end_to_end_distance_predictor import RePredictor
 
@@ -1315,7 +1335,11 @@ class Predictor:
 
         """
 
-        selector = "asph"
+        selector = self._network("asphericity")
+
+        # a prediction already made, here or by sparrow.batch, needs no network
+        if selector in self.__precomputed and not recompute:
+            return self.__precomputed[selector]
 
         if self.__asphericity_predictor_object is None:
             from .asphericity.asphericity_predictor import AsphericityPredictor
@@ -1346,7 +1370,11 @@ class Predictor:
 
         """
 
-        selector = "prefactor"
+        selector = self._network("prefactor")
+
+        # a prediction already made, here or by sparrow.batch, needs no network
+        if selector in self.__precomputed and not recompute:
+            return self.__precomputed[selector]
 
         if self.__prefactor_predictor_object is None:
             from .prefactor.prefactor_predictor import PrefactorPredictor
@@ -1375,7 +1403,11 @@ class Predictor:
 
         """
 
-        selector = "scaling_exponent"
+        selector = self._network("scaling_exponent")
+
+        # a prediction already made, here or by sparrow.batch, needs no network
+        if selector in self.__precomputed and not recompute:
+            return self.__precomputed[selector]
 
         if self.__scaling_exponent_predictor_object is None:
             from .scaling_exponent.scaling_exponent_predictor import (
@@ -1390,3 +1422,91 @@ class Predictor:
             )
 
         return self.__precomputed[selector]
+
+    # .................................................................
+    #
+    def _network(self, method, use_scaled=True, safe=True):
+        """The ALBATROSS network a polymer-dimension method runs for this sequence.
+
+        Each method caches its prediction under the name of the network that
+        made it, so this is also the prediction's cache key. sparrow.batch calls
+        it to decide which network to run for each sequence of a batch, and
+        :meth:`_store` to put the prediction where the method will look.
+
+        Parameters
+        ----------
+        method : str
+            One of the methods in :data:`ALBATROSS_NETWORKS`.
+        use_scaled : bool, optional
+            As for :meth:`radius_of_gyration` and :meth:`end_to_end_distance`;
+            ignored for the other methods. Default True.
+        safe : bool, optional
+            As for :meth:`radius_of_gyration` and :meth:`end_to_end_distance`;
+            ignored for the other methods. Default True.
+
+        Returns
+        -------
+        str
+            The network's name, as
+            :func:`~sparrow.predictors.batch_predict.batch_predict` knows it.
+
+        Raises
+        ------
+        sparrow.sparrow_exceptions.SparrowException
+            If ``method`` is not an ALBATROSS polymer-dimension method.
+        """
+        if method not in ALBATROSS_NETWORKS:
+            raise SparrowException(
+                f"{method!r} is not an ALBATROSS polymer-dimension method; these are {list(ALBATROSS_NETWORKS)}"
+            )
+
+        network = ALBATROSS_NETWORKS[method]
+        if method not in SCALED_NETWORK_METHODS:
+            return network
+
+        # the scaled network is much more accurate for short sequences, so they
+        # use it whatever was asked for, unless safe is False
+        if safe and len(self.__protein) < MIN_LENGTH_ALBATROSS_RE_RG:
+            use_scaled = True
+
+        if use_scaled:
+            return SCALED_NETWORK_PREFIX + network
+        return network
+
+    def _store(self, network, prediction):
+        """Adopt an ALBATROSS prediction made outside this Predictor.
+
+        Used by sparrow.batch, which predicts a whole batch at once with
+        :func:`~sparrow.predictors.batch_predict.batch_predict` and stores each
+        sequence's prediction here, under the network that made it - the key
+        the polymer-dimension methods look a prediction up by (see
+        :meth:`_network`). A prediction made in a batch can differ from one made
+        for the sequence alone by about 1e-7 relative, the precision of the
+        networks' 32-bit arithmetic, because the batch is summed in a different
+        order, so a prediction this Predictor has already made is kept: a value
+        already read does not change.
+
+        Parameters
+        ----------
+        network : str
+            The network that made the prediction, as ``batch_predict`` knows it.
+        prediction : float
+            The prediction, as ``batch_predict`` returns it.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        sparrow.sparrow_exceptions.SparrowException
+            If ``network`` is not an ALBATROSS polymer-dimension network.
+        """
+        networks = set(ALBATROSS_NETWORKS.values())
+        networks.update(SCALED_NETWORK_PREFIX + ALBATROSS_NETWORKS[method] for method in SCALED_NETWORK_METHODS)
+        if network not in networks:
+            raise SparrowException(
+                f"{network!r} is not an ALBATROSS polymer-dimension network; these are {sorted(networks)}"
+            )
+
+        self.__precomputed.setdefault(network, prediction)

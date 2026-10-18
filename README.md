@@ -36,7 +36,7 @@ SPARROW integrates direct sequence calculations with per-residue predictions fro
 - **Deep-learning predictions** via `Protein.predictor` — disorder and pLDDT, DSSP secondary structure, polymer dimensions (Rg, Re, scaling exponent, asphericity, prefactor), phosphorylation, localization signals, transactivation domains, transmembrane regions, and phase-separation propensity. Built on the [ALBATROSS](https://www.nature.com/articles/s41592-023-02159-5) networks.
 - **Polymer-model properties** via `Protein.polymeric` — analytical and simulation-derived dimensions and distance distributions.
 - **Molecular grammars** — a native NARDINI / NARDINI+ implementation (`sparrow.nardini`) for detecting non-random residue patterning, with user-buildable compositional backgrounds, assignment to the 30 human GIN grammars, clustering to derive your own, and parallel computation across a whole proteome.
-- **Scale-up tools** — every sequence parameter and profile for a whole batch of sequences at once (`sparrow.properties`), fast batch prediction across whole sequence sets, and fixed-length feature vectors for machine learning (the 20 scalar properties from `sparrow.properties.compute()`, or 90-feature NARDINI+ vectors).
+- **Scale-up tools** — `sparrow.batch`, which makes a `Protein` for every sequence of a set with the values you name already computed; and underneath it, every sequence parameter and profile for a whole batch of sequences at once (`sparrow.properties`), fast batch prediction across whole sequence sets, and fixed-length feature vectors for machine learning (the 20 scalar properties from `sparrow.properties.compute()`, or 90-feature NARDINI+ vectors).
 - **Extensible** — a simple plugin system for adding new sequence analyses.
 
 ## Installation
@@ -91,7 +91,20 @@ proteins = read_fasta("my_fasta_file.fasta")   # {header: Protein}
 
 ### Many sequences at once
 
-Every `Protein` property is calculated by a batch function in `sparrow.properties`, which takes a list of sequences and returns one value per sequence. `compute()` gives any of them by their `Protein` name — the same values, to the last bit, without making a `Protein` for each sequence:
+For fifty sequences or fifty thousand, `sparrow.batch` makes a `Protein` for each, with the values you name already computed, so reading them back costs nothing. A name is the path you would read the value back by, and on its own it uses its method's defaults; to give it arguments, pair it with them in a dict. Where sparrow can compute a value for a whole batch at once — the 20 scalar properties, the ALBATROSS polymer dimensions, the NARDINI scrambles — it does, and anything else is computed one protein at a time, by the method itself:
+
+```python
+import sparrow
+
+proteins = sparrow.batch("my_idrs.fasta", ["FCR", "kappa", "predictor.radius_of_gyration"])
+proteins["IDR1"].kappa                              # already computed
+
+proteins = sparrow.batch(sequences, ["FCR", {"charge_at_pH": {"pH": 6.0}}, {"nardini.vector": {"seed": 42}}], n_processes=8)
+```
+
+It takes a dict or a list of sequences or `Protein` objects, or the path to a FASTA file, and returns the same shape (a dict keyed by header, for a file). On the 6,067 yeast proteins, all 20 scalar properties take 0.46 s this way, against 2.8 s one `Protein` at a time, and the five ALBATROSS polymer dimensions for 2,000 of them 28 s on a CPU, against 227 s. See [the guide](https://idptools-sparrow.readthedocs.io/en/latest/api_guides/many_sequences.html).
+
+When you want arrays rather than `Protein` objects — a feature matrix, say — the functions underneath return them. Every `Protein` property is calculated by a batch function in `sparrow.properties`, which takes a list of sequences and returns one value per sequence. `compute()` gives any of them by their `Protein` name — the same values, to the last bit, without making a `Protein` for each sequence:
 
 ```python
 from sparrow.properties import compute, fraction_in_set, window_profile, composition
@@ -127,7 +140,7 @@ Rg and Re can be predicted with the `use_scaled` flag, which uses networks train
 
 ### Batch predictions
 
-Batch mode predicts thousands of sequences in seconds; this parallelizes particularly well on CUDA GPUs but is also a large speed-up on CPUs.
+Batch mode predicts thousands of sequences in seconds; this parallelizes particularly well on CUDA GPUs but is also a large speed-up on CPUs. `sparrow.batch(sequences, ["predictor.radius_of_gyration"])` uses it for you and returns `Protein` objects; call `batch_predict` yourself for the predictions alone. A batch prediction agrees with a single-sequence one to about 1e-7 relative, the precision of the networks' 32-bit arithmetic.
 
 ```python
 from sparrow.predictors import batch_predict

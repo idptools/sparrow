@@ -49,8 +49,11 @@ What can it do?
   implementation for detecting non-random residue patterning, with user-buildable
   compositional backgrounds, assignment to the 30 human GIN grammars,
   clustering to derive your own, and parallel computation across a whole proteome.
-* **Scale-up tools** -- every sequence parameter and profile for a whole batch
-  of sequences at once (:doc:`api_guides/sequence_properties`), batch prediction
+* **Scale-up tools** -- :func:`sparrow.batch`, which makes a ``Protein`` for
+  every sequence of a set with the values you name already computed
+  (:doc:`api_guides/many_sequences`); and underneath it, every sequence
+  parameter and profile for a whole batch of sequences at once
+  (:doc:`api_guides/sequence_properties`), batch prediction
   over whole sequence sets, and fixed-length feature vectors for machine learning
   (the 20 scalar properties from :func:`sparrow.properties.compute`, or
   90-feature NARDINI+ vectors).
@@ -64,6 +67,9 @@ Where to start
   profile).
 * :doc:`api_guides/protein` -- **the complete, organized reference for everything
   you can do with a protein.**
+* :doc:`api_guides/many_sequences` -- ``sparrow.batch``, for fifty sequences or
+  fifty thousand: a ``Protein`` for each, with the values you name already
+  computed.
 
 .. toctree::
    :maxdepth: 2
@@ -79,6 +85,7 @@ Where to start
    :hidden:
 
    api_guides/protein
+   api_guides/many_sequences
 
 .. toctree::
    :maxdepth: 1

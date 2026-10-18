@@ -11,7 +11,7 @@ from protfasta import utilities as protfasta_utilities
 from sparrow import sparrow_exceptions
 from sparrow.data import amino_acids
 
-from sparrow.properties import charge, composition, encoding, patches, patterning, profiles
+from sparrow.properties import PROPERTY_NAMES, charge, composition, encoding, patches, patterning, profiles
 from sparrow.sequence_analysis import (
     elm,
     phospho_isoforms,
@@ -97,7 +97,8 @@ class Protein:
             self.__seq = s.upper()
 
         # every value this protein has computed: a property's under its name, a
-        # method's under its name and arguments
+        # method's under its name and arguments. sparrow.batch fills it from
+        # outside through _store.
         self.__results = {}
 
         # the sequence encoded and counted once, shared by every property
@@ -125,6 +126,38 @@ class Protein:
         if self.__residue_counts is None:
             self.__residue_counts = composition.count_residues(self.__encoded_sequence())
         return self.__residue_counts
+
+    def _store(self, name, value):
+        """Adopt the value of a scalar property computed outside this Protein.
+
+        Used by sparrow.batch, which computes a property for a whole batch with
+        :func:`sparrow.properties.compute` - the same function, with the same
+        arguments, that the property calls - and stores each sequence's value
+        here, so that the property returns it rather than computing it again.
+        The value is the one the property would compute, to the last bit; one
+        this protein has already computed is kept.
+
+        Parameters
+        ----------
+        name : str
+            The property, one of :data:`sparrow.properties.PROPERTY_NAMES`.
+        value : float
+            Its value for this sequence.
+
+        Returns
+        -------
+        None
+
+        Raises
+        ------
+        sparrow.sparrow_exceptions.SparrowException
+            If ``name`` is not one of the scalar properties.
+        """
+        if name not in PROPERTY_NAMES:
+            raise sparrow_exceptions.SparrowException(
+                f"{name!r} is not a scalar Protein property; these are {list(PROPERTY_NAMES)}"
+            )
+        self.__results.setdefault(name, float(value))
 
     # .................................................................
     #

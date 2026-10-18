@@ -4,7 +4,13 @@ Batch Prediction (``batch_predict``)
 :func:`sparrow.predictors.batch_predict.batch_predict` runs a single ALBATROSS
 network over a whole set of sequences in batched forward passes. For large
 collections this is substantially faster than constructing one ``Protein`` per
-sequence and calling its ``predictor``, and it returns identical values.
+sequence and calling its ``predictor``. The values agree to about 1e-7
+relative, not to the last bit: the networks compute in 32-bit arithmetic, and a
+batch is summed in a different order than one sequence alone.
+
+To get ``Protein`` objects with these predictions already made, use
+:func:`sparrow.batch` (:doc:`many_sequences`), which calls ``batch_predict`` for
+you.
 
 .. note::
    Batch prediction covers the polymer-dimension networks only:
@@ -57,7 +63,8 @@ Key options
 
 * ``network`` -- which network to run (see the list above). Required.
 * ``batch_size`` -- forward-pass batch size (default 32). Larger values are
-  faster on GPU; results are independent of batch size. Should be no larger than
+  faster on GPU; results depend on it only at the networks' 32-bit precision
+  (1.4e-7 relative at most, between batch sizes 8 and 64). Should be no larger than
   the batch size used during training.
 * ``version`` -- network version (default 2, released May 21st 2023). Version 1
   weights also ship with sparrow for reproducing older results.
@@ -67,7 +74,7 @@ Key options
   PyTorch 1.11+, which batches mixed-length sequences together via
   ``pack_padded_sequence``, and falls back to ``"size-collect"`` on older
   versions. ``"size-collect"`` groups equal-length sequences instead. Both give
-  identical values. Requesting ``"pad-n-pack"`` explicitly on PyTorch older than
+  the same values, to about 1e-7 relative. Requesting ``"pad-n-pack"`` explicitly on PyTorch older than
   1.11 raises a ``SparrowException``.
 * ``return_seq2prediction`` -- switch the return shape (see above). Default
   ``False``.

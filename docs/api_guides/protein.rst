@@ -21,6 +21,9 @@ documented here alongside everything else so you never have to hunt across pages
    p.predictor.disorder()     # a prediction
    p.polymeric.predicted_nu   # a polymer-model property
 
+For many sequences, :func:`sparrow.batch` makes a ``Protein`` for each, with
+the values you name already computed; see :doc:`many_sequences`.
+
 .. contents:: Capabilities
    :local:
    :depth: 1

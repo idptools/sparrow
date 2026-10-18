@@ -7,6 +7,10 @@ fractions, SCD and the linear profiles -- is calculated in one place,
 :mod:`sparrow.nardini` both call into it rather than carrying arithmetic of
 their own.
 
+To get ``Protein`` objects with these values already computed, use
+:func:`sparrow.batch` (:doc:`many_sequences`), which calls these functions for
+you. This page is for when you want the arrays themselves.
+
 Every function there takes a **batch** of sequences and returns an array with
 one value per sequence. A ``Protein`` is simply a batch of one, so a whole
 proteome can be analysed without making a ``Protein`` for each sequence, and the

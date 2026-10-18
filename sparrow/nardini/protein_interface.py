@@ -444,6 +444,37 @@ class ProteinNardini:
         sparrow.sparrow_exceptions.SparrowException
             If ``background`` is None - GIN needs the full 90-feature vector.
         """
+        from sparrow.nardini.gin import assign_gin_clusters
+
+        result = self._result(**self._gin_options(background, num_scrambles, seed))
+        return assign_gin_clusters(result, reference=reference)
+
+    @staticmethod
+    def _gin_options(background, num_scrambles, seed):
+        """The options of the NARDINI+ vector a GIN assignment is made from.
+
+        The GIN centroids were defined with the default vector, so only the
+        background, the number of scrambles and the seed can be chosen.
+
+        Parameters
+        ----------
+        background : str or NardiniBackground
+            Reference set for the compositional half.
+        num_scrambles : int
+            Scrambles for the patterning half.
+        seed : int or None
+            Seed for reproducibility.
+
+        Returns
+        -------
+        dict
+            The vector's options, as :meth:`_result` and :meth:`vector` take them.
+
+        Raises
+        ------
+        sparrow.sparrow_exceptions.SparrowException
+            If ``background`` is None - GIN needs the full 90-feature vector.
+        """
         if background is None:
             raise SparrowException(
                 "GIN cluster assignment needs the compositional half of the "
@@ -451,18 +482,57 @@ class ProteinNardini:
                 "background='human' unless you have a specific reason not to."
             )
 
-        from sparrow.nardini.gin import assign_gin_clusters
+        return {
+            "background": background,
+            "num_scrambles": num_scrambles,
+            "seed": seed,
+            "typeset": "8",
+            "blob_size": DEFAULT_BLOB_SIZE,
+            "min_fraction": DEFAULT_MIN_FRACTION,
+            "backend": DEFAULT_BACKEND,
+        }
 
-        result = self._result(
-            background,
-            num_scrambles,
-            seed,
-            "8",
-            DEFAULT_BLOB_SIZE,
-            DEFAULT_MIN_FRACTION,
-            DEFAULT_BACKEND,
-        )
-        return assign_gin_clusters(result, reference=reference)
+    @classmethod
+    def _result_options(cls, method, arguments):
+        """The options of the scrambled result a method reads, for sparrow.batch.
+
+        Scrambling is nearly the whole cost of NARDINI, and :meth:`vector`,
+        :meth:`patterning`, :meth:`gin_cluster` and :meth:`gin_report` all read
+        one cached result. sparrow.batch computes that result for a whole batch
+        with :func:`~sparrow.nardini.batch.nardini_proteins`, in several
+        processes, so that each method then only reads it.
+
+        Parameters
+        ----------
+        method : str
+            The method's name.
+        arguments : dict
+            Every argument the method is called with, defaults included.
+
+        Returns
+        -------
+        dict or None
+            The result's options, as :meth:`vector` takes them, or None for a
+            method that does not scramble (:meth:`composition`). For
+            :meth:`patterning` the background is None, since the patterning
+            half does not depend on it and any cached result will do.
+
+        Raises
+        ------
+        sparrow.sparrow_exceptions.SparrowException
+            If ``method`` is not a NARDINI method, or a GIN method is given no
+            background.
+        """
+        patterning_options = ("num_scrambles", "seed", "typeset", "blob_size", "min_fraction", "backend")
+        if method == "vector":
+            return {"background": arguments["background"]} | {name: arguments[name] for name in patterning_options}
+        if method == "patterning":
+            return {"background": None} | {name: arguments[name] for name in patterning_options}
+        if method in ("gin_cluster", "gin_report"):
+            return cls._gin_options(arguments["background"], arguments["num_scrambles"], arguments["seed"])
+        if method == "composition":
+            return None
+        raise SparrowException(f"{method!r} is not a NARDINI method")
 
     def gin_cluster(
         self,

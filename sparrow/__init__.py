@@ -11,6 +11,7 @@ from sparrow.tools import io
 from sparrow.tools.utilities import warn_renamed
 from sparrow.protein import Protein
 from sparrow.tools.io import read_fasta
+from sparrow.batching import batch
 
 
 # Generate _version.py if missing and in the Read the Docs environment
