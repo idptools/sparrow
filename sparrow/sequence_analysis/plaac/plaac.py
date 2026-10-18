@@ -2011,6 +2011,21 @@ def _freqs_dict_to_list(freqs: Dict[str, float]) -> List[float]:
     return vec
 
 
+def _check_background_weight(bg_list: Optional[List[float]], alpha: float) -> None:
+    """Refuse a custom background that ``alpha=1.0`` would silently ignore."""
+    if bg_list is not None and alpha == 1.0:
+        raise ValueError(
+            "bg_freqs has no effect with alpha=1.0, which weights the S. cerevisiae background 100%; "
+            "lower alpha to use a custom background"
+        )
+
+
+def _sequence_to_score(sequence: str) -> Tuple[str, List[int]]:
+    """The sequence without trailing stop codons, and its integer residue codes."""
+    seq_str = sequence.rstrip("*")
+    return seq_str, seq_to_ints(seq_str)
+
+
 def score_sequence(
     sequence: str,
     *,
@@ -2090,19 +2105,14 @@ def score_sequence(
     >>> len(result.disorder.fi) == result.protein_length
     True
     """
-    seq_str = sequence.rstrip("*")
-    aa = seq_to_ints(seq_str)
+    seq_str, aa = _sequence_to_score(sequence)
     if len(aa) == 0:
         raise ValueError("Empty sequence after stripping stop codons.")
 
     # parse bg/fg frequencies
     bg_list = _freqs_dict_to_list(bg_freqs) if bg_freqs is not None else None
     fg_list = _freqs_dict_to_list(fg_freqs) if fg_freqs is not None else None
-
-    # default behavior over-rides non-standard background frequencies if alpha=1.0,
-    # so warn user if they try this
-    if bg_list is not None and alpha == 1.0:
-        raise ValueError("alpha=1.0 means S. cerevisiae background is 100% weighted")
+    _check_background_weight(bg_list, alpha)
 
     model = _build_model(
         alpha=alpha,
@@ -2143,9 +2153,14 @@ def score_sequences(
     Returns
     -------
     dict[str, PLAACResult]
-        One :class:`PLAACResult` per input name, keyed by the same names. A
-        sequence that is empty once stop codons are stripped is left out, where
-        :func:`score_sequence` raises.
+        One :class:`PLAACResult` per input name, keyed by the same names.
+
+    Raises
+    ------
+    ValueError
+        As :func:`score_sequence` does: if any sequence is empty after stripping
+        stop codons (all such names are listed, and nothing is scored), or if
+        *bg_freqs* is supplied while ``alpha`` is 1.0.
 
     Examples
     --------
@@ -2159,6 +2174,14 @@ def score_sequences(
     """
     bg_list = _freqs_dict_to_list(bg_freqs) if bg_freqs is not None else None
     fg_list = _freqs_dict_to_list(fg_freqs) if fg_freqs is not None else None
+    _check_background_weight(bg_list, alpha)
+
+    # check every sequence before scoring any, so a bad one fails the call
+    # rather than silently disappearing from the results
+    prepared = {name: _sequence_to_score(seq) for name, seq in sequences.items()}
+    empty = [name for name, (_, aa) in prepared.items() if len(aa) == 0]
+    if empty:
+        raise ValueError(f"Empty sequence(s) after stripping stop codons: {empty}")
 
     model = _build_model(
         alpha=alpha,
@@ -2169,14 +2192,7 @@ def score_sequences(
         bg_freqs=bg_list,
         fg_freqs=fg_list,
     )
-    results: Dict[str, PLAACResult] = {}
-    for name, seq in sequences.items():
-        seq_str = seq.rstrip("*")
-        aa = seq_to_ints(seq_str)
-        if len(aa) == 0:
-            continue
-        results[name] = _score_single_sequence(aa, seq_str, model)
-    return results
+    return {name: _score_single_sequence(aa, seq_str, model) for name, (seq_str, aa) in prepared.items()}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
