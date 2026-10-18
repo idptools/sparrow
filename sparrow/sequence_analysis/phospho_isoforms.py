@@ -15,13 +15,13 @@ with more than about twenty S/T/Y residues restrict the sites - with
 at once with ``phospho_rate``.
 
 From a :class:`~sparrow.protein.Protein`, ``Protein.generate_phosphoisoforms``
-calls :func:`get_phosphoisoforms`.
+calls :func:`phosphoisoforms`.
 
 Examples
 --------
 >>> from sparrow import Protein
 >>> protein = Protein("MKSPEEKTPRYS")
->>> isoforms = get_phosphoisoforms(protein)
+>>> isoforms = phosphoisoforms(protein)
 >>> len(isoforms)                  # four S/T/Y sites
 16
 >>> ncpr = [Protein(isoform).NCPR for isoform in isoforms]
@@ -30,8 +30,14 @@ Examples
 """
 
 import itertools
+from typing import Any
 
 from sparrow.sparrow_exceptions import SparrowException
+from sparrow.tools.utilities import warn_renamed
+
+# functions that lost their get_ prefix: old name -> new name. The old names
+# still work, with a DeprecationWarning, for one release.
+_RENAMED_FUNCTIONS = {"get_phosphoisoforms": "phosphoisoforms"}
 
 
 ## -----------------------------------------
@@ -68,7 +74,7 @@ def _predict_all_phosphosites(protein):
 
 ## ----------------------------------------
 ##
-def _get_all_phosphosites(sequence):
+def _all_phosphosites(sequence):
     """
     Function which returns a list of all the positions which *could* be
     phosphorylated (i.e. are T/S/Y). NOTE this does not use any kind of
@@ -171,7 +177,7 @@ def _build_phosphoSeqome(sequence, phosphosites, phospho_rate=1):
 
 ## -----------------------------------
 ##
-def get_phosphoisoforms(protein, mode="all", phospho_rate=1, phosphosites=None):
+def phosphoisoforms(protein, mode="all", phospho_rate=1, phosphosites=None):
     """Every phosphoisoform of a protein, with phosphorylated sites replaced by E.
 
     Replacing a phosphorylated residue with the phosphomimetic glutamate gives an
@@ -214,17 +220,17 @@ def get_phosphoisoforms(protein, mode="all", phospho_rate=1, phosphosites=None):
     Examples
     --------
     >>> from sparrow import Protein
-    >>> get_phosphoisoforms(Protein("MSAPTEEY"))[:4]
+    >>> phosphoisoforms(Protein("MSAPTEEY"))[:4]
     ['MSAPTEEY', 'MSAPTEEE', 'MSAPEEEY', 'MSAPEEEE']
-    >>> len(get_phosphoisoforms(Protein("MSAPTEEY"), phospho_rate=0.5))   # at most one site
+    >>> len(phosphoisoforms(Protein("MSAPTEEY"), phospho_rate=0.5))   # at most one site
     4
-    >>> get_phosphoisoforms(Protein("MSAPTEEY"), mode="custom", phosphosites=[1])
+    >>> phosphoisoforms(Protein("MSAPTEEY"), mode="custom", phosphosites=[1])
     ['MSAPTEEY', 'MEAPTEEY']
     """
 
     # get phosphosite positions
     if mode == "all":
-        _phosphosites = _get_all_phosphosites(protein.sequence)
+        _phosphosites = _all_phosphosites(protein.sequence)
     elif mode == "predict":
         _phosphosites = _predict_all_phosphosites(protein)
     elif mode == "custom":
@@ -237,3 +243,28 @@ def get_phosphoisoforms(protein, mode="all", phospho_rate=1, phosphosites=None):
 
     # generate all phospho-Isoforms
     return _build_phosphoSeqome(protein.sequence, _phosphosites, phospho_rate=phospho_rate)
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve a function's old ``get_`` name, with a ``DeprecationWarning``.
+
+    Parameters
+    ----------
+    name : str
+        The attribute asked for.
+
+    Returns
+    -------
+    Any
+        The renamed function.
+
+    Raises
+    ------
+    AttributeError
+        If ``name`` is not one of the renamed functions.
+    """
+    if name not in _RENAMED_FUNCTIONS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    new_name = _RENAMED_FUNCTIONS[name]
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{new_name}")
+    return globals()[new_name]

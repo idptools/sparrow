@@ -679,14 +679,14 @@ def test_preserved_order():
 
         """
 
-        def get_input_list():
+        def input_sequences():
             if type(seqs) is list:
                 return seqs
             else:
                 return list(seqs.values())
 
         return_vals = list(batch_predict(seqs, batch_size=32, network="rg").values())
-        input_list = get_input_list()
+        input_list = input_sequences()
         for idx in range(len(seqs)):
             assert return_vals[idx][0] == input_list[idx]
 
@@ -717,7 +717,7 @@ def test_preserved_order():
                 seqs = dict(items)
 
             # recompute order of sequences passed into the function
-            input_list = get_input_list()
+            input_list = input_sequences()
 
             # randomize batch size as well
             bs = np.random.randint(1, 32)

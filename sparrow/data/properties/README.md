@@ -42,7 +42,7 @@ loader is standard-library only and resolves the JSON files relative to its own
 location, so it also works as a stand-alone helper.
 
 > There is also a higher-level, slug-based accessor for the single-residue
-> database in `sparrow/data/aaindex.py` (e.g. `get_property_values("hydropathy-kyte-1982")`).
+> database in `sparrow/data/aaindex.py` (e.g. `property_values("hydropathy-kyte-1982")`).
 > Use that when you want human-readable identifiers; use this loader for direct
 > access by accession and for the pairwise matrices.
 

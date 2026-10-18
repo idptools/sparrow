@@ -18,7 +18,7 @@ def test_registry_unique_and_resolves():
     assert aaindex.resolve_identifier("hydropathy-kyte-1982") == "KYTJ820101"
     assert aaindex.resolve_identifier("KYTJ820101") == "KYTJ820101"
     # classic Kyte-Doolittle alanine value
-    assert aaindex.get_property_values("hydropathy-kyte-1982")["A"] == 1.8
+    assert aaindex.property_values("hydropathy-kyte-1982")["A"] == 1.8
 
 
 def test_collision_increment():
@@ -30,7 +30,7 @@ def test_collision_increment():
 
 def test_profile_matches_manual_window_mean():
     p = Protein(SEQ)
-    values = aaindex.get_property_values("hydropathy-kyte-1982")
+    values = aaindex.property_values("hydropathy-kyte-1982")
     window = 9
 
     raw = [np.mean([values[r] for r in SEQ[i : i + window]]) for i in range(len(SEQ) - window + 1)]
@@ -71,7 +71,7 @@ def test_missing_value_index_raises():
     # find an index that has a None value for at least one residue
     miss_id = None
     for identifier, _accession, _desc in aaindex.list_property_indices():
-        values = aaindex.get_property_values(identifier)
+        values = aaindex.property_values(identifier)
         if any(v is None for v in values.values()):
             miss_id = identifier
             break

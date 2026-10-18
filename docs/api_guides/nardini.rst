@@ -1453,4 +1453,4 @@ Residue groupings
 ^^^^^^^^^^^^^^^^^
 
 .. automodule:: sparrow.nardini.groups
-   :members: get_typeset, type_names, patterning_feature_names
+   :members: resolve_typeset, type_names, patterning_feature_names

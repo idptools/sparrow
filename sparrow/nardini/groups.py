@@ -19,6 +19,7 @@ on a compact integer label array rather than on strings (see
 """
 
 from collections import OrderedDict
+from typing import Any
 
 from sparrow.data.amino_acids import VALID_AMINO_ACIDS
 
@@ -26,10 +27,14 @@ __all__ = [
     "TYPES_8",
     "TYPES_9",
     "DEFAULT_TYPESET",
-    "get_typeset",
+    "resolve_typeset",
     "type_names",
     "patterning_feature_names",
 ]
+
+# functions renamed when they lost their get_ prefix: old name -> new name. The
+# old names still work, with a DeprecationWarning, for one release.
+_RENAMED_FUNCTIONS = {"get_typeset": "resolve_typeset"}
 
 
 #: The default NARDINI 8-type grouping. Histidine sits with the polar residues.
@@ -90,7 +95,7 @@ _validate_partition(TYPES_8, "TYPES_8")
 _validate_partition(TYPES_9, "TYPES_9")
 
 
-def get_typeset(typeset=DEFAULT_TYPESET):
+def resolve_typeset(typeset=DEFAULT_TYPESET):
     """Return a NARDINI residue grouping by name.
 
     Parameters
@@ -116,7 +121,7 @@ def get_typeset(typeset=DEFAULT_TYPESET):
 
     Examples
     --------
-    >>> list(get_typeset('8'))
+    >>> list(resolve_typeset('8'))
     ['pol', 'hyd', 'pos', 'neg', 'aro', 'ala', 'pro', 'gly']
     """
     # local import to keep this module importable without the wider package
@@ -142,14 +147,14 @@ def type_names(typeset=DEFAULT_TYPESET):
     Parameters
     ----------
     typeset : {'8', '9'} or dict, optional
-        Grouping selector, see :func:`get_typeset`.
+        Grouping selector, see :func:`resolve_typeset`.
 
     Returns
     -------
     tuple of str
         Type names in their canonical order.
     """
-    return tuple(get_typeset(typeset).keys())
+    return tuple(resolve_typeset(typeset).keys())
 
 
 def patterning_feature_names(typeset=DEFAULT_TYPESET):
@@ -167,7 +172,7 @@ def patterning_feature_names(typeset=DEFAULT_TYPESET):
     Parameters
     ----------
     typeset : {'8', '9'} or dict, optional
-        Grouping selector, see :func:`get_typeset`.
+        Grouping selector, see :func:`resolve_typeset`.
 
     Returns
     -------
@@ -182,3 +187,32 @@ def patterning_feature_names(typeset=DEFAULT_TYPESET):
     """
     names = type_names(typeset)
     return tuple(f"{names[i]}-{names[j]}" for i in range(len(names)) for j in range(i, len(names)))
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve a function's old name, with a ``DeprecationWarning``.
+
+    Parameters
+    ----------
+    name : str
+        The attribute asked for.
+
+    Returns
+    -------
+    Any
+        The renamed function.
+
+    Raises
+    ------
+    AttributeError
+        If ``name`` is not one of the renamed functions.
+    """
+    if name not in _RENAMED_FUNCTIONS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    # local import, like SparrowException in resolve_typeset, to keep this module
+    # importable without the wider package
+    from sparrow.tools.utilities import warn_renamed
+
+    new_name = _RENAMED_FUNCTIONS[name]
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{new_name}")
+    return globals()[new_name]

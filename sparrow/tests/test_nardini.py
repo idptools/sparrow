@@ -31,7 +31,7 @@ from sparrow.nardini import (
     patterning_values,
     patterning_zscores,
 )
-from sparrow.nardini.groups import TYPES_8, TYPES_9, get_typeset, type_names
+from sparrow.nardini.groups import TYPES_8, TYPES_9, resolve_typeset, type_names
 from sparrow.sparrow_exceptions import (
     BackgroundQualityWarning,
     SparrowException,
@@ -158,12 +158,12 @@ def test_nine_type_splits_histidine_out():
 
 def test_unknown_typeset_raises():
     with pytest.raises(SparrowException):
-        get_typeset("17")
+        resolve_typeset("17")
 
 
 def test_custom_typeset_must_be_a_partition():
     with pytest.raises(ValueError):
-        get_typeset({"a": tuple("AC"), "b": tuple("CD")})
+        resolve_typeset({"a": tuple("AC"), "b": tuple("CD")})
 
 
 # =====================================================================

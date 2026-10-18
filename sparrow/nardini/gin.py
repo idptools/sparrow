@@ -492,7 +492,7 @@ def load_gin_reference(name=DEFAULT_GIN_REFERENCE):
         return _REFERENCE_CACHE[key]
 
     centroid_file, definition_file = _REFERENCE_FILES[key]
-    centroid_path = sparrow.get_data(centroid_file)
+    centroid_path = sparrow.data_path(centroid_file)
     if not os.path.isfile(centroid_path):
         raise SparrowException(
             f"Bundled GIN centroid file is missing: {centroid_path}. Reinstall sparrow, "
@@ -515,7 +515,7 @@ def load_gin_reference(name=DEFAULT_GIN_REFERENCE):
         )
 
     descriptions, num_idrs = {}, {}
-    with open(sparrow.get_data(definition_file), newline="") as handle:
+    with open(sparrow.data_path(definition_file), newline="") as handle:
         for row in csv.DictReader(handle):
             cluster = int(row["cluster"])
             descriptions[cluster] = row["description"]

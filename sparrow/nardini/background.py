@@ -367,7 +367,7 @@ def load_reference_background(species="human"):
     if key in _REFERENCE_CACHE:
         return _REFERENCE_CACHE[key]
 
-    path = sparrow.get_data(f"nardini/gin_composition_prior_{key}_v1.npz")
+    path = sparrow.data_path(f"nardini/gin_composition_prior_{key}_v1.npz")
     background = NardiniBackground.load(path)
     _REFERENCE_CACHE[key] = background
     return background

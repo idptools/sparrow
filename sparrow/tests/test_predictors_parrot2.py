@@ -68,7 +68,7 @@ def filled_in_template(weights_path_template):
     from sparrow.predictors.predictor_template import MyPropertyPredictor
 
     class FilledIn(MyPropertyPredictor):
-        # an absolute path: sparrow.get_data joins it onto the data directory, which
+        # an absolute path: sparrow.data_path joins it onto the data directory, which
         # os.path.join leaves as the absolute path
         NETWORK_PATH = weights_path_template
 

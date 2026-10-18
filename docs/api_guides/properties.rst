@@ -36,7 +36,7 @@ takes the index's values directly:
    from sparrow.properties import profiles
 
    sequences = ["MEEEKKKKSSSTTTDDDQQQQNNNN", "GRGRGGYGGRGGYGGSRGGYGG"]
-   scale = aaindex.get_property_values("hydropathy-kyte-1982")
+   scale = aaindex.property_values("hydropathy-kyte-1982")
    hydropathy = profiles.scale_profile(sequences, scale, window_size=9)  # one per sequence
 
 Choosing an index (identifiers)
@@ -64,10 +64,10 @@ Discovering indices programmatically:
    all_indices = aaindex.list_property_indices()
 
    # metadata for one index
-   aaindex.get_property_metadata("hydropathy-kyte-1982")
+   aaindex.property_metadata("hydropathy-kyte-1982")
 
    # the raw amino-acid -> value mapping
-   aaindex.get_property_values("hydropathy-kyte-1982")
+   aaindex.property_values("hydropathy-kyte-1982")
 
 Notes
 -----
@@ -115,6 +115,6 @@ search it, or filter programmatically:
    hydro = [row for row in everything if "hydroph" in row[2].lower()]
 
    # full metadata, including authors, title, journal and PMID
-   aaindex.get_property_metadata("hydropathy-kyte-1982")
+   aaindex.property_metadata("hydropathy-kyte-1982")
 
 .. include:: _property_index_table.rst

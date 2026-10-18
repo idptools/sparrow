@@ -226,7 +226,7 @@ def _generate_property_index_table(app):
         # the citation makes an index interpretable; the description alone often
         # does not say which of several similar scales this is
         try:
-            metadata = aaindex.get_property_metadata(identifier)
+            metadata = aaindex.property_metadata(identifier)
         except Exception:  # pragma: no cover - never fail the build over metadata
             metadata = {}
 

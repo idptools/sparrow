@@ -190,7 +190,7 @@ def load_parrot_network(relative_path, architecture="MtO", device=None):
     relative_path : str
         Path to the weights file relative to the sparrow ``data`` directory,
         for example ``"networks/rg/rg_network_v2.pt"``. Resolved with
-        ``sparrow.get_data``.
+        ``sparrow.data_path``.
     architecture : {"MtO", "MtM"}, optional
         Network architecture of a PARROT 1 network. ``"MtO"`` builds a
         many-to-one network (one value per sequence); ``"MtM"`` builds a
@@ -218,7 +218,7 @@ def load_parrot_network(relative_path, architecture="MtO", device=None):
     if device is None:
         device = torch.device("cpu")
 
-    saved_weights = sparrow.get_data(relative_path)
+    saved_weights = sparrow.data_path(relative_path)
     if not os.path.isfile(saved_weights):
         raise SparrowException(f"Error: could not find saved weights file {saved_weights}")
 

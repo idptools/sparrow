@@ -84,7 +84,7 @@ from scipy import stats
 
 from sparrow.nardini.groups import (
     DEFAULT_TYPESET,
-    get_typeset,
+    resolve_typeset,
     patterning_feature_names,
 )
 from sparrow.properties import encoding
@@ -183,7 +183,7 @@ def encode_types(sequence, typeset=DEFAULT_TYPESET):
     sequence : str
         Amino acid sequence (upper case, standard residues only).
     typeset : {'8', '9'} or dict, optional
-        Residue grouping, see :func:`sparrow.nardini.groups.get_typeset`.
+        Residue grouping, see :func:`sparrow.nardini.groups.resolve_typeset`.
 
     Returns
     -------
@@ -197,9 +197,9 @@ def encode_types(sequence, typeset=DEFAULT_TYPESET):
         If the sequence contains anything other than the 20 standard amino acids
         (see :func:`sparrow.properties.encoding.residue_codes`).
     """
-    groups = get_typeset(typeset)
+    groups = resolve_typeset(typeset)
 
-    # residue code -> type index. get_typeset has already checked the grouping is
+    # residue code -> type index. resolve_typeset has already checked the grouping is
     # an exact partition of the 20 amino acids, so every residue gets a type.
     type_of_residue = np.full(encoding.NUM_RESIDUES, encoding.NOT_A_RESIDUE, dtype=np.int8)
     for index, residues in enumerate(groups.values()):
@@ -333,7 +333,7 @@ def _prepare_sequence(sequence, typeset, blob_size, min_fraction):
     sequence : str
         Amino acid sequence.
     typeset : {'8', '9'} or dict
-        Residue grouping, see :func:`sparrow.nardini.groups.get_typeset`.
+        Residue grouping, see :func:`sparrow.nardini.groups.resolve_typeset`.
     blob_size : int
         Sliding-window size.
     min_fraction : float
@@ -353,7 +353,7 @@ def _prepare_sequence(sequence, typeset, blob_size, min_fraction):
         If ``blob_size`` is below 2, the sequence is shorter than ``blob_size``,
         or it contains a non-standard residue.
     """
-    groups = get_typeset(typeset)
+    groups = resolve_typeset(typeset)
 
     if blob_size < 2:
         raise SparrowException(f"blob_size must be >= 2 (got {blob_size})")
@@ -535,7 +535,7 @@ def patterning_values(
     sequence : str
         Amino acid sequence.
     typeset : {'8', '9'} or dict, optional
-        Residue grouping, see :func:`sparrow.nardini.groups.get_typeset`.
+        Residue grouping, see :func:`sparrow.nardini.groups.resolve_typeset`.
     blob_size : int, optional
         Sliding-window size. Default 5. Ignored by the ``'iwd'`` backend.
     min_fraction : float, optional
@@ -682,7 +682,7 @@ def patterning_zscores(
         published protocol uses 100,000; 1,000 is usually adequate for
         low-complexity sequences.
     typeset : {'8', '9'} or dict, optional
-        Residue grouping, see :func:`sparrow.nardini.groups.get_typeset`.
+        Residue grouping, see :func:`sparrow.nardini.groups.resolve_typeset`.
     blob_size : int, optional
         Sliding-window size. Default 5. Ignored by the ``'iwd'`` backend.
     min_fraction : float, optional

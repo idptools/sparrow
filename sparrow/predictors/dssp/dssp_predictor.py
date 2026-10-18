@@ -29,7 +29,7 @@ e.g. here we have
 
 The class should have (at least) two functions:
 
-1. A constructor (__init__()) which PRE LOADS the network from sparrow/data/networks/relevant_name - the get_data() function
+1. A constructor (__init__()) which PRE LOADS the network from sparrow/data/networks/relevant_name - the sparrow.data_path() function
    is defined in sparrow/__init__.py and allows absolute-path access to the /data directory. The constructor should
    FULLY load the network along with standard PARROT-style options, as shown here. Trained networks should be versioned and 
    implemented so previous versions can be chosene even if the default version changes

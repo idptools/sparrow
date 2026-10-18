@@ -25,7 +25,7 @@ def test_resolve_accession_case_insensitive():
 
 
 def test_slug_format_is_meaning_author_year():
-    meta = aaindex.get_property_metadata("hydropathy-kyte-1982")
+    meta = aaindex.property_metadata("hydropathy-kyte-1982")
     assert meta["identifier"] == "hydropathy-kyte-1982"
     assert meta["accession"] == "KYTJ820101"
     assert "Kyte" in meta["authors"]
@@ -33,7 +33,7 @@ def test_slug_format_is_meaning_author_year():
 
 
 def test_get_values_has_twenty_amino_acids():
-    values = aaindex.get_property_values("hydropathy-kyte-1982")
+    values = aaindex.property_values("hydropathy-kyte-1982")
     assert set(values) == set("ACDEFGHIKLMNPQRSTVWY")
     assert values["A"] == 1.8  # classic Kyte-Doolittle alanine value
 
@@ -51,6 +51,6 @@ def test_unknown_identifier_raises():
 
 
 def test_metadata_keys_present():
-    meta = aaindex.get_property_metadata("KYTJ820101")
+    meta = aaindex.property_metadata("KYTJ820101")
     for key in ("identifier", "accession", "description", "authors", "reference"):
         assert key in meta

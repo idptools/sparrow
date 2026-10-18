@@ -1030,7 +1030,7 @@ class Protein:
             List of phosphoisoform sequences for the selected mode, with
             phosphorylated residues replaced by ``'E'``.
         """
-        return phospho_isoforms.get_phosphoisoforms(
+        return phospho_isoforms.phosphoisoforms(
             self,
             mode=mode,
             phospho_rate=phospho_rate,
@@ -1244,8 +1244,8 @@ class Protein:
         utilities.validate_keyword_option(end_mode, list(profiles.END_MODES), "end_mode")
 
         # resolve the requested index (raises SparrowException if unknown)
-        metadata = aaindex.get_property_metadata(mode)
-        value_map = aaindex.get_property_values(mode)
+        metadata = aaindex.property_metadata(mode)
+        value_map = aaindex.property_values(mode)
 
         # the index must provide a value for every residue in the sequence
         missing = sorted({r for r in self.__seq if value_map.get(r) is None})

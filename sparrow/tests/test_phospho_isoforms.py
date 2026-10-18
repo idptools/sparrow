@@ -8,16 +8,16 @@ from sparrow.sequence_analysis import phospho_isoforms
 SEQ = "MSRSTPYK"  # contains S, T, Y phosphosites
 
 
-def test_get_phosphoisoforms_all_mode_returns_list():
+def test_phosphoisoforms_all_mode_returns_list():
     p = Protein(SEQ)
-    isoforms = phospho_isoforms.get_phosphoisoforms(p, mode="all")
+    isoforms = phospho_isoforms.phosphoisoforms(p, mode="all")
     assert isinstance(isoforms, list)
     assert SEQ in isoforms  # the unmodified sequence is one isoform
 
 
 def test_phosphomimetic_is_glutamate():
     p = Protein(SEQ)
-    isoforms = phospho_isoforms.get_phosphoisoforms(p, mode="all")
+    isoforms = phospho_isoforms.phosphoisoforms(p, mode="all")
     # every isoform differs from wild-type only by S/T/Y -> E substitutions
     for iso in isoforms:
         assert len(iso) == len(SEQ)

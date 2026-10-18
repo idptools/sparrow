@@ -137,6 +137,8 @@ regions that span the human proteome. Cell (2025). [GIN resource]
 If you use this module, please cite the original NARDINI work above.
 """
 
+from typing import Any
+
 from sparrow.nardini.background import (
     REFERENCE_SPECIES,
     NardiniBackground,
@@ -172,8 +174,8 @@ from sparrow.nardini.table import FeatureTable, FeatureVector
 from sparrow.nardini.groups import (
     TYPES_8,
     TYPES_9,
-    get_typeset,
     patterning_feature_names,
+    resolve_typeset,
     type_names,
 )
 from sparrow.nardini.patterning import (
@@ -187,6 +189,7 @@ from sparrow.nardini.patterning import (
     resolve_backend,
 )
 from sparrow.nardini.vectors import NardiniResult, nardini_vectors
+from sparrow.tools.utilities import warn_renamed
 
 __all__ = [
     # step 1 - background
@@ -233,10 +236,39 @@ __all__ = [
     # groupings
     "TYPES_8",
     "TYPES_9",
-    "get_typeset",
+    "resolve_typeset",
     "type_names",
     # defaults
     "DEFAULT_BLOB_SIZE",
     "DEFAULT_MIN_FRACTION",
     "DEFAULT_NUM_SCRAMBLES",
 ]
+
+# functions renamed when they lost their get_ prefix: old name -> new name. The
+# old names still work, with a DeprecationWarning, for one release.
+_RENAMED_FUNCTIONS = {"get_typeset": "resolve_typeset"}
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve a function's old name, with a ``DeprecationWarning``.
+
+    Parameters
+    ----------
+    name : str
+        The attribute asked for.
+
+    Returns
+    -------
+    Any
+        The renamed function.
+
+    Raises
+    ------
+    AttributeError
+        If ``name`` is not one of the renamed functions.
+    """
+    if name not in _RENAMED_FUNCTIONS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    new_name = _RENAMED_FUNCTIONS[name]
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{new_name}")
+    return globals()[new_name]

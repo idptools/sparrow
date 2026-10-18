@@ -224,4 +224,4 @@ Reference: Phosphoisoforms
 --------------------------
 
 .. automodule:: sparrow.sequence_analysis.phospho_isoforms
-   :members: get_phosphoisoforms
+   :members: phosphoisoforms

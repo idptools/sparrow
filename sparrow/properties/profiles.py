@@ -462,7 +462,7 @@ def scale_profile(
         The batch.
     scale : mapping of str to float
         Value of each residue, e.g. :data:`sparrow.data.amino_acids.AA_hydro_KD`
-        or an AAindex index from :func:`sparrow.data.aaindex.get_property_values`.
+        or an AAindex index from :func:`sparrow.data.aaindex.property_values`.
     window_size, end_mode, smooth
         As for :func:`window_profile`.
 

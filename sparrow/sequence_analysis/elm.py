@@ -218,7 +218,7 @@ def generate_elm_df(file: str):
     ----------
     file : str
         Path to an ``elm_classes.tsv`` - for example the bundled one,
-        ``sparrow.get_data("elm_classes.tsv")``. The latest one can be downloaded
+        ``sparrow.data_path("elm_classes.tsv")``. The latest one can be downloaded
         from http://elm.eu.org/downloads.html
 
     Returns
@@ -251,7 +251,7 @@ def _elm_class_records() -> tuple:
         Tuple of ``(regex, identifier, functional_site_name, description,
         probability)`` tuples, one per ELM class.
     """
-    columns, rows = read_elm_table(sparrow.get_data("elm_classes.tsv"))
+    columns, rows = read_elm_table(sparrow.data_path("elm_classes.tsv"))
     index = {name: position for position, name in enumerate(columns)}
 
     records = []

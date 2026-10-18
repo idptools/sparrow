@@ -25,15 +25,24 @@ Use :func:`list_property_indices` to enumerate all available identifiers.
 import functools
 import json
 import re
+from typing import Any
 
 from sparrow.sparrow_exceptions import SparrowException
+from sparrow.tools.utilities import warn_renamed
 
 __all__ = [
     "list_property_indices",
     "resolve_identifier",
-    "get_property_values",
-    "get_property_metadata",
+    "property_values",
+    "property_metadata",
 ]
+
+# functions that lost their get_ prefix: old name -> new name. The old names
+# still work, with a DeprecationWarning, for one release.
+_RENAMED_FUNCTIONS = {
+    "get_property_values": "property_values",
+    "get_property_metadata": "property_metadata",
+}
 
 # the 20 standard amino acids every AAindex entry provides a value for
 VALID_AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
@@ -99,7 +108,7 @@ def _load_raw():
     # sparrow package import chain
     import sparrow
 
-    with open(sparrow.get_data(_DATA_RELATIVE_PATH)) as handle:
+    with open(sparrow.data_path(_DATA_RELATIVE_PATH)) as handle:
         return json.load(handle)
 
 
@@ -207,7 +216,7 @@ def resolve_identifier(identifier):
     )
 
 
-def get_property_values(identifier):
+def property_values(identifier):
     """Return the amino-acid -> value mapping for a property index.
 
     Parameters
@@ -226,7 +235,7 @@ def get_property_values(identifier):
     return dict(_load_raw()[accession]["values"])
 
 
-def get_property_metadata(identifier):
+def property_metadata(identifier):
     """Return descriptive metadata for a property index.
 
     Parameters
@@ -267,3 +276,28 @@ def list_property_indices():
     return [
         (accession_to_slug[accession], accession, raw[accession].get("description", "")) for accession in sorted(raw)
     ]
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve a function's old ``get_`` name, with a ``DeprecationWarning``.
+
+    Parameters
+    ----------
+    name : str
+        The attribute asked for.
+
+    Returns
+    -------
+    Any
+        The renamed function.
+
+    Raises
+    ------
+    AttributeError
+        If ``name`` is not one of the renamed functions.
+    """
+    if name not in _RENAMED_FUNCTIONS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    new_name = _RENAMED_FUNCTIONS[name]
+    warn_renamed(f"{__name__}.{name}", f"{__name__}.{new_name}")
+    return globals()[new_name]
