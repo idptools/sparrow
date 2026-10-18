@@ -1,7 +1,7 @@
 Batch Prediction (``batch_predict``)
 ====================================
 
-:func:`sparrow.predictors.batch_predict.batch_predict` runs a single ALBATROSS
+:func:`sparrow.predictors.batch_predictor.batch_predict` runs a single ALBATROSS
 network over a whole set of sequences in batched forward passes. For large
 collections this is substantially faster than constructing one ``Protein`` per
 sequence and calling its ``predictor``. The values agree to about 1e-7
@@ -24,7 +24,7 @@ Quick start
 
 .. code-block:: python
 
-   from sparrow.predictors.batch_predict import batch_predict
+   from sparrow.predictors.batch_predictor import batch_predict
 
    sequences = {
        "p1": "MEEEKKKKSSSTTTDDD",
@@ -97,4 +97,4 @@ Performance notes
 API Reference
 -------------
 
-.. autofunction:: sparrow.predictors.batch_predict.batch_predict
+.. autofunction:: sparrow.predictors.batch_predictor.batch_predict

@@ -13,7 +13,7 @@ Where sparrow has a function that computes a value for a whole batch at once,
 * the ALBATROSS polymer dimensions - ``predictor.radius_of_gyration``,
   ``end_to_end_distance``, ``asphericity``, ``prefactor`` and
   ``scaling_exponent``, and the ``polymeric.predicted_*`` values that read
-  them - with :func:`sparrow.predictors.batch_predict.batch_predict`;
+  them - with :func:`sparrow.predictors.batch_predictor.batch_predict`;
 * the scrambles behind ``nardini.vector``, ``patterning``, ``gin_cluster`` and
   ``gin_report``, with :func:`sparrow.nardini.batch.nardini_proteins`, in
   several processes.
@@ -151,7 +151,7 @@ def batch(
     batch_size : int or None, optional
         Sequences per forward pass of an ALBATROSS network. Default None, which
         uses the default of
-        :func:`~sparrow.predictors.batch_predict.batch_predict`.
+        :func:`~sparrow.predictors.batch_predictor.batch_predict`.
     gpuid : int or None, optional
         The CUDA device for the ALBATROSS networks, where CUDA is available.
         Default None, which uses ``batch_predict``'s default.
@@ -522,7 +522,7 @@ def _is_scalar_property(request: _Request) -> bool:
 
 
 def _is_albatross(request: _Request) -> bool:
-    """Whether :func:`~sparrow.predictors.batch_predict.batch_predict` computes this value.
+    """Whether :func:`~sparrow.predictors.batch_predictor.batch_predict` computes this value.
 
     Parameters
     ----------
@@ -599,7 +599,7 @@ def _predict_albatross(
     batch_size, gpuid : int or None
         Passed to ``batch_predict`` unless None.
     """
-    from sparrow.predictors.batch_predict import batch_predict
+    from sparrow.predictors.batch_predictor import batch_predict
 
     options: dict[str, Any] = {"show_progress_bar": show_progress}
     if batch_size is not None:

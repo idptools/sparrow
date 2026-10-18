@@ -143,12 +143,12 @@ Rg and Re can be predicted with the `use_scaled` flag, which uses networks train
 Batch mode predicts thousands of sequences in seconds; this parallelizes particularly well on CUDA GPUs but is also a large speed-up on CPUs. `sparrow.batch(sequences, ["predictor.radius_of_gyration"])` uses it for you and returns `Protein` objects; call `batch_predict` yourself for the predictions alone. A batch prediction agrees with a single-sequence one to about 1e-7 relative, the precision of the networks' 32-bit arithmetic.
 
 ```python
-from sparrow.predictors import batch_predict
+from sparrow.predictors.batch_predictor import batch_predict
 
 sequences = {"p1": "MKYLAAYLLL...", "p2": "GRGRGGYGG...", "p3": "QQQQAASS..."}
 
 # {key: [sequence, prediction]}
-results = batch_predict.batch_predict(sequences, network="re")
+results = batch_predict(sequences, network="re")
 ```
 
 Networks available  for batch predict are: `rg`, `scaled_rg`, `re`, `scaled_re`, `prefactor`,

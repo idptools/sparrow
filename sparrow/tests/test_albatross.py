@@ -2,7 +2,7 @@ from sparrow import Protein
 import pytest
 import protfasta
 import numpy as np
-from sparrow.predictors.batch_predict import batch_predict
+from sparrow.predictors.batch_predictor import batch_predict
 from sparrow import read_fasta as read_fasta_sparrow
 
 from . import reference_data_path

@@ -216,12 +216,12 @@ Predicting properties for many sequences
 ----------------------------------------
 
 To compute one ALBATROSS prediction (here radius of gyration) over a whole FASTA
-file efficiently, use :func:`~sparrow.predictors.batch_predict.batch_predict`:
+file efficiently, use :func:`~sparrow.predictors.batch_predictor.batch_predict`:
 
 .. code-block:: python
 
    from sparrow import read_fasta
-   from sparrow.predictors.batch_predict import batch_predict
+   from sparrow.predictors.batch_predictor import batch_predict
 
    proteins = read_fasta("example.fasta")          # {header: Protein}
    rg_by_header = batch_predict(proteins, network="rg", return_seq2prediction=False)

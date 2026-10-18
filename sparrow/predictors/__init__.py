@@ -1448,7 +1448,7 @@ class Predictor:
         -------
         str
             The network's name, as
-            :func:`~sparrow.predictors.batch_predict.batch_predict` knows it.
+            :func:`~sparrow.predictors.batch_predictor.batch_predict` knows it.
 
         Raises
         ------
@@ -1477,7 +1477,7 @@ class Predictor:
         """Adopt an ALBATROSS prediction made outside this Predictor.
 
         Used by sparrow.batch, which predicts a whole batch at once with
-        :func:`~sparrow.predictors.batch_predict.batch_predict` and stores each
+        :func:`~sparrow.predictors.batch_predictor.batch_predict` and stores each
         sequence's prediction here, under the network that made it - the key
         the polymer-dimension methods look a prediction up by (see
         :meth:`_network`). A prediction made in a batch can differ from one made

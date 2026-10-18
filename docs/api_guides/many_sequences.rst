@@ -102,7 +102,7 @@ What is computed for the whole batch
    * - ``predictor.radius_of_gyration``, ``end_to_end_distance``,
        ``asphericity``, ``prefactor``, ``scaling_exponent``, and the
        ``polymeric.predicted_*`` values that read them
-     - :func:`~sparrow.predictors.batch_predict.batch_predict`
+     - :func:`~sparrow.predictors.batch_predictor.batch_predict`
      - All 5 for 2,000 proteins in 28 s on a CPU, against 227 s
    * - ``nardini.vector``, ``patterning``, ``gin_cluster``, ``gin_report``
      - :func:`~sparrow.nardini.batch.nardini_proteins`, in ``n_processes``
@@ -146,7 +146,7 @@ clustering, wants:
 
 * :func:`sparrow.properties.compute` -- any of the scalar properties as a dict
   of arrays (:doc:`sequence_properties`);
-* :func:`~sparrow.predictors.batch_predict.batch_predict` -- one ALBATROSS
+* :func:`~sparrow.predictors.batch_predictor.batch_predict` -- one ALBATROSS
   network over a set of sequences (:doc:`batch`);
 * :func:`~sparrow.nardini.vectors.nardini_vectors` -- NARDINI+ vectors as a
   labelled matrix, with GIN assignment and clustering (:doc:`nardini`).
