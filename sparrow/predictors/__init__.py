@@ -25,28 +25,280 @@
 #
 #
 
+import functools
+import importlib
+from collections.abc import Callable, Hashable
+from dataclasses import dataclass
+
 import numpy as np
 
 from sparrow.data.configs import MIN_LENGTH_ALBATROSS_RE_RG
 from sparrow.sparrow_exceptions import SparrowException
-from sparrow.tools.utilities import cache_key, copy_of, validate_keyword_option
+from sparrow.tools.utilities import copy_of, validate_keyword_option
 
-# The ALBATROSS polymer-dimension methods, each with the network it runs, by the
-# name batch_predict knows the network by. Each prediction is cached under the
-# name of the network that made it, so that sparrow.batch can store a prediction
-# batch_predict made where the method will look for it.
-ALBATROSS_NETWORKS = {
+#: Every network a Predictor runs, by the name batch_predict knows it by, with the
+#: module and class of the predictor that loads it. A network's prediction is
+#: cached under its name, so sparrow.batch can store a prediction made for a
+#: whole batch where the methods below look for it.
+NETWORK_PREDICTORS = {
+    "rg": ("sparrow.predictors.rg.radius_of_gyration_predictor", "RgPredictor"),
+    "scaled_rg": ("sparrow.predictors.scaled_rg.scaled_radius_of_gyration_predictor", "ScaledRgPredictor"),
+    "re": ("sparrow.predictors.e2e.end_to_end_distance_predictor", "RePredictor"),
+    "scaled_re": ("sparrow.predictors.scaled_re.scaled_end_to_end_distance_predictor", "ScaledRePredictor"),
+    "asphericity": ("sparrow.predictors.asphericity.asphericity_predictor", "AsphericityPredictor"),
+    "prefactor": ("sparrow.predictors.prefactor.prefactor_predictor", "PrefactorPredictor"),
+    "scaling_exponent": ("sparrow.predictors.scaling_exponent.scaling_exponent_predictor", "ScalingExponentPredictor"),
+    "dssp": ("sparrow.predictors.dssp.dssp_predictor", "DSSPPredictor"),
+    "transmembrane": ("sparrow.predictors.transmembrane.transmembrane_predictor", "TransmembranePredictor"),
+    "mitochondrial_targeting": (
+        "sparrow.predictors.mitochondrial_targeting.mitochondrial_targeting_predictor",
+        "MitochondrialTargetingPredictor",
+    ),
+    "nes": ("sparrow.predictors.nes.nuclear_export_signal_predictor", "NESPredictor"),
+    "nls": ("sparrow.predictors.nls.nuclear_import_signal_predictor", "NLSPredictor"),
+    "tad": ("sparrow.predictors.tad.transactivation_domain_predictor", "TADPredictor"),
+    "pscore": ("sparrow.predictors.pscore.pscore_predictor", "PScorePredictor"),
+    "ser_phosphorylation": (
+        "sparrow.predictors.phosphorylation.ser_phosphorylation_predictor",
+        "SerPhosphorylationPredictor",
+    ),
+    "thr_phosphorylation": (
+        "sparrow.predictors.phosphorylation.thr_phosphorylation_predictor",
+        "ThrPhosphorylationPredictor",
+    ),
+    "tyr_phosphorylation": (
+        "sparrow.predictors.phosphorylation.tyr_phosphorylation_predictor",
+        "TyrPhosphorylationPredictor",
+    ),
+}
+
+#: The Predictor methods that read a network's prediction, each with the network.
+#: The radius of gyration and the end-to-end distance choose between this network
+#: and its scaled counterpart for each sequence (see Predictor._network).
+METHOD_NETWORKS = {
     "radius_of_gyration": "rg",
     "end_to_end_distance": "re",
     "asphericity": "asphericity",
     "prefactor": "prefactor",
     "scaling_exponent": "scaling_exponent",
+    "dssp_helicity": "dssp",
+    "dssp_extended": "dssp",
+    "dssp_coil": "dssp",
+    "transmembrane_regions": "transmembrane",
+    "mitochondrial_targeting_sequence": "mitochondrial_targeting",
+    "nuclear_export_signal": "nes",
+    "nuclear_import_signal": "nls",
+    "transactivation_domains": "tad",
+    "pscore": "pscore",
+    "serine_phosphorylation": "ser_phosphorylation",
+    "threonine_phosphorylation": "thr_phosphorylation",
+    "tyrosine_phosphorylation": "tyr_phosphorylation",
 }
+
+#: The Predictor methods that read a metapredict prediction
+METAPREDICT_METHODS = ("disorder", "disorder_domains", "binary_disorder", "pLDDT")
+
+#: Every Predictor method sparrow.batch can predict for a whole batch at once
+BATCH_METHODS = tuple(METHOD_NETWORKS) + METAPREDICT_METHODS
 
 # The methods that also have a network trained on the value divided by sqrt(N),
 # named with this prefix, which they use by default
 SCALED_NETWORK_METHODS = ("radius_of_gyration", "end_to_end_distance")
 SCALED_NETWORK_PREFIX = "scaled_"
+
+# The column of each DSSP method's class in the DSSP network's probabilities
+# (DSSPPredictor.predict_dssp_probabilities): helix, extended, coil
+_DSSP_COLUMNS = {"dssp_helicity": 0, "dssp_extended": 1, "dssp_coil": 2}
+
+# The PScore network predicts on a 0-6 scale, which pscore() rescales onto 0-1
+_PSCORE_MINIMUM = 0
+_PSCORE_MAXIMUM = 6.0
+
+# Where the metapredict predictions are cached: the disorder domains with
+# metapredict's own defaults, and the pLDDT. binary_disorder caches the domains
+# for each set of its arguments, under this prefix (see _binary_disorder_key).
+_DISORDER_KEY = "metapredict-disorder"
+_PLDDT_KEY = "metapredict-pLDDT"
+
+
+def network_predictor_class(network):
+    """The class of the predictor that loads one of sparrow's networks.
+
+    Parameters
+    ----------
+    network : str
+        One of :data:`NETWORK_PREDICTORS`.
+
+    Returns
+    -------
+    type
+        A subclass of :class:`~sparrow.predictors.base.BaseNetworkPredictor`.
+        Its module, which imports torch, is imported now.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If ``network`` is not one of sparrow's networks.
+    """
+    if network not in NETWORK_PREDICTORS:
+        raise SparrowException(f"{network!r} is not one of sparrow's networks; these are {list(NETWORK_PREDICTORS)}")
+    module_name, class_name = NETWORK_PREDICTORS[network]
+    return getattr(importlib.import_module(module_name), class_name)
+
+
+def load_network_predictor(network, version=None, device=None):
+    """Load the predictor for one of sparrow's networks.
+
+    Parameters
+    ----------
+    network : str
+        One of :data:`NETWORK_PREDICTORS`.
+    version : str or None, optional
+        The network version. Default None, the predictor's default.
+    device : torch.device, str or None, optional
+        The device to load it onto. Default None, the CPU.
+
+    Returns
+    -------
+    sparrow.predictors.base.BaseNetworkPredictor
+        The loaded predictor.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If ``network`` is not one of sparrow's networks, or its weights file
+        does not exist.
+    """
+    return network_predictor_class(network)(version=version, device=device)
+
+
+def _binary_disorder_key(disorder_threshold, minimum_IDR_size, minimum_folded_domain, gap_closure, override):
+    """Where binary_disorder caches the disorder domains for one set of its arguments.
+
+    The arguments are part of the key: the plain disorder key holds domains
+    found with metapredict's defaults, so reading that here would silently
+    ignore any other values.
+
+    Returns
+    -------
+    str
+    """
+    return f"{_DISORDER_KEY}-{disorder_threshold}-{minimum_IDR_size}-{minimum_folded_domain}-{gap_closure}-{override}"
+
+
+def _batch_options(batch_size, gpuid, show_progress):
+    """The options to pass on to a batch function: only those given.
+
+    Returns
+    -------
+    dict
+    """
+    options = {}
+    if batch_size is not None:
+        options["batch_size"] = batch_size
+    if gpuid is not None:
+        options["gpuid"] = gpuid
+    options["show_progress_bar"] = show_progress
+    return options
+
+
+def _predict_network(network, sequences, *, batch_size=None, gpuid=None, show_progress=False):
+    """One of sparrow's networks' prediction for each of many sequences, in batches.
+
+    Returns
+    -------
+    list
+        One prediction per sequence, as the network's predictor makes it.
+    """
+    from sparrow.predictors.batch_predictor import predict_many
+
+    return predict_many(network, sequences, **_batch_options(batch_size, gpuid, show_progress))
+
+
+def _predict_disorder_domains(sequences, *, batch_size=None, gpuid=None, show_progress=False, **domain_arguments):
+    """metapredict's disorder and disorder domains for each of many sequences, in batches.
+
+    metapredict chooses its own device, so ``gpuid`` is not passed to it.
+
+    Returns
+    -------
+    list of metapredict DisorderObject
+        One per sequence, as ``meta.predict_disorder_domains`` makes it for one.
+    """
+    from metapredict import meta
+
+    options = {"batch_size": batch_size} if batch_size is not None else {}
+    return meta.predict_disorder(
+        sequences,
+        return_domains=True,
+        return_numpy=False,
+        show_progress_bar=show_progress,
+        **options,
+        **domain_arguments,
+    )
+
+
+def _predict_plddt(sequences, *, batch_size=None, gpuid=None, show_progress=False):
+    """metapredict's predicted pLDDT for each of many sequences, in batches.
+
+    Returns
+    -------
+    list of numpy.ndarray
+        One per sequence, as ``meta.predict_pLDDT`` makes it for one.
+    """
+    from metapredict import meta
+
+    options = {"batch_size": batch_size} if batch_size is not None else {}
+    predictions = meta.predict_pLDDT(sequences, normalized=True, show_progress_bar=show_progress, **options)
+    return [scores for _, scores in predictions]
+
+
+def _dssp_result(probability, mode, threshold, minimum_length):
+    """A DSSP method's result, from the probability of its class at each residue.
+
+    Parameters
+    ----------
+    probability : numpy.ndarray
+        The probability of the class at each residue, as cached.
+    mode : {'class', 'probability', 'both'}
+        What to return.
+    threshold : float
+        As for :func:`~sparrow.predictors.dssp.dssp_predictor.classes_from_probability`.
+    minimum_length : int
+        As for :func:`~sparrow.predictors.dssp.dssp_predictor.classes_from_probability`.
+
+    Returns
+    -------
+    numpy.ndarray or tuple
+        The classes, a copy of the probabilities, or both.
+    """
+    from sparrow.predictors.dssp.dssp_predictor import classes_from_probability
+
+    if mode == "probability":
+        return probability.copy()
+
+    classes = classes_from_probability(probability, threshold, minimum_length)
+    if mode == "class":
+        return classes
+    return (classes, probability.copy())
+
+
+@dataclass(frozen=True)
+class _Source:
+    """A prediction a Predictor method reads, for sparrow.batch.
+
+    Attributes
+    ----------
+    key : Hashable
+        Where the prediction is cached.
+    predict_many : callable
+        Makes it for a list of sequences at once:
+        ``predict_many(sequences, batch_size=..., gpuid=..., show_progress=...)``
+        returns one prediction per sequence.
+    """
+
+    key: Hashable
+    predict_many: Callable[..., list]
 
 
 class Predictor:
@@ -87,34 +339,12 @@ class Predictor:
         # note the predictor object obtains a reference to the Protein object
         self.__protein = protein_obj
 
-        # predictors that operate using overaching Predictor objects needs to be initialized
-        # as a hidden variable and set to None here. This is the recommended approach for
-        # parrot-based predictors, although we note this is not strictly necessary if the
-        # predictor operates using some stateless master function (e.g. metapredict)
-        self.__transmembrane_predictor_object = None
-        self.__dssp_predictor_object = None
-        self.__mitochondrial_targeting_predictor_object = None
-        self.__nes_predictor_object = None
-        self.__nls_predictor_object = None
-        self.__pscore_predictor_object = None
-        self.__ser_phos_predictor_object = None
-        self.__thr_phos_predictor_object = None
-        self.__tyr_phos_predictor_object = None
-        self.__tad_predictor_object = None
+        # the predictor of each network this Predictor has run, by the network's
+        # name, each loaded on first use
+        self.__network_predictors = {}
 
-        # ALBATROSS predictors set here
-        self.__rg_predictor_object = None
-        self.__re_predictor_object = None
-
-        self.__scaled_rg_predictor_object = None
-        self.__scaled_re_predictor_object = None
-
-        self.__prefactor_predictor_object = None
-        self.__scaling_exponent_predictor_object = None
-        self.__asphericity_predictor_object = None
-
-        # this __precomputed dictionary is where predictions made can be scored so that
-        # the Predictor avoids needing to recompute (potentially expensive) predictions
+        # every prediction made, so that none is made twice: a network's under
+        # its name (see _prediction), and metapredict's under its key
         self.__precomputed = {}
 
     # .................................................................
@@ -141,19 +371,7 @@ class Predictor:
 
         """
 
-        selector = "transmembrane"
-
-        if self.__transmembrane_predictor_object is None:
-            from .transmembrane.transmembrane_predictor import TransmembranePredictor
-
-            self.__transmembrane_predictor_object = TransmembranePredictor()
-
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__transmembrane_predictor_object.predict_transmembrane_regions(
-                self.__protein.sequence
-            )
-
-        return copy_of(self.__precomputed[selector])
+        return copy_of(self._prediction("transmembrane", recompute))
 
     # .................................................................
     #
@@ -165,8 +383,9 @@ class Predictor:
         Value = 0 : non-helical
         Value = 1 : helical
 
-        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. Each
-        result is cached for its mode, threshold and minimum length.
+        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. The
+        network predicts helix, extended and coil at once, and its prediction is
+        cached, so the three DSSP methods, with any arguments, run it once.
 
         Parameters
         --------------
@@ -201,31 +420,9 @@ class Predictor:
         # ensure a valid keyword was passed
         validate_keyword_option(mode, ["class", "probability", "both"], "mode")
 
-        selector = cache_key("dssp_helicity", mode, threshold, minimum_helical_length)
-        if selector in self.__precomputed:
-            return copy_of(self.__precomputed[selector])
-
-        if self.__dssp_predictor_object is None:
-            from .dssp.dssp_predictor import DSSPPredictor
-
-            self.__dssp_predictor_object = DSSPPredictor()
-
-        if mode == "class":
-            result = self.__dssp_predictor_object.predict_helicity_smart(
-                self.__protein.sequence, threshold=threshold, minlen=minimum_helical_length
-            )
-        elif mode == "probability":
-            result = self.__dssp_predictor_object.predict_helical_probability(self.__protein.sequence)
-        else:
-            result = self.__dssp_predictor_object.predict_helicity_smart(
-                self.__protein.sequence,
-                threshold=threshold,
-                minlen=minimum_helical_length,
-                return_probability=True,
-            )
-
-        self.__precomputed[selector] = result
-        return copy_of(result)
+        # the network predicts all three DSSP classes at once; this is one column
+        probability = self._prediction("dssp")[:, _DSSP_COLUMNS["dssp_helicity"]]
+        return _dssp_result(probability, mode, threshold, minimum_helical_length)
 
     # .................................................................
     #
@@ -234,8 +431,9 @@ class Predictor:
         Prediction as to whethere a residue will be found in a coil-state or not (i.e.
         not a helix or an extended/beta structure).
 
-        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. Each
-        result is cached for its mode, threshold and minimum length.
+        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. The
+        network predicts helix, extended and coil at once, and its prediction is
+        cached, so the three DSSP methods, with any arguments, run it once.
 
         Parameters
         --------------
@@ -271,31 +469,9 @@ class Predictor:
         # ensure a valid keyword was passed
         validate_keyword_option(mode, ["class", "probability", "both"], "mode")
 
-        selector = cache_key("dssp_coil", mode, threshold, minimum_coil_length)
-        if selector in self.__precomputed:
-            return copy_of(self.__precomputed[selector])
-
-        if self.__dssp_predictor_object is None:
-            from .dssp.dssp_predictor import DSSPPredictor
-
-            self.__dssp_predictor_object = DSSPPredictor()
-
-        if mode == "class":
-            result = self.__dssp_predictor_object.predict_coil_smart(
-                self.__protein.sequence, threshold=threshold, minlen=minimum_coil_length
-            )
-        elif mode == "probability":
-            result = self.__dssp_predictor_object.predict_coil_probability(self.__protein.sequence)
-        else:
-            result = self.__dssp_predictor_object.predict_coil_smart(
-                self.__protein.sequence,
-                threshold=threshold,
-                minlen=minimum_coil_length,
-                return_probability=True,
-            )
-
-        self.__precomputed[selector] = result
-        return copy_of(result)
+        # the network predicts all three DSSP classes at once; this is one column
+        probability = self._prediction("dssp")[:, _DSSP_COLUMNS["dssp_coil"]]
+        return _dssp_result(probability, mode, threshold, minimum_coil_length)
 
     # .................................................................
     #
@@ -304,8 +480,9 @@ class Predictor:
         Prediction as to whethere a residue will be found in an extended/beta-state or not (i.e.
         not a helix or a coil region).
 
-        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. Each
-        result is cached for its mode, threshold and minimum length.
+        Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. The
+        network predicts helix, extended and coil at once, and its prediction is
+        cached, so the three DSSP methods, with any arguments, run it once.
 
         Parameters
         --------------
@@ -341,31 +518,9 @@ class Predictor:
         # ensure a valid keyword was passed
         validate_keyword_option(mode, ["class", "probability", "both"], "mode")
 
-        selector = cache_key("dssp_extended", mode, threshold, minimum_extended_length)
-        if selector in self.__precomputed:
-            return copy_of(self.__precomputed[selector])
-
-        if self.__dssp_predictor_object is None:
-            from .dssp.dssp_predictor import DSSPPredictor
-
-            self.__dssp_predictor_object = DSSPPredictor()
-
-        if mode == "class":
-            result = self.__dssp_predictor_object.predict_extended_smart(
-                self.__protein.sequence, threshold=threshold, minlen=minimum_extended_length
-            )
-        elif mode == "probability":
-            result = self.__dssp_predictor_object.predict_extended_probability(self.__protein.sequence)
-        else:
-            result = self.__dssp_predictor_object.predict_extended_smart(
-                self.__protein.sequence,
-                threshold=threshold,
-                minlen=minimum_extended_length,
-                return_probability=True,
-            )
-
-        self.__precomputed[selector] = result
-        return copy_of(result)
+        # the network predicts all three DSSP classes at once; this is one column
+        probability = self._prediction("dssp")[:, _DSSP_COLUMNS["dssp_extended"]]
+        return _dssp_result(probability, mode, threshold, minimum_extended_length)
 
     # .................................................................
     #
@@ -390,23 +545,7 @@ class Predictor:
 
         """
 
-        selector = "mitochondrial-targeting-sequence"
-
-        if self.__mitochondrial_targeting_predictor_object is None:
-            from .mitochondrial_targeting.mitochondrial_targeting_predictor import (
-                MitochondrialTargetingPredictor,
-            )
-
-            self.__mitochondrial_targeting_predictor_object = MitochondrialTargetingPredictor()
-
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = (
-                self.__mitochondrial_targeting_predictor_object.predict_mitochondrial_targeting(
-                    self.__protein.sequence
-                )
-            )
-
-        return copy_of(self.__precomputed[selector])
+        return copy_of(self._prediction("mitochondrial_targeting", recompute))
 
     # .................................................................
     #
@@ -430,19 +569,7 @@ class Predictor:
 
         """
 
-        selector = "nes"
-
-        if self.__nes_predictor_object is None:
-            from .nes.nuclear_export_signal_predictor import NESPredictor
-
-            self.__nes_predictor_object = NESPredictor()
-
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__nes_predictor_object.predict_nuclear_export_signal(
-                self.__protein.sequence
-            )
-
-        return copy_of(self.__precomputed[selector])
+        return copy_of(self._prediction("nes", recompute))
 
     # .................................................................
     #
@@ -465,19 +592,7 @@ class Predictor:
 
         """
 
-        selector = "tad"
-
-        if self.__tad_predictor_object is None:
-            from .tad.transactivation_domain_predictor import TADPredictor
-
-            self.__tad_predictor_object = TADPredictor()
-
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__tad_predictor_object.predict_transactivation_domains(
-                self.__protein.sequence
-            )
-
-        return copy_of(self.__precomputed[selector])
+        return copy_of(self._prediction("tad", recompute))
 
     # .................................................................
     #
@@ -501,19 +616,7 @@ class Predictor:
 
         """
 
-        selector = "nls"
-
-        if self.__nls_predictor_object is None:
-            from .nls.nuclear_import_signal_predictor import NLSPredictor
-
-            self.__nls_predictor_object = NLSPredictor()
-
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__nls_predictor_object.predict_nuclear_import_signal(
-                self.__protein.sequence
-            )
-
-        return copy_of(self.__precomputed[selector])
+        return copy_of(self._prediction("nls", recompute))
 
     # .................................................................
     #
@@ -535,7 +638,7 @@ class Predictor:
 
         """
 
-        selector = "metapredict-disorder"
+        selector = _DISORDER_KEY
         # local import
         from metapredict import meta
 
@@ -665,7 +768,7 @@ class Predictor:
 
         """
 
-        selector = "metapredict-disorder"
+        selector = _DISORDER_KEY
 
         # local import
         from metapredict import meta
@@ -721,7 +824,7 @@ class Predictor:
 
         """
 
-        selector = "metapredict-pLDDT"
+        selector = _PLDDT_KEY
         # local import
         from metapredict import meta
 
@@ -827,9 +930,8 @@ class Predictor:
         # "metapredict-disorder" key used by disorder()/disorder_domains() holds a
         # result computed with metapredict's defaults, so reusing it here would
         # silently ignore any non-default values passed to this function.
-        selector = (
-            f"metapredict-disorder-{disorder_threshold}-{minimum_IDR_size}"
-            f"-{minimum_folded_domain}-{gap_closure}-{override_folded_domain_minsize}"
+        selector = _binary_disorder_key(
+            disorder_threshold, minimum_IDR_size, minimum_folded_domain, gap_closure, override_folded_domain_minsize
         )
         # local import
         from metapredict import meta
@@ -916,28 +1018,13 @@ class Predictor:
 
         """
 
+        score = self._prediction("pscore", recompute)
+
         if normalized:
-            selector = "pscore-normalized"
-        else:
-            selector = "pscore"
+            # from the network's native 0-6 range onto 0-1, clipped to those bounds
+            return np.clip((score - _PSCORE_MINIMUM) / (_PSCORE_MAXIMUM - _PSCORE_MINIMUM), 0.0, 1.0)
 
-        if self.__pscore_predictor_object is None:
-            from .pscore.pscore_predictor import PScorePredictor
-
-            self.__pscore_predictor_object = PScorePredictor()
-
-        if selector not in self.__precomputed or recompute is True:
-            if normalized:
-                min_pscore = 0
-                max_pscore = 6.0
-
-                score = self.__pscore_predictor_object.predict_pscore(self.__protein.sequence)
-                self.__precomputed[selector] = np.clip((score - min_pscore) / (max_pscore - min_pscore), 0.0, 1.0)
-
-            else:
-                self.__precomputed[selector] = self.__pscore_predictor_object.predict_pscore(self.__protein.sequence)
-
-        return copy_of(self.__precomputed[selector])
+        return copy_of(score)
 
     # .................................................................
     #
@@ -982,37 +1069,7 @@ class Predictor:
                 "When calling the serine_phosphorylation() predictor you cannot request both raw_values and return_sites_only"
             )
 
-        if raw_values is True:
-            selector = "ser-phosphorylation-raw-vals"
-        elif return_sites_only is True:
-            selector = "ser-phosphorylation-sites"
-        else:
-            selector = "ser-phosphorylation"
-
-        if self.__ser_phos_predictor_object is None:
-            from .phosphorylation.ser_phosphorylation_predictor import (
-                SerPhosphorylationPredictor,
-            )
-
-            self.__ser_phos_predictor_object = SerPhosphorylationPredictor()
-
-        if selector not in self.__precomputed or recompute is True:
-            if selector == "ser-phosphorylation":
-                self.__precomputed[selector] = self.__ser_phos_predictor_object.predict_ser_phosphorylation(
-                    self.__protein.sequence
-                )
-
-            elif selector == "ser-phosphorylation-sites":
-                self.__precomputed[selector] = self.__ser_phos_predictor_object.predict_ser_phosphorylation(
-                    self.__protein.sequence, return_sites_only=True
-                )
-
-            elif selector == "ser-phosphorylation-raw-vals":
-                self.__precomputed[selector] = self.__ser_phos_predictor_object.predict_ser_phosphorylation(
-                    self.__protein.sequence, raw_values=True
-                )
-
-        return copy_of(self.__precomputed[selector])
+        return self.__phosphorylation("ser_phosphorylation", recompute, raw_values, return_sites_only)
 
     # .................................................................
     #
@@ -1057,37 +1114,7 @@ class Predictor:
                 "When calling the threonine_phosphorylation() predictor you cannot request both raw_values and return_sites_only"
             )
 
-        if raw_values is True:
-            selector = "thr-phosphorylation-raw-vals"
-        elif return_sites_only is True:
-            selector = "thr-phosphorylation-sites"
-        else:
-            selector = "thr-phosphorylation"
-
-        if self.__thr_phos_predictor_object is None:
-            from .phosphorylation.thr_phosphorylation_predictor import (
-                ThrPhosphorylationPredictor,
-            )
-
-            self.__thr_phos_predictor_object = ThrPhosphorylationPredictor()
-
-        if selector not in self.__precomputed or recompute is True:
-            if selector == "thr-phosphorylation":
-                self.__precomputed[selector] = self.__thr_phos_predictor_object.predict_thr_phosphorylation(
-                    self.__protein.sequence
-                )
-
-            elif selector == "thr-phosphorylation-sites":
-                self.__precomputed[selector] = self.__thr_phos_predictor_object.predict_thr_phosphorylation(
-                    self.__protein.sequence, return_sites_only=True
-                )
-
-            elif selector == "thr-phosphorylation-raw-vals":
-                self.__precomputed[selector] = self.__thr_phos_predictor_object.predict_thr_phosphorylation(
-                    self.__protein.sequence, raw_values=True
-                )
-
-        return copy_of(self.__precomputed[selector])
+        return self.__phosphorylation("thr_phosphorylation", recompute, raw_values, return_sites_only)
 
     # .................................................................
     #
@@ -1132,37 +1159,7 @@ class Predictor:
                 "When calling the tyrosine_phosphorylation() predictor you cannot request both raw_values and return_sites_only"
             )
 
-        if raw_values is True:
-            selector = "tyr-phosphorylation-raw-vals"
-        elif return_sites_only is True:
-            selector = "tyr-phosphorylation-sites"
-        else:
-            selector = "tyr-phosphorylation"
-
-        if self.__tyr_phos_predictor_object is None:
-            from .phosphorylation.tyr_phosphorylation_predictor import (
-                TyrPhosphorylationPredictor,
-            )
-
-            self.__tyr_phos_predictor_object = TyrPhosphorylationPredictor()
-
-        if selector not in self.__precomputed or recompute is True:
-            if selector == "tyr-phosphorylation":
-                self.__precomputed[selector] = self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(
-                    self.__protein.sequence
-                )
-
-            elif selector == "tyr-phosphorylation-sites":
-                self.__precomputed[selector] = self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(
-                    self.__protein.sequence, return_sites_only=True
-                )
-
-            elif selector == "tyr-phosphorylation-raw-vals":
-                self.__precomputed[selector] = self.__tyr_phos_predictor_object.predict_tyr_phosphorylation(
-                    self.__protein.sequence, raw_values=True
-                )
-
-        return copy_of(self.__precomputed[selector])
+        return self.__phosphorylation("tyr_phosphorylation", recompute, raw_values, return_sites_only)
 
     def radius_of_gyration(self, use_scaled=True, recompute=False, safe=True):
         """
@@ -1211,35 +1208,8 @@ class Predictor:
 
         # a sequence shorter than MIN_LENGTH_ALBATROSS_RE_RG uses the scaled
         # network unless safe is False; see _network
-        selector = self._network("radius_of_gyration", use_scaled=use_scaled, safe=safe)
-
-        # a prediction already made, here or by sparrow.batch, needs no network
-        if selector in self.__precomputed and not recompute:
-            return copy_of(self.__precomputed[selector])
-
-        if selector == "scaled_rg":
-            if self.__scaled_rg_predictor_object is None:
-                from .scaled_rg.scaled_radius_of_gyration_predictor import (
-                    ScaledRgPredictor,
-                )
-
-                self.__scaled_rg_predictor_object = ScaledRgPredictor()
-
-            if selector not in self.__precomputed or recompute is True:
-                self.__precomputed[selector] = self.__scaled_rg_predictor_object.predict_scaled_rg(
-                    self.__protein.sequence
-                ) * np.sqrt(len(self.__protein.sequence))
-
-        else:
-            if self.__rg_predictor_object is None:
-                from .rg.radius_of_gyration_predictor import RgPredictor
-
-                self.__rg_predictor_object = RgPredictor()
-
-            if selector not in self.__precomputed or recompute is True:
-                self.__precomputed[selector] = self.__rg_predictor_object.predict_rg(self.__protein.sequence)
-
-        return copy_of(self.__precomputed[selector])
+        network = self._network("radius_of_gyration", use_scaled=use_scaled, safe=safe)
+        return copy_of(self._prediction(network, recompute))
 
     def end_to_end_distance(self, use_scaled=True, recompute=False, safe=True):
         """
@@ -1288,35 +1258,8 @@ class Predictor:
 
         # a sequence shorter than MIN_LENGTH_ALBATROSS_RE_RG uses the scaled
         # network unless safe is False; see _network
-        selector = self._network("end_to_end_distance", use_scaled=use_scaled, safe=safe)
-
-        # a prediction already made, here or by sparrow.batch, needs no network
-        if selector in self.__precomputed and not recompute:
-            return copy_of(self.__precomputed[selector])
-
-        if selector == "scaled_re":
-            if self.__scaled_re_predictor_object is None:
-                from .scaled_re.scaled_end_to_end_distance_predictor import (
-                    ScaledRePredictor,
-                )
-
-                self.__scaled_re_predictor_object = ScaledRePredictor()
-
-            if selector not in self.__precomputed or recompute is True:
-                self.__precomputed[selector] = self.__scaled_re_predictor_object.predict_scaled_re(
-                    self.__protein.sequence
-                ) * np.sqrt(len(self.__protein.sequence))
-
-        else:
-            if self.__re_predictor_object is None:
-                from .e2e.end_to_end_distance_predictor import RePredictor
-
-                self.__re_predictor_object = RePredictor()
-
-            if selector not in self.__precomputed or recompute is True:
-                self.__precomputed[selector] = self.__re_predictor_object.predict_re(self.__protein.sequence)
-
-        return copy_of(self.__precomputed[selector])
+        network = self._network("end_to_end_distance", use_scaled=use_scaled, safe=safe)
+        return copy_of(self._prediction(network, recompute))
 
     def asphericity(self, recompute=False):
         """
@@ -1335,23 +1278,7 @@ class Predictor:
 
         """
 
-        selector = self._network("asphericity")
-
-        # a prediction already made, here or by sparrow.batch, needs no network
-        if selector in self.__precomputed and not recompute:
-            return copy_of(self.__precomputed[selector])
-
-        if self.__asphericity_predictor_object is None:
-            from .asphericity.asphericity_predictor import AsphericityPredictor
-
-            self.__asphericity_predictor_object = AsphericityPredictor()
-
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__asphericity_predictor_object.predict_asphericity(
-                self.__protein.sequence
-            )
-
-        return copy_of(self.__precomputed[selector])
+        return copy_of(self._prediction(self._network("asphericity"), recompute))
 
     def prefactor(self, recompute=False):
         """
@@ -1370,21 +1297,7 @@ class Predictor:
 
         """
 
-        selector = self._network("prefactor")
-
-        # a prediction already made, here or by sparrow.batch, needs no network
-        if selector in self.__precomputed and not recompute:
-            return copy_of(self.__precomputed[selector])
-
-        if self.__prefactor_predictor_object is None:
-            from .prefactor.prefactor_predictor import PrefactorPredictor
-
-            self.__prefactor_predictor_object = PrefactorPredictor()
-
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__prefactor_predictor_object.predict_prefactor(self.__protein.sequence)
-
-        return copy_of(self.__precomputed[selector])
+        return copy_of(self._prediction(self._network("prefactor"), recompute))
 
     def scaling_exponent(self, recompute=False):
         """
@@ -1403,40 +1316,80 @@ class Predictor:
 
         """
 
-        selector = self._network("scaling_exponent")
-
-        # a prediction already made, here or by sparrow.batch, needs no network
-        if selector in self.__precomputed and not recompute:
-            return copy_of(self.__precomputed[selector])
-
-        if self.__scaling_exponent_predictor_object is None:
-            from .scaling_exponent.scaling_exponent_predictor import (
-                ScalingExponentPredictor,
-            )
-
-            self.__scaling_exponent_predictor_object = ScalingExponentPredictor()
-
-        if selector not in self.__precomputed or recompute is True:
-            self.__precomputed[selector] = self.__scaling_exponent_predictor_object.predict_scaling_exponent(
-                self.__protein.sequence
-            )
-
-        return copy_of(self.__precomputed[selector])
+        return copy_of(self._prediction(self._network("scaling_exponent"), recompute))
 
     # .................................................................
     #
-    def _network(self, method, use_scaled=True, safe=True):
-        """The ALBATROSS network a polymer-dimension method runs for this sequence.
+    def _prediction(self, network, recompute=False):
+        """The prediction of one of sparrow's networks for this sequence, made on first use.
 
-        Each method caches its prediction under the name of the network that
-        made it, so this is also the prediction's cache key. sparrow.batch calls
-        it to decide which network to run for each sequence of a batch, and
-        :meth:`_store` to put the prediction where the method will look.
+        Each network's prediction is cached under its name, as its predictor
+        makes it (:meth:`~sparrow.predictors.base.BaseNetworkPredictor.predict`),
+        and every method that reads the network makes its result from that. So a
+        network runs once for this sequence, whatever the methods are asked,
+        and sparrow.batch can store a prediction made in a batch (see
+        :meth:`_store`). The cached object itself is returned; a method copies
+        what it hands back.
+
+        Parameters
+        ----------
+        network : str
+            One of :data:`NETWORK_PREDICTORS`.
+        recompute : bool, optional
+            Predict again even if a prediction is cached. Default False.
+
+        Returns
+        -------
+        Any
+            The prediction.
+        """
+        if network in self.__precomputed and not recompute:
+            return self.__precomputed[network]
+
+        if network not in self.__network_predictors:
+            self.__network_predictors[network] = load_network_predictor(network)
+        self.__precomputed[network] = self.__network_predictors[network].predict(self.__protein.sequence)
+        return self.__precomputed[network]
+
+    def __phosphorylation(self, network, recompute, raw_values, return_sites_only):
+        """A phosphorylation method's result, made from its network's cached probabilities.
+
+        Parameters
+        ----------
+        network : str
+            The phosphorylation network.
+        recompute : bool
+            Predict again even if a prediction is cached.
+        raw_values, return_sites_only : bool
+            As for :meth:`serine_phosphorylation`.
+
+        Returns
+        -------
+        numpy.ndarray or list
+            As for :meth:`serine_phosphorylation`.
+        """
+        from sparrow.predictors.phosphorylation.phospho_predictor_utils import phosphorylation_result
+
+        target_residue = network_predictor_class(network).TARGET_RESIDUE
+        return phosphorylation_result(
+            self.__protein.sequence,
+            self._prediction(network, recompute),
+            target_residue,
+            raw_values=raw_values,
+            return_sites_only=return_sites_only,
+        )
+
+    def _network(self, method, use_scaled=True, safe=True):
+        """The network a method reads for this sequence, which is also its prediction's cache key.
+
+        sparrow.batch calls it to decide which network to run for each sequence
+        of a batch, and :meth:`_store` to put each prediction where the method
+        will look.
 
         Parameters
         ----------
         method : str
-            One of the methods in :data:`ALBATROSS_NETWORKS`.
+            One of the methods in :data:`METHOD_NETWORKS`.
         use_scaled : bool, optional
             As for :meth:`radius_of_gyration` and :meth:`end_to_end_distance`;
             ignored for the other methods. Default True.
@@ -1453,14 +1406,12 @@ class Predictor:
         Raises
         ------
         sparrow.sparrow_exceptions.SparrowException
-            If ``method`` is not an ALBATROSS polymer-dimension method.
+            If ``method`` does not read a network.
         """
-        if method not in ALBATROSS_NETWORKS:
-            raise SparrowException(
-                f"{method!r} is not an ALBATROSS polymer-dimension method; these are {list(ALBATROSS_NETWORKS)}"
-            )
+        if method not in METHOD_NETWORKS:
+            raise SparrowException(f"{method!r} does not read a network; these do: {list(METHOD_NETWORKS)}")
 
-        network = ALBATROSS_NETWORKS[method]
+        network = METHOD_NETWORKS[method]
         if method not in SCALED_NETWORK_METHODS:
             return network
 
@@ -1473,25 +1424,87 @@ class Predictor:
             return SCALED_NETWORK_PREFIX + network
         return network
 
-    def _store(self, network, prediction):
-        """Adopt an ALBATROSS prediction made outside this Predictor.
-
-        Used by sparrow.batch, which predicts a whole batch at once with
-        :func:`~sparrow.predictors.batch_predictor.batch_predict` and stores each
-        sequence's prediction here, under the network that made it - the key
-        the polymer-dimension methods look a prediction up by (see
-        :meth:`_network`). A prediction made in a batch can differ from one made
-        for the sequence alone by about 1e-7 relative, the precision of the
-        networks' 32-bit arithmetic, because the batch is summed in a different
-        order, so a prediction this Predictor has already made is kept: a value
-        already read does not change.
+    def _source(self, method, arguments):
+        """The prediction a method reads, for sparrow.batch: where it is cached, and how to make it at once for many.
 
         Parameters
         ----------
-        network : str
-            The network that made the prediction, as ``batch_predict`` knows it.
-        prediction : float
-            The prediction, as ``batch_predict`` returns it.
+        method : str
+            The method's name.
+        arguments : dict
+            Every argument the method is called with, defaults included.
+
+        Returns
+        -------
+        _Source or None
+            None for a method that reads no prediction, such as
+            :meth:`low_complexity_domains`.
+        """
+        if method in METHOD_NETWORKS:
+            network_arguments = {name: arguments[name] for name in ("use_scaled", "safe") if name in arguments}
+            network = self._network(method, **network_arguments)
+            return _Source(network, functools.partial(_predict_network, network))
+
+        if method in ("disorder", "disorder_domains"):
+            return _Source(_DISORDER_KEY, _predict_disorder_domains)
+
+        if method == "binary_disorder":
+            key = _binary_disorder_key(
+                arguments["disorder_threshold"],
+                arguments["minimum_IDR_size"],
+                arguments["minimum_folded_domain"],
+                arguments["gap_closure"],
+                arguments["override_folded_domain_minsize"],
+            )
+            predict_many = functools.partial(
+                _predict_disorder_domains,
+                disorder_threshold=arguments["disorder_threshold"],
+                minimum_IDR_size=arguments["minimum_IDR_size"],
+                minimum_folded_domain=arguments["minimum_folded_domain"],
+                gap_closure=arguments["gap_closure"],
+            )
+            return _Source(key, predict_many)
+
+        if method == "pLDDT":
+            return _Source(_PLDDT_KEY, _predict_plddt)
+
+        return None
+
+    def _has(self, key):
+        """Whether a prediction is cached under a key.
+
+        Parameters
+        ----------
+        key : Hashable
+            A key, as :meth:`_source` gives it.
+
+        Returns
+        -------
+        bool
+        """
+        return key in self.__precomputed
+
+    def _store(self, key, prediction):
+        """Adopt a prediction made outside this Predictor.
+
+        Used by sparrow.batch, which makes a prediction for a whole batch at
+        once - with the batch harness for a network
+        (:func:`~sparrow.predictors.batch_predictor.predict_many`), or with
+        metapredict's own batch functions - and stores each sequence's here,
+        under the key :meth:`_source` gives, where the methods look. A
+        prediction made in a batch can differ from one made for the sequence
+        alone by about 1e-7 relative for a network, the precision of its 32-bit
+        arithmetic, because the batch is summed in a different order, and by
+        one in the last rounded place for metapredict's; so a prediction this
+        Predictor has already made is kept, and a value already read does not
+        change.
+
+        Parameters
+        ----------
+        key : Hashable
+            Where the prediction is cached: a network's name, or a metapredict key.
+        prediction : Any
+            The prediction, as the network's predictor or metapredict makes it.
 
         Returns
         -------
@@ -1500,13 +1513,10 @@ class Predictor:
         Raises
         ------
         sparrow.sparrow_exceptions.SparrowException
-            If ``network`` is not an ALBATROSS polymer-dimension network.
+            If ``key`` is neither a network nor a metapredict key.
         """
-        networks = set(ALBATROSS_NETWORKS.values())
-        networks.update(SCALED_NETWORK_PREFIX + ALBATROSS_NETWORKS[method] for method in SCALED_NETWORK_METHODS)
-        if network not in networks:
-            raise SparrowException(
-                f"{network!r} is not an ALBATROSS polymer-dimension network; these are {sorted(networks)}"
-            )
+        is_metapredict = key in (_DISORDER_KEY, _PLDDT_KEY) or str(key).startswith(f"{_DISORDER_KEY}-")
+        if key not in NETWORK_PREDICTORS and not is_metapredict:
+            raise SparrowException(f"{key!r} is neither one of sparrow's networks nor a metapredict prediction")
 
-        self.__precomputed.setdefault(network, prediction)
+        self.__precomputed.setdefault(key, prediction)

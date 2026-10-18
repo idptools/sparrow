@@ -37,8 +37,31 @@ class MitochondrialTargetingPredictor(BaseNetworkPredictor):
             Per-residue binary classification (0/1); positions beyond the first
             ``168`` residues are 0.
         """
-        seq = seq.upper()
-        sub_seq = seq[0:_MTS_WINDOW]
-        prediction = outputs.argmax_per_residue(self._raw_predict(sub_seq))
-        prediction.extend([0] * (len(seq) - len(sub_seq)))
+        return self.predict(seq)
+
+    def _network_input(self, seq):
+        """The first 168 residues, upper-cased: mitochondrial targeting sequences are N-terminal.
+
+        See :meth:`~sparrow.predictors.base.BaseNetworkPredictor._network_input`.
+
+        Returns
+        -------
+        str
+            What the network is run on.
+        """
+        return seq.upper()[0:_MTS_WINDOW]
+
+    def _from_raw(self, seq, raw):
+        """The prediction for a sequence, from the network's raw output for its first residues.
+
+        See :meth:`~sparrow.predictors.base.BaseNetworkPredictor._from_raw`.
+
+        Returns
+        -------
+        list
+            The predicted class (0/1) of each residue; residues beyond the
+            first 168 are 0.
+        """
+        prediction = outputs.argmax_per_residue(raw)
+        prediction.extend([0] * (len(seq) - len(prediction)))
         return prediction

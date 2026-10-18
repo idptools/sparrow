@@ -50,14 +50,33 @@ class MyPropertyPredictor(BaseNetworkPredictor):
         Returns
         -------
         numpy.ndarray
+            The prediction, as :meth:`_from_raw` makes it.
+        """
+        return self.predict(seq)
+
+    def _from_raw(self, seq, raw):
+        """The prediction for a sequence, from PARROT's prediction for it.
+
+        ``predict`` and ``predict_many`` both call this, so a sequence's
+        prediction is made the same way alone or with many others.
+
+        Parameters
+        ----------
+        seq : str
+            The sequence.
+        raw : numpy.ndarray
             PARROT's prediction. For a regression network that is one value per
             residue (a ``residues`` network) or a one-element array (a
             ``sequence`` network); for a classification network, the
             probability of each class, with shape ``(len(seq), num_classes)`` or
-            ``(num_classes,)``. Reduce it here to what the predictor should
+            ``(num_classes,)``.
+
+        Returns
+        -------
+        numpy.ndarray
+            PARROT's prediction. Reduce it here to what the predictor should
             return - for example ``float(prediction[0])`` for one value per
             sequence, or ``prediction[:, 1]`` for the probability of class 1 at
             each residue - and say so in this docstring, with units.
         """
-        prediction = self._predict(seq)
-        return prediction
+        return raw

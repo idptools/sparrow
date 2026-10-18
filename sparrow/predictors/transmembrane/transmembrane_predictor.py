@@ -30,7 +30,19 @@ class TransmembranePredictor(BaseNetworkPredictor):
         list
             Per-residue predicted class (arg-max over network output).
         """
-        return outputs.argmax_per_residue(self._raw_predict(seq))
+        return self.predict(seq)
+
+    def _from_raw(self, seq, raw):
+        """The prediction for a sequence, from the network's raw output for it.
+
+        See :meth:`~sparrow.predictors.base.BaseNetworkPredictor._from_raw`.
+
+        Returns
+        -------
+        list
+            The predicted class of each residue (arg-max over the network output).
+        """
+        return outputs.argmax_per_residue(raw)
 
     # backwards-compatible alias for the previously-misspelled method name
     predict_transmebrane_regions = predict_transmembrane_regions

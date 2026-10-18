@@ -6,20 +6,34 @@ pattern: the path to its weights (``NETWORK_PATH``) and the default version
 (``ARCHITECTURE``). Loading the weights and running the forward pass are handled
 here, so no predictor subclass needs to touch ``torch`` directly.
 
-Subclasses then expose a single ``predict_<thing>(seq, ...)`` method that turns
-the network's output into the desired result:
+Each predictor says how the network's output for a sequence becomes its
+prediction, in ``_from_raw``. That one transform serves both
+:meth:`BaseNetworkPredictor.predict`, for one sequence, and
+:meth:`BaseNetworkPredictor.predict_many`, for many, which runs the network in
+batches. Subclasses also expose a ``predict_<thing>(seq, ...)`` method by name.
+Whether a network was trained with PARROT 1 or PARROT 2 changes only what
+``_from_raw`` is given, never how a predictor is called:
 
-* for a network saved by PARROT 1 (every network sparrow ships), the raw output
-  of ``BaseNetworkPredictor._raw_predict``, typically through a helper from
-  :mod:`sparrow.predictors.outputs`;
-* for a network saved by PARROT 2, PARROT's own prediction, from
-  ``BaseNetworkPredictor._predict`` (see ``sparrow/predictors/predictor_template.py``).
+* For a network saved by PARROT 1 (every network sparrow ships), ``_from_raw``
+  is given the network's raw output, typically reduced with a helper from
+  :mod:`sparrow.predictors.outputs`, and ``predict_many`` runs the network
+  with sparrow's batch harness,
+  :func:`~sparrow.predictors.batch_predictor.run_network`.
+* For a network saved by PARROT 2, ``_from_raw`` is given PARROT's own
+  prediction (see ``sparrow/predictors/predictor_template.py``), and
+  ``predict_many`` runs the network with PARROT's ``Predictor.predict_batch``.
 """
 
 from typing import ClassVar
 
 from parrot import encode_sequence
 
+from sparrow.predictors.batch_predictor import (
+    DEFAULT_BATCH_ALGORITHM,
+    DEFAULT_BATCH_SIZE,
+    resolve_batch_algorithm,
+    run_network,
+)
 from sparrow.predictors.network_loader import load_parrot_network
 from sparrow.sparrow_exceptions import SparrowException
 
@@ -50,7 +64,7 @@ class BaseNetworkPredictor:
     DEFAULT_VERSION: ClassVar[str]
     ARCHITECTURE: ClassVar[str] = "MtO"
 
-    def __init__(self, version=None):
+    def __init__(self, version=None, device=None):
         """Load the versioned network for this predictor.
 
         Parameters
@@ -59,22 +73,164 @@ class BaseNetworkPredictor:
             Specific network version to load. When ``None`` (default), uses
             :attr:`DEFAULT_VERSION`. The value is substituted into
             :attr:`NETWORK_PATH` (no leading ``"v"`` or ``.pt`` extension).
+        device : torch.device, str or None, optional
+            The device to load the network onto and predict on. Default None,
+            the CPU.
         """
         if version is None:
             version = self.DEFAULT_VERSION
 
         relative_path = self.NETWORK_PATH.format(version=version)
-        self.network, meta = load_parrot_network(relative_path, self.ARCHITECTURE)
+        self.network, meta = load_parrot_network(relative_path, self.ARCHITECTURE, device=device)
 
         # which of the two prediction methods below applies to this network
         self.saved_by_parrot2 = meta.saved_by_parrot2
+        self.device = meta.device
+
+        # The loader copies the weights into a network built on the CPU, so the
+        # network is moved to the device here (a no-op on the CPU). A network is
+        # only ever used to predict, so it is also put in evaluation mode, in
+        # which dropout is off. Every network sparrow ships has a dropout
+        # probability of 0, so this changes no prediction; a network with dropout
+        # would otherwise predict differently on every call.
+        if not self.saved_by_parrot2:
+            self.network.to(self.device)
+            self.network.eval()
 
         # surface inferred hyper-parameters as instance attributes (these are
-        # read by batch_predict and useful for sanity checks)
+        # useful for sanity checks)
         self.number_of_classes = meta.number_of_classes
         self.input_size = meta.input_size
         self.number_of_layers = meta.number_of_layers
         self.hidden_vector_size = meta.hidden_vector_size
+
+    def _network_input(self, seq):
+        """The sequence as the network reads it.
+
+        Upper-cased. A predictor whose network reads only part of a sequence
+        overrides this.
+
+        Parameters
+        ----------
+        seq : str
+            Amino acid sequence.
+
+        Returns
+        -------
+        str
+            What the network is run on.
+        """
+        return seq.upper()
+
+    def _from_raw(self, seq, raw):
+        """This predictor's prediction for a sequence, from the network's output for it.
+
+        Every predictor implements this, and :meth:`predict` and
+        :meth:`predict_many` both call it, so a sequence's prediction is made
+        the same way alone or in a batch.
+
+        Parameters
+        ----------
+        seq : str
+            The sequence, as given (before ``_network_input``).
+        raw : numpy.ndarray
+            For a network saved by PARROT 1, its raw output for the sequence,
+            with a leading batch dimension of 1: ``(1, number_of_classes)`` for a
+            many-to-one network and ``(1, len(input), number_of_classes)`` for a
+            many-to-many one. For a network saved by PARROT 2, PARROT's
+            prediction, as its ``Predictor.predict`` and ``predict_batch``
+            return it.
+
+        Returns
+        -------
+        Any
+            The prediction.
+
+        Raises
+        ------
+        NotImplementedError
+            If the predictor does not implement it.
+        """
+        raise NotImplementedError(f"{type(self).__name__} does not say how its network's output becomes a prediction")
+
+    def predict(self, seq):
+        """The prediction for one sequence.
+
+        Parameters
+        ----------
+        seq : str
+            Valid amino acid sequence.
+
+        Returns
+        -------
+        Any
+            The prediction, as ``_from_raw`` makes it.
+        """
+        if self.saved_by_parrot2:
+            return self._from_raw(seq, self._predict(self._network_input(seq)))
+        return self._from_raw(seq, self._raw_predict(self._network_input(seq)))
+
+    def predict_many(
+        self,
+        sequences,
+        batch_size=DEFAULT_BATCH_SIZE,
+        batch_algorithm=DEFAULT_BATCH_ALGORITHM,
+        show_progress_bar=False,
+    ):
+        """The prediction for each of many sequences, running the network in batches.
+
+        Each prediction is made by ``_from_raw``, as :meth:`predict` makes
+        it, from the network's output for that sequence in a batch. That output
+        can differ from the output for the sequence alone by about 1e-7
+        relative, the precision of the networks' 32-bit arithmetic, because a
+        batch is summed in a different order. A network saved by PARROT 1 is
+        run by sparrow's batch harness and one saved by PARROT 2 by PARROT's
+        ``Predictor.predict_batch``, which batches sequences of similar length
+        together and masks the padding.
+
+        Parameters
+        ----------
+        sequences : list of str
+            Valid amino acid sequences.
+        batch_size : int, optional
+            Sequences per forward pass. Default 32.
+        batch_algorithm : {'default', 'pad-n-pack', 'size-collect'}, optional
+            How the sequences of a network saved by PARROT 1 are batched; see
+            :func:`~sparrow.predictors.batch_predictor.run_network`. Default
+            ``'default'``. PARROT batches those of a network saved by PARROT 2
+            its own way, so there it is only checked.
+        show_progress_bar : bool, optional
+            Show progress over the batches. Default False.
+
+        Returns
+        -------
+        list
+            One prediction per sequence, in order.
+
+        Raises
+        ------
+        sparrow.sparrow_exceptions.SparrowException
+            If the batch algorithm is not valid.
+        """
+        network_inputs = [self._network_input(seq) for seq in sequences]
+
+        if self.saved_by_parrot2:
+            # checked so a bad value fails the same way whichever PARROT saved the network
+            resolve_batch_algorithm(batch_algorithm)
+            outputs = self.network.predict_batch(
+                network_inputs, batch_size=batch_size, show_progress=show_progress_bar
+            )
+        else:
+            outputs = run_network(
+                self.network,
+                network_inputs,
+                architecture=self.ARCHITECTURE,
+                device=self.device,
+                batch_size=batch_size,
+                batch_algorithm=batch_algorithm,
+                show_progress_bar=show_progress_bar,
+            )
+        return [self._from_raw(seq, output) for seq, output in zip(sequences, outputs)]
 
     def _raw_predict(self, seq):
         """Run a PARROT 1 network forward pass and return the raw numpy output.
@@ -94,7 +250,7 @@ class BaseNetworkPredictor:
         ------
         sparrow.sparrow_exceptions.SparrowException
             If the network was saved by PARROT 2, which may not take one-hot
-            input; use :meth:`_predict` for it.
+            input; use ``_predict`` for it.
         """
         if self.saved_by_parrot2:
             raise SparrowException(
@@ -104,7 +260,8 @@ class BaseNetworkPredictor:
         seq = seq.upper()
         seq_vector = encode_sequence.one_hot(seq)
         seq_vector = seq_vector.view(1, len(seq_vector), -1)
-        return self.network(seq_vector.float()).detach().numpy()
+        # to the network's device and back; both are no-ops on the CPU
+        return self.network(seq_vector.float().to(self.device)).detach().cpu().numpy()
 
     def _predict(self, seq):
         """Predict with a PARROT 2 network, as PARROT's own ``Predictor`` does.
@@ -125,7 +282,7 @@ class BaseNetworkPredictor:
         Raises
         ------
         sparrow.sparrow_exceptions.SparrowException
-            If the network was saved by PARROT 1; use :meth:`_raw_predict` for it.
+            If the network was saved by PARROT 1; use ``_raw_predict`` for it.
         """
         if not self.saved_by_parrot2:
             raise SparrowException(

@@ -99,11 +99,22 @@ What is computed for the whole batch
      - :func:`sparrow.properties.compute`
      - All 20 for 6,067 proteins in 0.46 s, against 2.8 s one ``Protein`` at a
        time
-   * - ``predictor.radius_of_gyration``, ``end_to_end_distance``,
-       ``asphericity``, ``prefactor``, ``scaling_exponent``, and the
-       ``polymeric.predicted_*`` values that read them
-     - :func:`~sparrow.predictors.batch_predictor.batch_predict`
-     - All 5 for 2,000 proteins in 28 s on a CPU, against 227 s
+   * - Every network prediction: ``predictor.radius_of_gyration``,
+       ``end_to_end_distance``, ``asphericity``, ``prefactor`` and
+       ``scaling_exponent`` (and the ``polymeric.predicted_*`` values that
+       read them), the three DSSP methods, ``transmembrane_regions``,
+       ``mitochondrial_targeting_sequence``, ``nuclear_export_signal``,
+       ``nuclear_import_signal``, ``transactivation_domains``, ``pscore`` and
+       the three phosphorylation methods
+     - The batch harness, :func:`~sparrow.predictors.batch_predictor.run_network`, once
+       for each network, whatever its methods are asked
+     - The 5 ALBATROSS values for 2,000 proteins in 28 s on a CPU, against
+       227 s
+   * - ``predictor.disorder``, ``disorder_domains``, ``binary_disorder`` and
+       ``pLDDT``
+     - metapredict's own batch functions, once for each set of options
+     - All 21 deep-learning predictions, these and the networks', for 300
+       proteins in 10.8 s, against 103 s
    * - ``nardini.vector``, ``patterning``, ``gin_cluster``, ``gin_report``
      - :func:`~sparrow.nardini.batch.nardini_proteins`, in ``n_processes``
        processes
@@ -111,21 +122,21 @@ What is computed for the whole batch
        default vector's scrambles
 
 Every other value is computed one protein at a time, by the method itself, so
-the call is the same if it gains a batch function later. Most are fast; the
-per-residue networks are not. Disorder, DSSP helicity and serine
-phosphorylation each took 11-12 ms per sequence of 80 to 300 residues, which
-for 50,000 sequences is about 10 minutes per predictor. ``show_progress=True``
-shows a progress bar for each.
+the call is the same if it gains a batch function later; none of them runs a
+network. ``show_progress=True`` shows a progress bar for each, and for each
+network.
 
 How exact the values are
 ------------------------
 
 The scalar properties and the NARDINI values are the ones each ``Protein``
-computes alone, to the last bit. An ALBATROSS prediction made in a batch can
-differ from one made for the sequence alone by about 1e-7 relative: the
-networks compute in 32-bit arithmetic, and a batch is summed in a different
-order. A prediction that a ``Protein`` you pass in has already made is kept, so
-a value you have already read does not change.
+computes alone, to the last bit. A deep-learning prediction made in a batch
+can differ from one made for the sequence alone at the networks' 32-bit
+precision, because a batch is summed in a different order: about 1e-7
+relative for the ALBATROSS values, and one place in the last rounded decimal
+for the per-residue probabilities and metapredict's scores (see
+:doc:`batch` for the measurements). A prediction that a ``Protein`` you pass in
+has already made is kept, so a value you have already read does not change.
 
 Options
 -------
@@ -134,8 +145,10 @@ Options
   core). Nothing else runs in parallel.
 * ``show_progress`` -- progress bars for each ALBATROSS network, the NARDINI
   scrambles, and each value computed one protein at a time.
-* ``batch_size``, ``gpuid`` -- passed to ``batch_predict`` for the ALBATROSS
-  networks, if given.
+* ``batch_size`` -- sequences per forward pass, for the networks and for
+  metapredict, if given.
+* ``gpuid`` -- the CUDA device for the networks, if given and CUDA is
+  available. metapredict chooses its own device.
 
 When you want arrays instead
 ----------------------------
@@ -146,8 +159,8 @@ clustering, wants:
 
 * :func:`sparrow.properties.compute` -- any of the scalar properties as a dict
   of arrays (:doc:`sequence_properties`);
-* :func:`~sparrow.predictors.batch_predictor.batch_predict` -- one ALBATROSS
-  network over a set of sequences (:doc:`batch`);
+* :func:`~sparrow.predictors.batch_predictor.batch_predict` -- any one of
+  sparrow's networks over a set of sequences (:doc:`batch`);
 * :func:`~sparrow.nardini.vectors.nardini_vectors` -- NARDINI+ vectors as a
   labelled matrix, with GIN assignment and clustering (:doc:`nardini`).
 

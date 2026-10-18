@@ -8,7 +8,6 @@ phosphosites via :func:`phospho_predictor_utils.return_hits`.
 
 from typing import ClassVar
 
-import numpy as np
 
 from sparrow.predictors import outputs
 from sparrow.predictors.base import BaseNetworkPredictor
@@ -52,28 +51,26 @@ class PhosphoPredictor(BaseNetworkPredictor):
             Binary mask array by default; raw probability array if
             ``raw_values``; a list of site positions if ``return_sites_only``.
         """
-        seq = seq.upper()
-        probability = outputs.per_residue_class1_probability(self._raw_predict(seq), self.number_of_classes)
-
-        if raw_values:
-            return np.array(probability)
-
-        if return_sites_only:
-            return phospho_predictor_utils.return_hits(
-                seq,
-                probability,
-                self.TARGET_RESIDUE,
-                windowsize=windowsize,
-                threshold=threshold,
-                return_sites_only=True,
-            )
-
-        return np.array(
-            phospho_predictor_utils.return_hits(
-                seq,
-                probability,
-                self.TARGET_RESIDUE,
-                windowsize=windowsize,
-                threshold=threshold,
-            )
+        return phospho_predictor_utils.phosphorylation_result(
+            seq.upper(),
+            self.predict(seq),
+            self.TARGET_RESIDUE,
+            raw_values=raw_values,
+            return_sites_only=return_sites_only,
+            windowsize=windowsize,
+            threshold=threshold,
         )
+
+    def _from_raw(self, seq, raw):
+        """The probability that each residue is phosphorylated, from the network's raw output.
+
+        The masks and sites :meth:`_predict_phospho` returns are made from this,
+        by :func:`~sparrow.predictors.phosphorylation.phospho_predictor_utils.phosphorylation_result`.
+        See :meth:`~sparrow.predictors.base.BaseNetworkPredictor._from_raw`.
+
+        Returns
+        -------
+        list of float
+            The probability of each residue, rounded to 5 decimal places.
+        """
+        return outputs.per_residue_class1_probability(raw, self.number_of_classes)

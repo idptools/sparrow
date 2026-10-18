@@ -1,20 +1,351 @@
+"""Running sparrow's networks over many sequences at once.
+
+:func:`run_network` is the batch harness: it runs any network saved by PARROT 1
+- a many-to-one network, with one value per sequence, or a many-to-many
+network, with one value per residue - over a list of sequences in batches, and
+returns the network's raw output for each, in the shape the network gives it for
+that sequence alone. Each predictor class turns that output into its prediction
+with the same transform it uses for one sequence
+(:meth:`~sparrow.predictors.base.BaseNetworkPredictor.predict_many`).
+
+:func:`batch_predict` is the public function: it runs one of sparrow's networks
+by name (:data:`~sparrow.predictors.NETWORK_PREDICTORS`) over a dict or list of
+sequences or ``Protein`` objects. :func:`sparrow.batch` uses it for every
+network-backed value it is asked for.
+"""
+
 from typing import Optional
 
 import torch
-import numpy as np
+from packaging import version as VERSION_PACKAGE
+from parrot import encode_sequence
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence, pad_sequence
 from torch.utils.data import DataLoader
-from torch.nn.utils.rnn import pad_sequence, pack_padded_sequence
 from tqdm import tqdm
 
-from packaging import version as VERSION_PACKAGE
-
-from parrot import encode_sequence
 import sparrow
-
-from .network_loader import load_parrot_network
-from ..sparrow_exceptions import SparrowException
-
 from sparrow.data.configs import MIN_LENGTH_ALBATROSS_RE_RG
+from sparrow.sparrow_exceptions import SparrowException
+
+#: Sequences per forward pass when none is given. Larger is faster on a GPU, and
+#: changes predictions only at the networks' 32-bit precision.
+DEFAULT_BATCH_SIZE = 32
+
+#: The CUDA device used when none is given, where CUDA is available.
+DEFAULT_GPU_ID = 0
+
+#: The batch algorithm used when none is given: pad-n-pack where PyTorch has it.
+DEFAULT_BATCH_ALGORITHM = "default"
+
+BATCH_ALGORITHMS = ("default", "size-collect", "pad-n-pack")
+
+# pack_padded_sequence with enforce_sorted=False needs PyTorch 1.11 or newer
+_MINIMUM_TORCH_FOR_PAD_N_PACK = "1.11.0"
+
+# the two architectures of a network saved by PARROT 1
+_SEQUENCE_ARCHITECTURE = "MtO"
+_RESIDUE_ARCHITECTURE = "MtM"
+
+# rg and re have a scaled counterpart, which is more accurate for short sequences
+_SCALED_COUNTERPARTS = {"rg": "scaled_rg", "re": "scaled_re"}
+
+
+# ....................................................................................
+#
+#
+def device_for(gpuid):
+    """The device to run networks on: CUDA device ``gpuid`` if CUDA is available, else the CPU.
+
+    Parameters
+    ----------
+    gpuid : int
+        Index of the CUDA device.
+
+    Returns
+    -------
+    torch.device
+    """
+    if torch.cuda.is_available():
+        return torch.device(f"cuda:{gpuid}")
+    return torch.device("cpu")
+
+
+def resolve_batch_algorithm(batch_algorithm):
+    """The batch algorithm to use, with ``'default'`` resolved and availability checked.
+
+    Parameters
+    ----------
+    batch_algorithm : {'default', 'size-collect', 'pad-n-pack'}
+        As for :func:`run_network`.
+
+    Returns
+    -------
+    str
+        ``'size-collect'`` or ``'pad-n-pack'``.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If ``batch_algorithm`` is not one of the three, or is ``'pad-n-pack'``
+        on PyTorch older than 1.11.
+    """
+    if batch_algorithm not in BATCH_ALGORITHMS:
+        raise SparrowException(
+            "For option 'batch_algorithm': Please choose a valid batch algorithm, one of 'default', 'size-collect', "
+            "'pad-n-pack"
+        )
+
+    has_pad_n_pack = VERSION_PACKAGE.parse(torch.__version__) >= VERSION_PACKAGE.parse(_MINIMUM_TORCH_FOR_PAD_N_PACK)
+    if batch_algorithm == "pad-n-pack" and not has_pad_n_pack:
+        raise SparrowException(
+            "For option 'batch_algorithm': pad-n-pack is only available in PyTorch 1.11.0 or higher. Please use "
+            "'default' or 'size-collect'"
+        )
+
+    if batch_algorithm == "default":
+        return "pad-n-pack" if has_pad_n_pack else "size-collect"
+    return batch_algorithm
+
+
+def _one_hot_batch(sequences, device):
+    """One-hot encode a batch of sequences, padded with zeros to the longest.
+
+    Parameters
+    ----------
+    sequences : list of str
+        The batch.
+    device : torch.device
+        Where the network runs.
+
+    Returns
+    -------
+    torch.Tensor
+        ``(len(sequences), longest, 20)``, on ``device``.
+    """
+    return pad_sequence([encode_sequence.one_hot(seq).float() for seq in sequences], batch_first=True).to(device)
+
+
+def _run_packed(network, sequences, architecture, device):
+    """Run one mixed-length batch through a network, packed so padding has no effect.
+
+    Each batch is padded to its longest member and packed with
+    ``pack_padded_sequence``, so the LSTM runs over each sequence's true
+    residues only - the reverse direction starts at each sequence's own last
+    residue, not in the padding. This is the network's own forward pass - the
+    LSTM, then the fully connected layer - on the packed input: a many-to-one
+    network decodes the final hidden states of the last forward and reverse
+    layers, and a many-to-many network decodes the output at every residue.
+
+    Parameters
+    ----------
+    network : torch.nn.Module
+        The network: a PARROT 1 ``BRNN_MtO`` or ``BRNN_MtM``.
+    sequences : list of str
+        The batch.
+    architecture : {'MtO', 'MtM'}
+        The network's architecture.
+    device : torch.device
+        Where the network runs.
+
+    Returns
+    -------
+    list of numpy.ndarray
+        The output for each sequence, as :func:`run_network` returns it.
+    """
+    padded = _one_hot_batch(sequences, device)
+    # lengths must be a CPU tensor for pack_padded_sequence; enforce_sorted=False
+    # lets the batch stay in input order, which the outputs keep
+    lengths = torch.tensor([len(seq) for seq in sequences])
+    packed = pack_padded_sequence(padded, lengths, batch_first=True, enforce_sorted=False)
+
+    with torch.no_grad():
+        if architecture == _SEQUENCE_ARCHITECTURE:
+            _, (h_n, _) = network.lstm(packed)
+            # the final hidden states of the last forward (-2) and reverse (-1)
+            # layers, as BRNN_MtO.forward decodes them
+            outputs = network.fc(torch.cat((h_n[-2], h_n[-1]), dim=-1)).cpu().numpy()
+            return [outputs[index : index + 1] for index in range(len(sequences))]
+
+        packed_output, _ = network.lstm(packed)
+        per_residue, _ = pad_packed_sequence(packed_output, batch_first=True)
+        outputs = network.fc(per_residue).cpu().numpy()
+        return [outputs[index : index + 1, : len(seq)] for index, seq in enumerate(sequences)]
+
+
+def _run_same_length(network, sequences, device):
+    """Run one batch of sequences that are all the same length, which needs no padding.
+
+    Parameters
+    ----------
+    network : torch.nn.Module
+        The network: a PARROT 1 ``BRNN_MtO`` or ``BRNN_MtM``.
+    sequences : list of str
+        The batch, every sequence the same length.
+    device : torch.device
+        Where the network runs.
+
+    Returns
+    -------
+    list of numpy.ndarray
+        The output for each sequence, as :func:`run_network` returns it.
+    """
+    with torch.no_grad():
+        outputs = network(_one_hot_batch(sequences, device)).cpu().numpy()
+    return [outputs[index : index + 1] for index in range(len(sequences))]
+
+
+def run_network(
+    network,
+    sequences,
+    *,
+    architecture,
+    device,
+    batch_size=DEFAULT_BATCH_SIZE,
+    batch_algorithm=DEFAULT_BATCH_ALGORITHM,
+    show_progress_bar=False,
+):
+    """Run a network saved by PARROT 1 over many sequences, in batches.
+
+    The batch harness behind every network sparrow runs in batches. It returns
+    the network's raw output for each sequence, in the shape the network gives
+    it for that sequence alone, so each predictor turns it into a prediction
+    with the transform it uses for one sequence. The output can differ from the
+    output for the sequence alone by about 1e-7 relative, the precision of the
+    networks' 32-bit arithmetic, because a batch is summed in a different
+    order.
+
+    Parameters
+    ----------
+    network : torch.nn.Module
+        The network, on ``device``: a PARROT 1 ``BRNN_MtO`` or ``BRNN_MtM``.
+    sequences : list of str
+        Upper-case amino acid sequences, run in the order given. A sequence
+        given twice is run twice.
+    architecture : {'MtO', 'MtM'}
+        ``'MtO'`` for a many-to-one network, with one output per sequence;
+        ``'MtM'`` for a many-to-many network, with one per residue.
+    device : torch.device
+        Where the network runs.
+    batch_size : int, optional
+        Sequences per forward pass. Default 32.
+    batch_algorithm : {'default', 'size-collect', 'pad-n-pack'}, optional
+        ``'pad-n-pack'`` batches sequences of any lengths together, each batch
+        padded to its longest and packed so that the padding has no effect;
+        ``'size-collect'`` batches only sequences of the same length, which
+        need no padding, so a length that appears once is a batch of one.
+        ``'default'`` (the default) is pad-n-pack, or size-collect on PyTorch
+        older than 1.11, which has no pad-n-pack.
+    show_progress_bar : bool, optional
+        Show a progress bar over the batches (pad-n-pack) or the lengths
+        (size-collect). Default False.
+
+    Returns
+    -------
+    list of numpy.ndarray
+        One array per sequence, in order: ``(1, number_of_classes)`` for a
+        many-to-one network, and ``(1, len(sequence), number_of_classes)`` for a
+        many-to-many network.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If the architecture or batch algorithm is not valid.
+    """
+    if architecture not in (_SEQUENCE_ARCHITECTURE, _RESIDUE_ARCHITECTURE):
+        raise SparrowException(f"Unknown network architecture '{architecture}' (expected 'MtO' or 'MtM')")
+    batch_algorithm = resolve_batch_algorithm(batch_algorithm)
+
+    outputs = [None] * len(sequences)
+
+    if batch_algorithm == "size-collect":
+        # the positions of the sequences of each length, lengths in order of first appearance
+        positions_by_length = {}
+        for position, seq in enumerate(sequences):
+            positions_by_length.setdefault(len(seq), []).append(position)
+
+        lengths = tqdm(positions_by_length) if show_progress_bar else positions_by_length
+        for length in lengths:
+            for batch in DataLoader(positions_by_length[length], batch_size=batch_size, shuffle=False):
+                batch_positions = batch.tolist()
+                batch_outputs = _run_same_length(
+                    network, [sequences[position] for position in batch_positions], device
+                )
+                for position, output in zip(batch_positions, batch_outputs):
+                    outputs[position] = output
+        return outputs
+
+    # torch declares DataLoader(dataset: Dataset[_T_co]) nominally, but a map-style
+    # dataset only needs __len__/__getitem__, which a list has (isinstance([],
+    # Dataset) is False). cast(Dataset, ...) would also silence this; the directive
+    # is preferred because ty reports unused-ignore-comment if the stub is ever
+    # fixed, whereas a cast would silently outlive it.
+    batches = DataLoader(
+        list(range(len(sequences))),  # ty: ignore[invalid-argument-type]
+        batch_size=batch_size,
+        shuffle=False,
+    )
+    batches = tqdm(batches) if show_progress_bar else batches
+    for batch in batches:
+        batch_positions = batch.tolist()
+        batch_outputs = _run_packed(
+            network, [sequences[position] for position in batch_positions], architecture, device
+        )
+        for position, output in zip(batch_positions, batch_outputs):
+            outputs[position] = output
+    return outputs
+
+
+def predict_many(
+    network,
+    sequences,
+    *,
+    version=None,
+    batch_size=DEFAULT_BATCH_SIZE,
+    gpuid=DEFAULT_GPU_ID,
+    batch_algorithm=DEFAULT_BATCH_ALGORITHM,
+    show_progress_bar=False,
+):
+    """Predict many sequences with one of sparrow's networks, by name.
+
+    Parameters
+    ----------
+    network : str
+        One of :data:`~sparrow.predictors.NETWORK_PREDICTORS`.
+    sequences : list of str
+        Valid amino acid sequences.
+    version : str, int or None, optional
+        The network version. Default None, the predictor's default.
+    batch_size : int, optional
+        Sequences per forward pass. Default 32.
+    gpuid : int, optional
+        The CUDA device, where CUDA is available. Default 0.
+    batch_algorithm : {'default', 'size-collect', 'pad-n-pack'}, optional
+        As for :func:`run_network`. Default ``'default'``.
+    show_progress_bar : bool, optional
+        Show a progress bar over the batches. Default False.
+
+    Returns
+    -------
+    list
+        One prediction per sequence, in order, as the network's predictor
+        makes it for one sequence.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If ``network`` is not one of sparrow's networks.
+    """
+    from sparrow.predictors import load_network_predictor
+
+    if version is not None:
+        version = str(version)
+    predictor = load_network_predictor(network, version=version, device=device_for(gpuid))
+    return predictor.predict_many(
+        sequences,
+        batch_size=batch_size,
+        batch_algorithm=batch_algorithm,
+        show_progress_bar=show_progress_bar,
+    )
 
 
 # ....................................................................................
@@ -22,16 +353,17 @@ from sparrow.data.configs import MIN_LENGTH_ALBATROSS_RE_RG
 #
 def prepare_model(network, version, gpuid):
     """
-    Given a predictor name and version, load the network weights and parameters
+    Given a network name and version, load the network weights and parameters
     to the appropriate device.
 
     Parameters
     ----------
     network : str
-        Name of the network you want to predict
+        One of :data:`~sparrow.predictors.NETWORK_PREDICTORS`.
 
-    version : int
-        The version of the network you want to use for predictions
+    version : int or str or None
+        The version of the network you want to use for predictions; None for
+        the predictor's default.
 
     gpuid : int
         Index of the CUDA device to load the network onto. Only used when CUDA is
@@ -48,54 +380,11 @@ def prepare_model(network, version, gpuid):
         An exception is raised if there is no weights file corresponding to the
         network and version requested.
     """
-    # Check if GPU is available
-    if torch.cuda.is_available():
-        device = torch.device(f"cuda:{gpuid}")
-    else:
-        device = torch.device("cpu")
+    from sparrow.predictors import load_network_predictor
 
-    # the batch predictors are all many-to-one (per-sequence) polymer networks;
-    # the shared loader owns the torch.load + hyper-parameter inference logic
-    relative_path = f"networks/{network}/{network}_network_v{version}.pt"
-    model, _meta = load_parrot_network(relative_path, architecture="MtO", device=device)
-
-    # inference only: disable dropout/batchnorm-style training behaviour (the
-    # ALBATROSS networks have no dropout, so this does not change outputs)
-    model.eval()
-
-    return (device, model)
-
-
-# ....................................................................................
-#
-#
-def __size_filter(inseqs):
-    """
-    Helper function that breaks down sequences into groups
-    where all sequences are the same size. Used as part of the
-    size-collect algorithm.
-
-    Parameters
-    ---------------
-    inseqs : list
-        List of amino acid sequencs
-
-    Returns
-    ---------------
-    dict
-        Returns a dictionary where keys are sequence length and
-        values are a list of sequences where all seqs are same length
-    """
-
-    retdict = {}
-
-    for s in inseqs:
-        if len(s) not in retdict:
-            retdict[len(s)] = []
-
-        retdict[len(s)].append(s)
-
-    return retdict
+    device = device_for(gpuid)
+    predictor = load_network_predictor(network, version=None if version is None else str(version), device=device)
+    return (device, predictor.network)
 
 
 # ....................................................................................
@@ -144,9 +433,9 @@ def __short_seq_fix(
     protein_objs,
     batch_size: int,
     network: Optional[str] = None,
-    version: int = 2,
-    gpuid: int = 0,
-    batch_algorithm: str = "default",
+    version=None,
+    gpuid: int = DEFAULT_GPU_ID,
+    batch_algorithm: str = DEFAULT_BATCH_ALGORITHM,
     return_seq2prediction: bool = False,
     show_progress_bar: bool = True,
 ):
@@ -177,33 +466,14 @@ def __short_seq_fix(
     network : str
         Must be either 'rg' or 're'
 
-    version : int, optional
-        Network version number, by default 2
+    version : int, str or None, optional
+        Network version number, by default None, the network's default
 
     gpuid : int, optional
         GPU ID to use for predictions, by default 0
 
     batch_algorithm : str
-        Selector which defines the approach used to batch processes
-        the sequences. Must be one of the following:
-
-        'default' - Selects either of the following two algorithms,
-                    prefering pad-n-pack if verison of torch allows
-
-        'size-collect' - Break sequences into groups where all
-                         sequences within a group are the same
-                         size, and then pass these grouped sequences
-                         into the device. This is available in all
-                         versions of torch, and gives the best performance
-                         for very large sequence sets or sets where there
-                         are many sequences of the same length.
-
-        'pad-n-pack' - Pad each mixed-length batch to its longest member and
-                       use pack_padded_sequence so the padding does not affect
-                       the result. Only available in PyTorch 1.11.0+. Provides
-                       true mixed-length batching and is typically much faster
-                       when sequence lengths vary; it is the default on modern
-                       PyTorch.
+        As for :func:`batch_predict`.
 
     return_seq2prediction : bool
         Flag which, if set to true, means the return from this function is
@@ -224,7 +494,7 @@ def __short_seq_fix(
 
     """
 
-    if network not in ["rg", "re"]:
+    if network not in _SCALED_COUNTERPARTS:
         raise SparrowException("__short_seq_fix() requires the network to be 'rg' or 're'")
 
     short_seqs = {}
@@ -265,7 +535,7 @@ def __short_seq_fix(
         return_dict1 = batch_predict(
             short_seqs,
             batch_size=batch_size,
-            network=f"scaled_{network}",
+            network=_SCALED_COUNTERPARTS[network],
             version=version,
             gpuid=gpuid,
             batch_algorithm=batch_algorithm,
@@ -351,15 +621,15 @@ def __short_seq_fix(
 def batch_predict(
     protein_objs,
     network: Optional[str] = None,
-    batch_size: int = 32,
-    version: int = 2,
-    gpuid: int = 0,
-    batch_algorithm="default",
+    batch_size: int = DEFAULT_BATCH_SIZE,
+    version=None,
+    gpuid: int = DEFAULT_GPU_ID,
+    batch_algorithm=DEFAULT_BATCH_ALGORITHM,
     return_seq2prediction: bool = False,
     show_progress_bar: bool = True,
     safe: bool = True,
 ) -> dict:
-    """Perform batch predictions with a PARROT network in sparrow.
+    """Perform batch predictions with one of sparrow's networks.
 
     Input can be either a dictionary or a list.
 
@@ -406,6 +676,11 @@ def batch_predict(
     network is preferable, setting safe=False will over-ride this
     option, although we do not recommend this.
 
+    Each prediction is what the network's predictor makes for one sequence -
+    for the ALBATROSS networks, the value ``Protein.predictor`` returns - from
+    the network's output for that sequence in a batch, which can differ from
+    its output for the sequence alone by about 1e-7 relative, the precision of
+    the networks' 32-bit arithmetic.
 
     Parameters
     ----------
@@ -415,24 +690,39 @@ def batch_predict(
         strings or sparrow.protein.Protein objects.
 
     network : str
-        The name of the network you wish to predict, by default None
-        Currently implemented options include:
+        The name of the network to predict with, by default None. One of
+        these, which give one value per sequence (the ALBATROSS networks) or
+        one per residue:
 
-            "rg"
-            "re",
-            "prefactor",
-            "asphericity",
-            "scaling_exponent",
-            "scaled_re",
-            "scaled_rg"
+        * ``"rg"``, ``"scaled_rg"`` - the radius of gyration, in Angstroms
+        * ``"re"``, ``"scaled_re"`` - the end-to-end distance, in Angstroms
+        * ``"asphericity"``, ``"prefactor"``, ``"scaling_exponent"``
+        * ``"dssp"`` - the probability of helix, extended and coil at each
+          residue, an array of shape ``(len(sequence), 3)``
+        * ``"transmembrane"`` - the predicted class of each residue
+        * ``"mitochondrial_targeting"`` - 1 in a predicted targeting
+          sequence, else 0; only the first 168 residues are predicted
+        * ``"nes"``, ``"nls"``, ``"tad"`` - the probability that each residue
+          is in a nuclear export signal, a nuclear import signal or a
+          transactivation domain
+        * ``"pscore"`` - the phase-separation propensity of each residue, on
+          its native 0-6 scale
+        * ``"ser_phosphorylation"``, ``"thr_phosphorylation"``,
+          ``"tyr_phosphorylation"`` - the probability that each residue is
+          phosphorylated
+
+        The ``Protein.predictor`` methods return these, or values made from
+        them: ``pscore()`` rescales to 0-1 by default, and the phosphorylation
+        and DSSP methods apply their thresholds.
 
     batch_size : int
         The batch size to use for network forward pass.
         This should be <= the batch size used during training.
         Default = 32.
 
-    version : int, optional
-        Network version number, by default 2 (released May 21st 2023).
+    version : int, str or None, optional
+        Network version, by default None, the network's default (2 for the
+        ALBATROSS networks, released May 21st 2023).
 
     gpuid : int, optional
         GPU ID to use for predictions, by default 0
@@ -487,6 +777,7 @@ def batch_predict(
     SparrowException
         An exception is raised if the requested network is not one of the available options.
     """
+    from sparrow.predictors import NETWORK_PREDICTORS
 
     ## ------------------------------------------------------------------------------------
     ##
@@ -494,24 +785,17 @@ def batch_predict(
     ##
 
     # check a valid network was passed
-    if network not in ["rg", "re", "prefactor", "asphericity", "scaling_exponent", "scaled_re", "scaled_rg"]:
-        raise SparrowException("For option 'network': Please choose a valid network for batch predictions")
-
-    # check a valid batch_algo was passed
-    if batch_algorithm not in ["default", "size-collect", "pad-n-pack"]:
+    if network not in NETWORK_PREDICTORS:
         raise SparrowException(
-            "For option 'batch_algorithm': Please choose a valid batch algorithm, one of 'default', 'size-collect', 'pad-n-pack"
+            f"For option 'network': Please choose a valid network for batch predictions, one of {list(NETWORK_PREDICTORS)}"
         )
 
-    # pad-n-pack relies on pack_padded_sequence, only available in PyTorch 1.11.0+
-    if batch_algorithm == "pad-n-pack" and VERSION_PACKAGE.parse(torch.__version__) < VERSION_PACKAGE.parse("1.11.0"):
-        raise SparrowException(
-            "For option 'batch_algorithm': pad-n-pack is only available in PyTorch 1.11.0 or higher. Please use 'default' or 'size-collect'"
-        )
+    # check a valid batch algorithm was passed, before anything is run
+    resolve_batch_algorithm(batch_algorithm)
 
     # if we've requested to use rg/re predictions, this function ensures short sequences are appropriately
     # dealt with (this is a recurisve function that calls batch_predict)
-    if network in ["rg", "re"] and safe:
+    if network in _SCALED_COUNTERPARTS and safe:
         return __short_seq_fix(
             protein_objs,
             batch_size=batch_size,
@@ -522,14 +806,6 @@ def batch_predict(
             return_seq2prediction=return_seq2prediction,
             show_progress_bar=show_progress_bar,
         )
-
-    # resolve 'default' to a concrete algorithm: prefer pad-n-pack on modern
-    # PyTorch (true mixed-length batching), falling back to size-collect otherwise
-    if batch_algorithm == "default":
-        if VERSION_PACKAGE.parse(torch.__version__) >= VERSION_PACKAGE.parse("1.11.0"):
-            batch_algorithm = "pad-n-pack"
-        else:
-            batch_algorithm = "size-collect"
 
     ## ------------------------------------------------------------------------------------
     ##
@@ -581,95 +857,18 @@ def batch_predict(
     ## Perform prediction
     ##
 
-    pred_dict = {}
-    device, model = prepare_model(network, version, gpuid)
-    model.to(device)
-
-    if batch_algorithm == "size-collect":
-        # size-collect means we systematically subdivide the sequences into groups
-        # where they're all the same length in a given megabatch, meaning we don't
-        # need to pad. This works well in earlier version or torch, but is not optimal
-        # in that the effective batch size ends up being 1 for every uniquely-lengthed
-        # sequence.
-
-        # build a dictionary where keys are sequence length
-        # and values is a list of sequences of that exact length
-        size_filtered = __size_filter(sequence_list)
-
-        loop_range = tqdm(size_filtered) if show_progress_bar else size_filtered
-
-        # for local_size in tqdm(size_filtered):
-        for local_size in loop_range:
-            local_seqs = size_filtered[local_size]
-
-            seq_loader = DataLoader(local_seqs, batch_size=batch_size, shuffle=False)
-
-            for batch in seq_loader:
-                # Pad the sequence vector to have the same length as the longest sequence in the batch
-                seqs_padded = pad_sequence([encode_sequence.one_hot(seq).float() for seq in batch], batch_first=True)
-
-                # Move padded sequences to device
-                seqs_padded = seqs_padded.to(device)
-
-                # inference only: torch.no_grad() avoids building the autograd
-                # graph, cutting memory and time without changing the result
-                with torch.no_grad():
-                    outputs = model(seqs_padded).cpu().numpy()
-
-                for j, seq in enumerate(batch):
-                    pred_dict[seq] = outputs[j][0]
-
-    elif batch_algorithm == "pad-n-pack":
-        # pad-n-pack batches mixed-length sequences together: each batch is padded
-        # to its longest member and packed with pack_padded_sequence so the padding
-        # does not contribute to the LSTM state. This mirrors BRNN_MtO.forward
-        # exactly -- it decodes the concatenated final hidden states (h_n) of the
-        # last forward and reverse layers -- but on the packed input, so every
-        # sequence's output is computed from its true final timestep.
-        # torch declares DataLoader(dataset: Dataset[_T_co]) nominally, but a
-        # map-style dataset only needs __len__/__getitem__, which a list has
-        # (isinstance([], Dataset) is False). cast(Dataset, ...) would also silence
-        # this; the directive is preferred because ty reports unused-ignore-comment
-        # if the stub is ever fixed, whereas a cast would silently outlive it.
-        seq_loader = DataLoader(
-            sequence_list,  # ty: ignore[invalid-argument-type]
-            batch_size=batch_size,
-            shuffle=False,
-        )
-
-        loop_range = tqdm(seq_loader) if show_progress_bar else seq_loader
-
-        for batch in loop_range:
-            # one-hot encode and pad to the longest sequence in this batch
-            seqs_padded = pad_sequence(
-                [encode_sequence.one_hot(seq).float() for seq in batch],
-                batch_first=True,
-            ).to(device)
-
-            # lengths must be a CPU tensor for pack_padded_sequence
-            lengths = torch.tensor([len(seq) for seq in batch])
-
-            # enforce_sorted=False lets us pass an unsorted batch; the LSTM still
-            # returns h_n in the original (input) order
-            packed = pack_padded_sequence(seqs_padded, lengths, batch_first=True, enforce_sorted=False)
-
-            with torch.no_grad():
-                _, (h_n, _) = model.lstm(packed)
-                # concat final hidden state of the last forward (-2) and reverse
-                # (-1) layers, then decode -- identical to BRNN_MtO.forward
-                final_outs = torch.cat((h_n[-2], h_n[-1]), dim=-1)
-                outputs = model.fc(final_outs).cpu().numpy()
-
-            for j, seq in enumerate(batch):
-                pred_dict[seq] = outputs[j][0]
-
-    else:
-        raise SparrowException("Invalid batch_algorithm passed")
-
-    # finally, if using a scaled network re-multiply by np.sqrt(N)
-    if network in ["scaled_re", "scaled_rg"]:
-        for s in pred_dict:
-            pred_dict[s] = pred_dict[s] * np.sqrt(len(s))
+    # every sequence is run, in input order, as it always has been; a sequence that
+    # appears twice gets the prediction from its last appearance
+    predictions = predict_many(
+        network,
+        sequence_list,
+        version=version,
+        batch_size=batch_size,
+        gpuid=gpuid,
+        batch_algorithm=batch_algorithm,
+        show_progress_bar=show_progress_bar,
+    )
+    pred_dict = dict(zip(sequence_list, predictions))
 
     if return_seq2prediction:
         return pred_dict

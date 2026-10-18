@@ -30,4 +30,16 @@ class NESPredictor(BaseNetworkPredictor):
         list of float
             Per-residue probability of being in an NES.
         """
-        return outputs.per_residue_class1_probability(self._raw_predict(seq), self.number_of_classes)
+        return self.predict(seq)
+
+    def _from_raw(self, seq, raw):
+        """The prediction for a sequence, from the network's raw output for it.
+
+        See :meth:`~sparrow.predictors.base.BaseNetworkPredictor._from_raw`.
+
+        Returns
+        -------
+        list of float
+            The probability that each residue is in a nuclear export signal.
+        """
+        return outputs.per_residue_class1_probability(raw, self.number_of_classes)

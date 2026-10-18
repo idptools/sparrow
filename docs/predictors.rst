@@ -81,7 +81,7 @@ The reason to make a separate package (directory) for every predictor is that if
 
 * rename the class (``MyPropertyPredictor``) and its method (``predict_my_property``);
 * set ``NETWORK_PATH`` -- a ``{version}`` template for the weights file under ``sparrow/data/`` (here ``"networks/my_property/my_property_network_v{version}.pt"``) -- and ``DEFAULT_VERSION``, the version loaded when none is asked for;
-* reduce PARROT's prediction to what the predictor should return, in ``predict_my_property``. For a regression network, ``self._predict(seq)`` gives one value per residue, or a one-element array for a ``sequence`` network; for a classification network it gives the probability of each class (per residue, or for the sequence).
+* reduce PARROT's prediction to what the predictor should return, in ``_from_raw``. For a regression network, PARROT's prediction is one value per residue, or a one-element array for a ``sequence`` network; for a classification network it is the probability of each class (per residue, or for the sequence).
 
 The whole template is:
 
@@ -91,7 +91,9 @@ The whole template is:
 ``sparrow/tests/test_predictors_parrot2.py`` runs this template, with only its weights path changed, on per-residue and per-sequence networks saved by PARROT 2, so it is known to work as written.
 
 .. note::
-   Every network sparrow currently ships was trained with PARROT 1, which saved only a BRNN's weights. Those predictors (for example ``sparrow/predictors/rg/radius_of_gyration_predictor.py``) also declare ``ARCHITECTURE`` -- ``"MtO"`` for one value per sequence or ``"MtM"`` for one per residue -- and turn the raw network output from ``self._raw_predict(seq)`` into a result with a helper from :mod:`sparrow.predictors.outputs`. A network saved by PARROT 2 records its architecture, so new predictors need neither.
+   Every network sparrow currently ships was trained with PARROT 1, which saved only a BRNN's weights. Those predictors (for example ``sparrow/predictors/rg/radius_of_gyration_predictor.py``) also declare ``ARCHITECTURE`` -- ``"MtO"`` for one value per sequence or ``"MtM"`` for one per residue -- and their ``_from_raw`` turns the network's raw output into a result with a helper from :mod:`sparrow.predictors.outputs`. A network saved by PARROT 2 records its architecture, so new predictors need neither.
+
+The predictor's ``_from_raw`` is the one place its prediction is made, from the network's output: ``predict(seq)`` calls it for one sequence, and ``predict_many(sequences)`` for many, run through the network in batches - many times faster than one at a time. A network saved by PARROT 2 is run in batches by PARROT's own ``Predictor.predict_batch``, and one saved by PARROT 1 by sparrow's batch harness, :func:`~sparrow.predictors.batch_predictor.run_network`; either way the predictor is called the same way, so nobody using it needs to know which PARROT trained it. Batching needs a PARROT 2 recent enough to have ``predict_batch``, and sparrow refuses to load a network saved by PARROT 2 with an earlier development version, saying how to update it.
 
 Once this is done, it's worth seeing if you can import and run predictions using this class as a stand-alone predictor i.e. you should be able to do::
 
@@ -118,13 +120,13 @@ This class generates an object which is accessible in Protein object under the `
   p.predictor.<predictor function>
 
 
-As such, to finally make a new predictor accessible, ``sparrow.predictors.Predictor`` class should be edited to add a new function which is simply the name of the prediction (e.g. ``dssp``, ``transmembrane`` etc). This function should do three things:
+As such, to finally make a new predictor accessible, three small edits to ``sparrow/predictors/__init__.py`` are needed:
 
-1. It should UPON BEING CALLED import the predictor package you just created.
-2. It should then perform the prediction on the underlying protein sequence
-3. It should (ideally) memoize the outcome into a local dictionary that means if the same prediction is called again it is simply referenced rather than recomputed.
+1. Register the network in ``NETWORK_PREDICTORS``, under a short name, with the module and class of your predictor: ``"my_property": ("sparrow.predictors.my_property.my_property_predictor", "MyPropertyPredictor")``. The module is imported only when the network is first used, so an unused predictor costs nothing.
+2. Add a method to the ``Predictor`` class, named for the prediction (e.g. ``my_property``), that reads the network's prediction with ``self._prediction("my_property", recompute)`` and returns it - wrapped in ``copy_of``, so that a caller who changes the result cannot change the cache - or a value made from it. ``_prediction`` runs the network on first use and caches its prediction, so the network runs once for a sequence, whatever its methods are asked.
+3. Add the method to ``METHOD_NETWORKS``, with the network's name. That is what lets :func:`sparrow.batch` predict it for a whole batch at once, and ``batch_predict(sequences, network="my_property")`` runs it from the registration alone.
 
-Rather than going into the details here, the underlying code and example should make this clear. Notably, see ``dssp_helicity()`` and ``transmembrane_regions()`` for good examples of PARROT-based predictors.
+``transmembrane_regions()`` is the simplest example, and ``dssp_helicity()`` one that makes its result from the prediction with options of its own.
 
 One important thing is to document these predictors clearly. In particular:
 

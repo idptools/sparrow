@@ -1,3 +1,5 @@
+import numpy as np
+
 from sparrow.sparrow_exceptions import SparrowException
 
 
@@ -118,3 +120,48 @@ def return_hits(seq, phospho_probability, target_res, windowsize=4, threshold=0.
                 return_list.append(0)
 
         return return_list
+
+
+def phosphorylation_result(
+    seq, phospho_probability, target_res, raw_values=False, return_sites_only=False, windowsize=4, threshold=0.6
+):
+    """A phosphorylation predictor's result, made from its per-residue probabilities.
+
+    The phosphorylation networks predict the probability that each residue is
+    phosphorylated; everything the predictors return is made from that, here,
+    whether the probability was predicted for this sequence alone or in a
+    batch.
+
+    Parameters
+    ----------
+    seq : str
+        Upper-case amino acid sequence.
+    phospho_probability : list of float
+        The probability that each residue is phosphorylated.
+    target_res : str
+        The residue the predictor is for: ``'S'``, ``'T'`` or ``'Y'``.
+    raw_values : bool, optional
+        Return the probabilities themselves, as an array. Default False.
+    return_sites_only : bool, optional
+        Return only the positions of the predicted phosphosites. Default False.
+    windowsize : int, optional
+        As for :func:`return_hits`. Default 4.
+    threshold : float, optional
+        As for :func:`return_hits`. Default 0.6.
+
+    Returns
+    -------
+    numpy.ndarray or list
+        The probabilities if ``raw_values``; a list of site positions if
+        ``return_sites_only``; otherwise a binary mask array, 1 at each
+        predicted phosphosite.
+    """
+    if raw_values:
+        return np.array(phospho_probability)
+
+    if return_sites_only:
+        return return_hits(
+            seq, phospho_probability, target_res, windowsize=windowsize, threshold=threshold, return_sites_only=True
+        )
+
+    return np.array(return_hits(seq, phospho_probability, target_res, windowsize=windowsize, threshold=threshold))

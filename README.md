@@ -91,7 +91,7 @@ proteins = read_fasta("my_fasta_file.fasta")   # {header: Protein}
 
 ### Many sequences at once
 
-For fifty sequences or fifty thousand, `sparrow.batch` makes a `Protein` for each, with the values you name already computed, so reading them back costs nothing. A name is the path you would read the value back by, and on its own it uses its method's defaults; to give it arguments, pair it with them in a dict. Where sparrow can compute a value for a whole batch at once — the 20 scalar properties, the ALBATROSS polymer dimensions, the NARDINI scrambles — it does, and anything else is computed one protein at a time, by the method itself:
+For fifty sequences or fifty thousand, `sparrow.batch` makes a `Protein` for each, with the values you name already computed, so reading them back costs nothing. A name is the path you would read the value back by, and on its own it uses its method's defaults; to give it arguments, pair it with them in a dict. Where sparrow can compute a value for a whole batch at once — the 20 scalar properties, every deep-learning prediction, the NARDINI scrambles — it does, and anything else is computed one protein at a time, by the method itself:
 
 ```python
 import sparrow
@@ -102,7 +102,7 @@ proteins["IDR1"].kappa                              # already computed
 proteins = sparrow.batch(sequences, ["FCR", {"charge_at_pH": {"pH": 6.0}}, {"nardini.vector": {"seed": 42}}], n_processes=8)
 ```
 
-It takes a dict or a list of sequences or `Protein` objects, or the path to a FASTA file, and returns the same shape (a dict keyed by header, for a file). On the 6,067 yeast proteins, all 20 scalar properties take 0.46 s this way, against 2.8 s one `Protein` at a time, and the five ALBATROSS polymer dimensions for 2,000 of them 28 s on a CPU, against 227 s. See [the guide](https://idptools-sparrow.readthedocs.io/en/latest/api_guides/many_sequences.html).
+It takes a dict or a list of sequences or `Protein` objects, or the path to a FASTA file, and returns the same shape (a dict keyed by header, for a file). On the 6,067 yeast proteins, all 20 scalar properties take 0.46 s this way, against 2.8 s one `Protein` at a time; for 300 of them, all 21 deep-learning predictions — the ALBATROSS polymer dimensions, DSSP, transmembrane regions, localization signals, transactivation domains, PScore, phosphorylation, and metapredict's disorder and pLDDT — take 10.8 s on a CPU, against 103 s. See [the guide](https://idptools-sparrow.readthedocs.io/en/latest/api_guides/many_sequences.html).
 
 When you want arrays rather than `Protein` objects — a feature matrix, say — the functions underneath return them. Every `Protein` property is calculated by a batch function in `sparrow.properties`, which takes a list of sequences and returns one value per sequence. `compute()` gives any of them by their `Protein` name — the same values, to the last bit, without making a `Protein` for each sequence:
 
@@ -140,7 +140,7 @@ Rg and Re can be predicted with the `use_scaled` flag, which uses networks train
 
 ### Batch predictions
 
-Batch mode predicts thousands of sequences in seconds; this parallelizes particularly well on CUDA GPUs but is also a large speed-up on CPUs. `sparrow.batch(sequences, ["predictor.radius_of_gyration"])` uses it for you and returns `Protein` objects; call `batch_predict` yourself for the predictions alone. A batch prediction agrees with a single-sequence one to about 1e-7 relative, the precision of the networks' 32-bit arithmetic.
+Batch mode predicts thousands of sequences in seconds, with any of sparrow's networks — the ALBATROSS networks, with one value per sequence, and the per-residue networks for DSSP, transmembrane regions, mitochondrial targeting, nuclear export and import signals, transactivation domains, PScore and phosphorylation. This parallelizes particularly well on CUDA GPUs but is also a large speed-up on CPUs: over 300 yeast proteins, 7 to 16 times faster for each network. `sparrow.batch(sequences, ["predictor.radius_of_gyration"])` uses it for you and returns `Protein` objects; call `batch_predict` yourself for the predictions alone. A batch prediction agrees with a single-sequence one to the precision of the networks' 32-bit arithmetic — about 1e-7 relative for the ALBATROSS values — because a batch is summed in a different order.
 
 ```python
 from sparrow.predictors.batch_predictor import batch_predict
@@ -151,8 +151,7 @@ sequences = {"p1": "MKYLAAYLLL...", "p2": "GRGRGGYGG...", "p3": "QQQQAASS..."}
 results = batch_predict(sequences, network="re")
 ```
 
-Networks available  for batch predict are: `rg`, `scaled_rg`, `re`, `scaled_re`, `prefactor`,
-`scaling_exponent`, `asphericity`. As with single-sequence predictions, we
+Networks available for batch predict are: `rg`, `scaled_rg`, `re`, `scaled_re`, `prefactor`, `scaling_exponent`, `asphericity`, `dssp`, `transmembrane`, `mitochondrial_targeting`, `nes`, `nls`, `tad`, `pscore`, `ser_phosphorylation`, `thr_phosphorylation` and `tyr_phosphorylation`. As with single-sequence predictions, we
 **strongly recommend the `scaled_rg` and `scaled_re` networks**. Note that with the
 default `safe=True`, the `rg` and `re` networks automatically hand sequences shorter
 than 35 residues to their scaled counterparts.

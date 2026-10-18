@@ -10,10 +10,13 @@ Where sparrow has a function that computes a value for a whole batch at once,
 ``batch`` uses it:
 
 * the 20 scalar properties, with :func:`sparrow.properties.compute`;
-* the ALBATROSS polymer dimensions - ``predictor.radius_of_gyration``,
-  ``end_to_end_distance``, ``asphericity``, ``prefactor`` and
-  ``scaling_exponent``, and the ``polymeric.predicted_*`` values that read
-  them - with :func:`sparrow.predictors.batch_predictor.batch_predict`;
+* every deep-learning prediction - the ALBATROSS polymer dimensions, DSSP,
+  transmembrane regions, mitochondrial targeting, nuclear export and import
+  signals, transactivation domains, PScore and phosphorylation - with the
+  batch harness, :func:`~sparrow.predictors.batch_predictor.run_network`, and the
+  ``polymeric.predicted_*`` values that read the ALBATROSS predictions;
+* metapredict's disorder, disorder domains and pLDDT, with metapredict's own
+  batch functions;
 * the scrambles behind ``nardini.vector``, ``patterning``, ``gin_cluster`` and
   ``gin_report``, with :func:`sparrow.nardini.batch.nardini_proteins`, in
   several processes.
@@ -31,7 +34,7 @@ from collections.abc import Hashable, Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any, NoReturn
 
-from sparrow.predictors import ALBATROSS_NETWORKS
+from sparrow.predictors import BATCH_METHODS
 from sparrow.properties import PROPERTY_NAMES
 from sparrow.protein import Protein
 from sparrow.sparrow_exceptions import SparrowException
@@ -63,9 +66,6 @@ _READS = {
 # The NARDINI methods that read a scrambled result, which batch computes for the
 # whole batch with nardini_proteins. composition does not scramble.
 _NARDINI_SCRAMBLED = ("vector", "patterning", "gin_cluster", "gin_report")
-
-# The arguments of a polymer-dimension method that choose its network
-_NETWORK_ARGUMENTS = ("use_scaled", "safe")
 
 SequencesInput = str | os.PathLike[str] | Mapping[Hashable, str | Protein] | Iterable[str | Protein]
 ArgumentsInput = Mapping[str, Any] | None
@@ -206,13 +206,13 @@ def batch(
             batched.setdefault(cache_key(read.name, read.every_argument), read)
 
     properties = [request for request in batched.values() if _is_scalar_property(request)]
-    networks = [request for request in batched.values() if _is_albatross(request)]
+    predicted = [request for request in batched.values() if _is_predicted(request)]
     scrambled = [request for request in batched.values() if _is_scrambled(request)]
 
     if properties:
         _compute_properties(proteins, properties)
-    if networks:
-        _predict_albatross(proteins, networks, show_progress=show_progress, batch_size=batch_size, gpuid=gpuid)
+    if predicted:
+        _predict(proteins, predicted, show_progress=show_progress, batch_size=batch_size, gpuid=gpuid)
     if scrambled:
         _score_nardini(proteins, scrambled, n_processes=n_processes, show_progress=show_progress)
 
@@ -221,7 +221,7 @@ def batch(
     # itself, so it needs nothing more.
     for request in requests:
         is_vector = request.accessor == "nardini" and request.attribute == "vector"
-        stored = _is_scalar_property(request) or _is_albatross(request) or is_vector
+        stored = _is_scalar_property(request) or _is_predicted(request) or is_vector
         if not stored:
             _compute_one_at_a_time(proteins, request, show_progress=show_progress)
 
@@ -521,8 +521,8 @@ def _is_scalar_property(request: _Request) -> bool:
     return request.accessor is None and request.attribute in PROPERTY_NAMES
 
 
-def _is_albatross(request: _Request) -> bool:
-    """Whether :func:`~sparrow.predictors.batch_predictor.batch_predict` computes this value.
+def _is_predicted(request: _Request) -> bool:
+    """Whether this is a deep-learning prediction, which is made for the whole batch at once.
 
     Parameters
     ----------
@@ -532,9 +532,10 @@ def _is_albatross(request: _Request) -> bool:
     Returns
     -------
     bool
-        True if it is an ALBATROSS polymer dimension.
+        True if it is a ``Predictor`` method that reads a network's prediction
+        or metapredict's.
     """
-    return request.accessor == "predictor" and request.attribute in ALBATROSS_NETWORKS
+    return request.accessor == "predictor" and request.attribute in BATCH_METHODS
 
 
 def _is_scrambled(request: _Request) -> bool:
@@ -574,7 +575,7 @@ def _compute_properties(proteins: list[Protein], requests: list[_Request]) -> No
             protein._store(name, value)
 
 
-def _predict_albatross(
+def _predict(
     proteins: list[Protein],
     requests: list[_Request],
     *,
@@ -582,45 +583,48 @@ def _predict_albatross(
     batch_size: int | None,
     gpuid: int | None,
 ) -> None:
-    """Predict polymer dimensions for the whole batch, and store each protein's prediction.
+    """Make the predictions the requested methods read for the whole batch, and store each protein's.
 
-    Each protein's method chooses its network by the sequence's length as well
-    as its arguments, so the batch is split by the network each protein would
-    run, and each network predicts its share in one call.
+    Each ``Predictor`` method says which prediction it reads for a sequence -
+    a network's, or metapredict's - and how to make that for many sequences at
+    once (:meth:`~sparrow.predictors.Predictor._source`). The radius of
+    gyration and the end-to-end distance read a different network for a short
+    sequence than for a long one, so each prediction is made once, for every
+    protein that reads it, and stored where its methods look. A prediction a
+    protein already has is not made again.
 
     Parameters
     ----------
     proteins : list of sparrow.protein.Protein
         The batch.
     requests : list of _Request
-        ALBATROSS polymer-dimension methods.
+        ``Predictor`` methods that read a prediction.
     show_progress : bool
-        Show a progress bar for each network.
+        Show a progress bar for each prediction.
     batch_size, gpuid : int or None
-        Passed to ``batch_predict`` unless None.
+        Passed on unless None.
     """
-    from sparrow.predictors.batch_predictor import batch_predict
-
-    options: dict[str, Any] = {"show_progress_bar": show_progress}
-    if batch_size is not None:
-        options["batch_size"] = batch_size
-    if gpuid is not None:
-        options["gpuid"] = gpuid
-
+    # each prediction, with how to make it and the proteins that need it
+    pending: dict[Hashable, tuple[Any, list[Protein]]] = {}
     for request in requests:
-        network_arguments = {
-            name: request.every_argument[name] for name in _NETWORK_ARGUMENTS if name in request.every_argument
-        }
-        networks = [protein.predictor._network(request.attribute, **network_arguments) for protein in proteins]
+        for protein in proteins:
+            source = protein.predictor._source(request.attribute, request.every_argument)
+            if source is None or protein.predictor._has(source.key):
+                continue
+            members = pending.setdefault(source.key, (source, []))[1]
+            # a protein given twice, or asked for twice, needs the prediction once
+            if not any(member is protein for member in members):
+                members.append(protein)
 
-        for network in dict.fromkeys(networks):
-            members = [protein for protein, chosen in zip(proteins, networks) if chosen == network]
-            # each protein's network is already chosen, so batch_predict must not reroute short sequences
-            predictions = batch_predict(
-                [protein.sequence for protein in members], network=network, safe=False, **options
-            )
-            for index, protein in enumerate(members):
-                protein.predictor._store(network, predictions[index][1])
+    for key, (source, members) in pending.items():
+        predictions = source.predict_many(
+            [protein.sequence for protein in members],
+            batch_size=batch_size,
+            gpuid=gpuid,
+            show_progress=show_progress,
+        )
+        for protein, prediction in zip(members, predictions):
+            protein.predictor._store(key, prediction)
 
 
 def _score_nardini(

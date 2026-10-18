@@ -1,7 +1,7 @@
 import numpy as np
-from parrot import encode_sequence
 
 from sparrow.predictors.base import BaseNetworkPredictor
+from sparrow.sparrow_exceptions import SparrowException
 
 
 """
@@ -47,6 +47,86 @@ def softmax(v):
     return (np.e**v) / np.sum(np.e**v)
 
 
+def classes_from_probability(probability, threshold=0.5, minlen=5):
+    """Binary per-residue classes from the probability of one DSSP class.
+
+    A residue whose probability is above ``threshold`` is in the class, but
+    only within a contiguous run of such residues longer than ``minlen``;
+    shorter runs are set to 0. The DSSP predictors classify helix, extended and
+    coil this way, from probabilities predicted for one sequence or a batch.
+
+    Parameters
+    ----------
+    probability : sequence of float
+        The probability of the class at each residue.
+    threshold : float, optional
+        The probability a residue must exceed, between 0 and 1. Default 0.5.
+    minlen : int, optional
+        A run must be longer than this to count, at least 1. Default 5.
+
+    Returns
+    -------
+    numpy.ndarray
+        1 for each residue in the class, else 0.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If ``threshold`` is not between 0 and 1, or ``minlen`` is below 1.
+    """
+    if threshold < 0 or threshold > 1:
+        raise SparrowException("Threshold must be between 0 and 1")
+    if minlen < 1:
+        raise SparrowException("Minlen must be 1 or greater")
+
+    binary_helicity = [1 if x > threshold else 0 for x in probability]
+
+    if binary_helicity[0] == 1:
+        inside = True
+        counter = 0
+    else:
+        inside = False
+        counter = 0
+
+    return_list = []
+
+    # for each binarized residue
+    for i in binary_helicity:
+        # if we're inside a region
+        if inside:
+            # if still inside...
+            if i == 1:
+                counter = counter + 1
+
+            # if breaking the region
+            else:
+                if counter > minlen:
+                    return_list.extend([1] * counter)
+                else:
+                    return_list.extend([0] * counter)
+
+                # also add a '0' for this element
+                return_list.append(0)
+
+                # reset counters for next region
+                inside = False
+                counter = 0
+
+        # if we're outside a region
+        else:
+            if i == 1:
+                counter = counter + 1
+                inside = True
+            else:
+                return_list.append(0)
+    if inside:
+        if counter > minlen:
+            return_list.extend([1] * counter)
+        else:
+            return_list.extend([0] * counter)
+    return np.array(return_list)
+
+
 class DSSPPredictor(BaseNetworkPredictor):
     """
 
@@ -80,15 +160,8 @@ class DSSPPredictor(BaseNetworkPredictor):
 
         """
 
-        # convert sequence to uppercase
-        seq = seq.upper()
-
-        # Convert to one-hot sequence vector
-        seq_vector = encode_sequence.one_hot(seq)
-        seq_vector = seq_vector.view(1, len(seq_vector), -1)  # formatting
-
         # Forward pass  -this is specific for classication
-        prediction = self.network(seq_vector.float()).detach().numpy()
+        prediction = self._raw_predict(seq)
         int_vals = []
         for row in prediction[0]:
             int_vals.append(np.argmax(row))
@@ -117,18 +190,21 @@ class DSSPPredictor(BaseNetworkPredictor):
 
         """
 
-        # convert sequence to uppercase
-        seq = seq.upper()
+        return self.predict(seq)
 
-        # Convert to one-hot sequence vector
-        seq_vector = encode_sequence.one_hot(seq)
-        seq_vector = seq_vector.view(1, len(seq_vector), -1)  # formatting
+    def _from_raw(self, seq, raw):
+        """The probability of each DSSP class at each residue, from the network's raw output.
 
-        prediction = self.network(seq_vector.float()).detach().numpy().flatten()
-        prediction = prediction.reshape(-1, self.number_of_classes)
-        prediction = np.array(list(map(softmax, prediction)))
+        See :meth:`~sparrow.predictors.base.BaseNetworkPredictor._from_raw`.
 
-        return prediction
+        Returns
+        -------
+        numpy.ndarray
+            ``(len(seq), 3)``: the probability of helix (column 0), extended
+            (1) and coil (2) at each residue.
+        """
+        prediction = raw.flatten().reshape(-1, self.number_of_classes)
+        return np.array(list(map(softmax, prediction)))
 
     # .................................................................................
     #
@@ -155,21 +231,13 @@ class DSSPPredictor(BaseNetworkPredictor):
 
         """
 
-        # defensive programming
-        if threshold < 0 or threshold > 1:
-            raise Exception("Threshold myst be between 0 and 1")
-
-        # defensive programming
-        if minlen < 1:
-            raise Exception("Minlen must be 1 or greater")
-
         tmp = self.predict_helical_probability(seq)
+        classes = classes_from_probability(tmp, threshold, minlen)
 
         if return_probability is True:
-            return (self.__binarize_probabilities(tmp, threshold, minlen), tmp)
+            return (classes, tmp)
 
-        else:
-            return self.__binarize_probabilities(tmp, threshold, minlen)
+        return classes
 
     # .................................................................................
     #
@@ -196,21 +264,13 @@ class DSSPPredictor(BaseNetworkPredictor):
 
         """
 
-        # defensive programming
-        if threshold < 0 or threshold > 1:
-            raise Exception("Threshold myst be between 0 and 1")
-
-        # defensive programming
-        if minlen < 1:
-            raise Exception("Minlen must be 1 or greater")
-
         tmp = self.predict_extended_probability(seq)
+        classes = classes_from_probability(tmp, threshold, minlen)
 
         if return_probability is True:
-            return (self.__binarize_probabilities(tmp, threshold, minlen), tmp)
+            return (classes, tmp)
 
-        else:
-            return self.__binarize_probabilities(tmp, threshold, minlen)
+        return classes
 
     # .................................................................................
     #
@@ -237,21 +297,13 @@ class DSSPPredictor(BaseNetworkPredictor):
 
         """
 
-        # defensive programming
-        if threshold < 0 or threshold > 1:
-            raise Exception("Threshold myst be between 0 and 1")
-
-        # defensive programming
-        if minlen < 1:
-            raise Exception("Minlen must be 1 or greater")
-
         tmp = self.predict_coil_probability(seq)
+        classes = classes_from_probability(tmp, threshold, minlen)
 
         if return_probability is True:
-            return (self.__binarize_probabilities(tmp, threshold, minlen), tmp)
+            return (classes, tmp)
 
-        else:
-            return self.__binarize_probabilities(tmp, threshold, minlen)
+        return classes
 
     # .................................................................................
     #
@@ -319,62 +371,3 @@ class DSSPPredictor(BaseNetworkPredictor):
         """
         probs = self.predict_dssp_probabilities(seq)
         return probs.transpose()[2]
-
-    # .................................................................................
-    #
-    #
-    def __binarize_probabilities(self, helical_probability, threshold=0.5, minlen=5):
-        """
-        Internal function for binarizing probabilities with
-        Takes an array of probabilities over all residues in a sequence. Assigns
-        a binary helical label to each residue with a probability above the
-        specificed threshold 'thresh'. Any residues above the threshold which
-        are not in a contiguous stretch of residues at or about the length
-        threshold 'minlen' are set to 0.
-        """
-        binary_helicity = [1 if x > threshold else 0 for x in helical_probability]
-
-        if binary_helicity[0] == 1:
-            inside = True
-            counter = 0
-        else:
-            inside = False
-            counter = 0
-
-        return_list = []
-
-        # for each binarized residue
-        for i in binary_helicity:
-            # if we're inside a region
-            if inside:
-                # if still inside...
-                if i == 1:
-                    counter = counter + 1
-
-                # if breaking the region
-                else:
-                    if counter > minlen:
-                        return_list.extend([1] * counter)
-                    else:
-                        return_list.extend([0] * counter)
-
-                    # also add a '0' for this element
-                    return_list.append(0)
-
-                    # reset counters for next region
-                    inside = False
-                    counter = 0
-
-            # if we're outside a region
-            else:
-                if i == 1:
-                    counter = counter + 1
-                    inside = True
-                else:
-                    return_list.append(0)
-        if inside:
-            if counter > minlen:
-                return_list.extend([1] * counter)
-            else:
-                return_list.extend([0] * counter)
-        return np.array(return_list)

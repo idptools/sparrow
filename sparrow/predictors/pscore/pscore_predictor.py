@@ -29,4 +29,16 @@ class PScorePredictor(BaseNetworkPredictor):
         numpy.ndarray
             Flattened network output.
         """
-        return self._raw_predict(seq).flatten()
+        return self.predict(seq)
+
+    def _from_raw(self, seq, raw):
+        """The prediction for a sequence, from the network's raw output for it.
+
+        See :meth:`~sparrow.predictors.base.BaseNetworkPredictor._from_raw`.
+
+        Returns
+        -------
+        numpy.ndarray
+            The PScore of each residue, on its native 0-6 scale.
+        """
+        return raw.flatten()

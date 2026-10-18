@@ -30,4 +30,16 @@ class ScalingExponentPredictor(BaseNetworkPredictor):
         float
             Predicted scaling exponent.
         """
-        return outputs.scalar_regression(self._raw_predict(seq))
+        return self.predict(seq)
+
+    def _from_raw(self, seq, raw):
+        """The prediction for a sequence, from the network's raw output for it.
+
+        See :meth:`~sparrow.predictors.base.BaseNetworkPredictor._from_raw`.
+
+        Returns
+        -------
+        float
+            The predicted scaling exponent.
+        """
+        return outputs.scalar_regression(raw)

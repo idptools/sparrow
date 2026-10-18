@@ -5,20 +5,31 @@ covers those. These tests build small PARROT 2 networks at test time (untrained:
 loading and predicting do not depend on the weights being any good), save them
 as PARROT 2 does, and check that the template in
 sparrow/predictors/predictor_template.py, with only its weights path changed,
-predicts exactly what PARROT 2's own Predictor does. They are skipped when
-PARROT 2 is not installed, except the one that checks the error in that case.
+predicts exactly what PARROT 2's own Predictor does, one sequence at a time and
+in batches, and that a network registered as docs/predictors.rst describes runs
+in batch_predict and sparrow.batch as a network saved by PARROT 1 does. They are
+skipped when PARROT 2 is not installed, except those that do not need it.
 """
 
 import importlib.util
 import sys
+import types
 
 import numpy as np
 import pytest
 import torch
 
-from sparrow.predictors.network_loader import PARROT2_INSTALL_COMMAND, load_parrot_network
+import sparrow
+import sparrow.batching
+from sparrow import Protein
+from sparrow.predictors import METHOD_NETWORKS, NETWORK_PREDICTORS
+from sparrow.predictors import Predictor as ProteinPredictor
+from sparrow.predictors.base import BaseNetworkPredictor
+from sparrow.predictors.batch_predictor import DEFAULT_BATCH_SIZE, batch_predict
+from sparrow.predictors.network_loader import PARROT2_INSTALL_COMMAND, _parrot2_device_type, load_parrot_network
 from sparrow.predictors.rg.radius_of_gyration_predictor import RgPredictor
 from sparrow.sparrow_exceptions import SparrowException
+from sparrow.tools.utilities import copy_of
 
 # The module that reads PARROT 2 checkpoints, which PARROT 1 does not have
 PARROT2_MODULE = "parrot.checkpoint"
@@ -34,6 +45,21 @@ WEIGHTS_SEED = 7
 ONE_HOT_WIDTH = 20
 
 SEQUENCES = ["MEEEKKKKSSSTTTDDDGRGRGYYPQ", "ACDEFGHIKLMNPQRSTVWY" * 3, "GSGSGS"]
+
+#: The sequences predicted in batches; the first appears twice.
+BATCHED_SEQUENCES = [*SEQUENCES, SEQUENCES[0]]
+
+#: How far a prediction made in a batch may be from one made alone. They differ
+#: at the precision of the networks' 32-bit arithmetic, because a batch is
+#: summed in a different order: by at most 1.2e-6 for these networks, over 200
+#: random sequences of 5 to 400 residues.
+BATCH_ABSOLUTE_TOLERANCE = 1e-5
+
+#: The name a test network is registered under, as a contributor would register
+#: theirs, and the module and class its predictor is put in.
+REGISTERED_NETWORK = "my_property"
+REGISTERED_MODULE = "registered_parrot2_predictor"
+REGISTERED_CLASS = "RegisteredPredictor"
 
 #: (architecture, datatype, number of classes, hyperparameters) of each test
 #: network. The sequence BRNN with no hyperparameters given has PARROT 2's default
@@ -75,6 +101,31 @@ def filled_in_template(weights_path_template):
     return FilledIn
 
 
+def register_network(tmp_path, monkeypatch):
+    """Save a PARROT 2 network and register it in sparrow as docs/predictors.rst says to, until the test ends."""
+    save_parrot2_network(tmp_path / "network_v1.pt", "brnn", "residues", 1, {})
+
+    # the predictor module a contributor would add
+    module = types.ModuleType(REGISTERED_MODULE)
+    setattr(module, REGISTERED_CLASS, filled_in_template(str(tmp_path / "network_v{version}.pt")))
+    monkeypatch.setitem(sys.modules, REGISTERED_MODULE, module)
+
+    # 1. the network, in NETWORK_PREDICTORS
+    monkeypatch.setitem(NETWORK_PREDICTORS, REGISTERED_NETWORK, (REGISTERED_MODULE, REGISTERED_CLASS))
+
+    # 2. the Protein.predictor method that reads it
+    def my_property(self, recompute=False):
+        """My property at each residue."""
+        return copy_of(self._prediction(REGISTERED_NETWORK, recompute))
+
+    monkeypatch.setattr(ProteinPredictor, REGISTERED_NETWORK, my_property, raising=False)
+
+    # 3. the method, in METHOD_NETWORKS, and so in the BATCH_METHODS sparrow.batching
+    # built from it when it was imported
+    monkeypatch.setitem(METHOD_NETWORKS, REGISTERED_NETWORK, REGISTERED_NETWORK)
+    monkeypatch.setattr(sparrow.batching, "BATCH_METHODS", (*sparrow.batching.BATCH_METHODS, REGISTERED_NETWORK))
+
+
 @requires_parrot2
 @pytest.mark.parametrize("name", list(NETWORKS))
 def test_the_template_predicts_what_parrot2_does(tmp_path, name):
@@ -93,6 +144,70 @@ def test_the_template_predicts_what_parrot2_does(tmp_path, name):
         expected = reference.predict(sequence)
         assert prediction.dtype == expected.dtype
         np.testing.assert_array_equal(prediction, expected)
+
+
+@requires_parrot2
+@pytest.mark.parametrize("name", list(NETWORKS))
+def test_the_template_predicts_many_as_parrot2_does(tmp_path, name):
+    from parrot import Predictor
+
+    architecture, datatype, num_classes, hyperparameters = NETWORKS[name]
+    save_parrot2_network(tmp_path / "network_v1.pt", architecture, datatype, num_classes, hyperparameters)
+
+    predictor = filled_in_template(str(tmp_path / "network_v{version}.pt"))()
+    reference = Predictor(tmp_path / "network_v1.pt")
+
+    batched = predictor.predict_many(BATCHED_SEQUENCES)
+    expected = reference.predict_batch(BATCHED_SEQUENCES, batch_size=DEFAULT_BATCH_SIZE)
+    assert len(batched) == len(BATCHED_SEQUENCES)
+    for sequence, prediction, expected_prediction in zip(BATCHED_SEQUENCES, batched, expected):
+        assert prediction.dtype == expected_prediction.dtype
+        np.testing.assert_array_equal(prediction, expected_prediction)
+        alone = predictor.predict(sequence)
+        assert prediction.shape == alone.shape
+        np.testing.assert_allclose(prediction, alone, rtol=0, atol=BATCH_ABSOLUTE_TOLERANCE)
+
+
+@requires_parrot2
+def test_a_registered_parrot2_network_runs_in_batches_like_any_other(tmp_path, monkeypatch):
+    register_network(tmp_path, monkeypatch)
+    alone = [Protein(sequence).predictor.my_property() for sequence in BATCHED_SEQUENCES]
+
+    by_name = batch_predict(BATCHED_SEQUENCES, network=REGISTERED_NETWORK, show_progress_bar=False)
+    proteins = sparrow.batch(BATCHED_SEQUENCES, ["predictor.my_property"])
+
+    def fail(*args, **kwargs):
+        raise AssertionError("a prediction sparrow.batch made was made again")
+
+    # what sparrow.batch predicted is read, not predicted again
+    monkeypatch.setattr(BaseNetworkPredictor, "predict", fail)
+    monkeypatch.setattr(BaseNetworkPredictor, "predict_many", fail)
+
+    assert list(by_name) == list(range(len(BATCHED_SEQUENCES)))
+    for index, sequence in enumerate(BATCHED_SEQUENCES):
+        assert by_name[index][0] == sequence
+        np.testing.assert_allclose(by_name[index][1], alone[index], rtol=0, atol=BATCH_ABSOLUTE_TOLERANCE)
+        from_batch = proteins[index].predictor.my_property()
+        np.testing.assert_allclose(from_batch, alone[index], rtol=0, atol=BATCH_ABSOLUTE_TOLERANCE)
+
+
+@requires_parrot2
+def test_a_bad_batch_algorithm_is_refused_for_a_parrot2_network_too(tmp_path):
+    save_parrot2_network(tmp_path / "network_v1.pt", "brnn", "residues", 1, {})
+    predictor = filled_in_template(str(tmp_path / "network_v{version}.pt"))()
+    with pytest.raises(SparrowException, match="batch_algorithm"):
+        predictor.predict_many(SEQUENCES, batch_algorithm="all-at-once")
+
+
+@requires_parrot2
+def test_a_parrot2_without_predict_batch_says_to_update_it(tmp_path, monkeypatch):
+    from parrot.py_predictor import Predictor
+
+    save_parrot2_network(tmp_path / "network.pt", "brnn", "residues", 1, {})
+    monkeypatch.delattr(Predictor, "predict_batch")  # as in earlier development versions
+    with pytest.raises(SparrowException, match="predict_batch") as error:
+        load_parrot_network(str(tmp_path / "network.pt"))
+    assert PARROT2_INSTALL_COMMAND in str(error.value)
 
 
 @requires_parrot2
@@ -138,8 +253,20 @@ def test_a_device_index_is_refused_for_a_parrot2_network(tmp_path):
     from sparrow.predictors.network_loader import _load_parrot2_network
 
     save_parrot2_network(tmp_path / "network.pt", "brnn", "residues", 1, {})
-    with pytest.raises(SparrowException, match="device index"):
+    with pytest.raises(SparrowException, match="current CUDA device"):
         _load_parrot2_network(str(tmp_path / "network.pt"), "cuda:1")
+
+
+def test_the_current_cuda_device_can_be_named_by_index(monkeypatch):
+    # as on a machine with CUDA, whose current device is cuda:0: what sparrow asks
+    # for by default there (gpuid=0), and what PARROT runs 'cuda' on
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "current_device", lambda: 0)
+    assert _parrot2_device_type("cuda:0") == "cuda"
+    assert _parrot2_device_type(torch.device("cuda")) == "cuda"
+    assert _parrot2_device_type("cpu") == "cpu"
+    with pytest.raises(SparrowException, match="current CUDA device"):
+        _parrot2_device_type("cuda:1")
 
 
 def test_a_parrot1_network_is_not_run_through_parrot2():

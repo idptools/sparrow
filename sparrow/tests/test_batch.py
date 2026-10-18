@@ -12,6 +12,8 @@ from sparrow import Protein
 from sparrow.batching import _available_names
 from sparrow.data.amino_acids import AA_hydro_KD
 from sparrow.nardini.table import FeatureVector
+from sparrow.predictors import BATCH_METHODS
+from sparrow.predictors.base import BaseNetworkPredictor
 from sparrow.properties import PROPERTY_NAMES
 from sparrow.sparrow_exceptions import SparrowException
 
@@ -23,16 +25,14 @@ SEQUENCES = {
     "long": "MKYLAAYLLLNAAGNTPDATKIKAILESVGIEIEDEKVSSVLSALEGKSVDELITEGNEKLAAVPAAGPASAGGAAAASGDAAAEEEKEEEAAEESDDDMGFGLFD",
 }
 
-# a prediction made in a batch differs from one made alone by the precision of
-# the networks' 32-bit arithmetic
-ALBATROSS_RELATIVE_TOLERANCE = 1e-6
-ALBATROSS_NAMES = [
-    "predictor.radius_of_gyration",
-    "predictor.end_to_end_distance",
-    "predictor.asphericity",
-    "predictor.prefactor",
-    "predictor.scaling_exponent",
-]
+# A prediction made in a batch differs from one made alone by the precision of
+# the networks' 32-bit arithmetic: about 1e-7 relative for a single value, and,
+# for per-residue values rounded to a few decimal places (metapredict's to 4,
+# the signal, domain and phosphorylation probabilities to 5), up to one rounded
+# place, relative to the largest value
+PREDICTION_RELATIVE_TOLERANCE = 1e-6
+PREDICTION_ABSOLUTE_TOLERANCE = 2e-4
+PREDICTION_NAMES = [f"predictor.{method}" for method in BATCH_METHODS]
 
 # few scrambles, so the NARDINI tests are quick; a seed, so they are reproducible
 NARDINI_ARGUMENTS = {"seed": 1, "num_scrambles": 50}
@@ -68,11 +68,26 @@ def read_back(protein, name, arguments):
     return value(**arguments)
 
 
+def assert_close_prediction(first, second, name):
+    """Assert two predictions are equal to the precision a batch keeps (see above)."""
+    batched, alone = np.asarray(first, dtype=float), np.asarray(second, dtype=float)
+    assert batched.shape == alone.shape, name
+    if batched.ndim == 0:
+        assert np.isclose(batched, alone, rtol=PREDICTION_RELATIVE_TOLERANCE, atol=0), name
+        return
+    scale = max(1.0, float(np.max(np.abs(alone)))) if alone.size else 1.0
+    assert np.allclose(
+        batched, alone, rtol=PREDICTION_RELATIVE_TOLERANCE, atol=PREDICTION_ABSOLUTE_TOLERANCE * scale
+    ), name
+
+
 def assert_same(first, second, name):
-    """Assert two values are equal: anything built from an ALBATROSS prediction to
-    the networks' precision, everything else exactly."""
-    from_albatross = name in ALBATROSS_NAMES or name.startswith("polymeric.predicted")
-    if isinstance(first, FeatureVector):
+    """Assert two values are equal: a deep-learning prediction, or anything built
+    from one, to the precision a batch keeps; everything else exactly."""
+    from_prediction = name in PREDICTION_NAMES or name.startswith("polymeric.predicted")
+    if from_prediction and not isinstance(first, (dict, FeatureVector)):
+        assert_close_prediction(first, second, name)
+    elif isinstance(first, FeatureVector):
         assert np.array_equal(first.values, second.values), name
     elif dataclasses.is_dataclass(first):
         assert_same(dataclasses.asdict(first), dataclasses.asdict(second), name)
@@ -84,16 +99,15 @@ def assert_same(first, second, name):
         assert len(first) == len(second), name
         for one, other in zip(first, second):
             assert_same(one, other, name)
-    elif from_albatross:
-        # a distribution is compared relative to its peak, where its precision is set
-        scale = np.max(np.abs(second))
-        assert np.allclose(
-            first, second, rtol=ALBATROSS_RELATIVE_TOLERANCE, atol=ALBATROSS_RELATIVE_TOLERANCE * scale
-        ), name
     elif isinstance(first, np.ndarray):
         assert np.array_equal(first, second), name
     else:
         assert first == second, name
+
+
+def fail(*args, **kwargs):
+    """Stands in for anything a test says must not be called."""
+    raise AssertionError("called where it should not have been")
 
 
 # .................................................................
@@ -287,13 +301,13 @@ def test_the_scalar_properties_are_computed_once_for_the_whole_batch(monkeypatch
     assert len(calls) == 1
 
 
-@pytest.mark.parametrize("name", ALBATROSS_NAMES)
-def test_the_albatross_predictions_are_each_proteins_own(name):
+@pytest.mark.parametrize("name", PREDICTION_NAMES)
+def test_each_prediction_is_each_proteins_own(name):
     proteins = sparrow.batch(SEQUENCES, [name])
     for key, sequence in SEQUENCES.items():
         batched = read_back(proteins[key], name, {})
         alone = read_back(Protein(sequence), name, {})
-        assert type(batched) is type(alone)
+        assert type(batched) is type(alone), name
         assert_same(batched, alone, name)
 
 
@@ -304,19 +318,78 @@ def test_each_sequence_uses_the_network_its_method_would(arguments):
     for key, sequence in SEQUENCES.items():
         batched = proteins[key].predictor.radius_of_gyration(**arguments)
         alone = Protein(sequence).predictor.radius_of_gyration(**arguments)
-        assert np.isclose(batched, alone, rtol=ALBATROSS_RELATIVE_TOLERANCE, atol=0), key
+        assert np.isclose(batched, alone, rtol=PREDICTION_RELATIVE_TOLERANCE, atol=0), key
 
 
-def test_reading_a_batch_prediction_loads_no_network(monkeypatch):
-    proteins = sparrow.batch(SEQUENCES, ALBATROSS_NAMES)
+def test_reading_a_batch_prediction_runs_nothing(monkeypatch):
+    from metapredict import meta
 
-    def fail(*args, **kwargs):
-        raise AssertionError("a network was loaded to read a prediction already made")
+    proteins = sparrow.batch(SEQUENCES, PREDICTION_NAMES)
 
+    # no network is loaded, and metapredict is not called, to read what was made in the batch
     monkeypatch.setattr("sparrow.predictors.base.load_parrot_network", fail)
+    for function_name in ("predict_disorder", "predict_disorder_domains", "predict_pLDDT"):
+        monkeypatch.setattr(meta, function_name, fail)
     for protein in proteins.values():
-        for name in ALBATROSS_NAMES:
+        for name in PREDICTION_NAMES:
             read_back(protein, name, {})
+
+
+def test_each_network_runs_once_for_the_whole_batch(monkeypatch):
+    calls = []
+    real_predict_many = BaseNetworkPredictor.predict_many
+
+    def counting_predict_many(self, sequences, **options):
+        calls.append((type(self).__name__, len(sequences)))
+        return real_predict_many(self, sequences, **options)
+
+    monkeypatch.setattr(BaseNetworkPredictor, "predict_many", counting_predict_many)
+    # and no protein predicts for itself
+    monkeypatch.setattr(BaseNetworkPredictor, "predict", fail)
+
+    names = [
+        "predictor.dssp_helicity",
+        "predictor.dssp_coil",
+        {"predictor.dssp_extended": {"mode": "probability"}},
+        "predictor.serine_phosphorylation",
+        {"predictor.serine_phosphorylation": {"raw_values": True}},
+        "predictor.radius_of_gyration",
+    ]
+    proteins = sparrow.batch(SEQUENCES, names)
+    # DSSP once and serine phosphorylation once, whatever was asked of them, and the
+    # scaled Rg network once, for all three sequences
+    assert sorted(calls) == [
+        ("DSSPPredictor", 3),
+        ("ScaledRgPredictor", 3),
+        ("SerPhosphorylationPredictor", 3),
+    ]
+    for protein in proteins.values():
+        protein.predictor.dssp_extended(threshold=0.3)
+        protein.predictor.serine_phosphorylation(return_sites_only=True)
+
+
+def test_metapredict_runs_once_for_each_set_of_options(monkeypatch):
+    from metapredict import meta
+
+    calls = []
+    real_predict_disorder = meta.predict_disorder
+
+    def counting_predict_disorder(sequences, **options):
+        calls.append(len(sequences))
+        return real_predict_disorder(sequences, **options)
+
+    monkeypatch.setattr(meta, "predict_disorder", counting_predict_disorder)
+    monkeypatch.setattr(meta, "predict_disorder_domains", fail)
+    names = [
+        "predictor.disorder",
+        "predictor.disorder_domains",
+        "predictor.binary_disorder",
+        {"predictor.binary_disorder": {"disorder_threshold": 0.3}},
+    ]
+    sparrow.batch(SEQUENCES, names)
+    # disorder and disorder_domains read metapredict's defaults; binary_disorder
+    # reads its own arguments, which here are two sets
+    assert calls == [3, 3, 3]
 
 
 def test_a_prediction_already_made_is_kept():
@@ -327,10 +400,8 @@ def test_a_prediction_already_made_is_kept():
 
 
 def test_the_polymeric_predictions_read_the_batch_predictions(monkeypatch):
-    def fail(*args, **kwargs):
-        raise AssertionError("a protein ran its own network")
-
-    monkeypatch.setattr("sparrow.predictors.base.load_parrot_network", fail)
+    # no protein predicts for itself during the batch
+    monkeypatch.setattr(BaseNetworkPredictor, "predict", fail)
     names = ["polymeric.predicted_rg", "polymeric.predicted_nu", "polymeric.predicted_nu_dep_end_to_end_distribution"]
     proteins = sparrow.batch(SEQUENCES, names)
     monkeypatch.undo()
@@ -339,7 +410,7 @@ def test_the_polymeric_predictions_read_the_batch_predictions(monkeypatch):
         assert np.isclose(
             proteins[key].polymeric.predicted_rg,
             Protein(sequence).polymeric.predicted_rg,
-            rtol=ALBATROSS_RELATIVE_TOLERANCE,
+            rtol=PREDICTION_RELATIVE_TOLERANCE,
             atol=0,
         )
 

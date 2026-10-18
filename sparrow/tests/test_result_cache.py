@@ -26,7 +26,6 @@ import sparrow.sequence_analysis.phospho_isoforms
 import sparrow.sequence_analysis.sequence_complexity
 from sparrow.data.amino_acids import AA_hydro_KD
 from sparrow.nardini.table import FeatureVector
-from sparrow.predictors.dssp.dssp_predictor import DSSPPredictor
 from sparrow.properties import PROPERTY_NAMES
 from sparrow.protein import Protein
 from sparrow.sequence_analysis.plugins import BasePlugin
@@ -292,28 +291,34 @@ def test_plaac_runs_once_for_the_simple_and_full_forms(monkeypatch):
     assert len(calls) == 2
 
 
-@pytest.mark.parametrize(
-    ("method", "length_argument"),
-    [
-        ("dssp_helicity", "minimum_helical_length"),
-        ("dssp_coil", "minimum_coil_length"),
-        ("dssp_extended", "minimum_extended_length"),
+# (method, arguments): calls that read one network's prediction, with different arguments
+NETWORK_READS = {
+    "dssp": [
+        ("dssp_helicity", {}),
+        ("dssp_helicity", {"mode": "both", "threshold": 0.4, "minimum_helical_length": 2}),
+        ("dssp_coil", {"mode": "probability"}),
+        ("dssp_extended", {"threshold": 0.6}),
     ],
-)
-def test_each_dssp_method_runs_the_network_once_for_its_arguments(monkeypatch, method, length_argument):
-    calls = count_calls(monkeypatch, DSSPPredictor, "predict_dssp_probabilities")
+    "ser_phosphorylation": [
+        ("serine_phosphorylation", {}),
+        ("serine_phosphorylation", {"raw_values": True}),
+        ("serine_phosphorylation", {"return_sites_only": True}),
+    ],
+    "pscore": [("pscore", {}), ("pscore", {"normalized": False})],
+}
+
+
+@pytest.mark.parametrize("network", NETWORK_READS)
+def test_a_network_runs_once_whatever_its_methods_are_asked(monkeypatch, network):
+    from sparrow.predictors import network_predictor_class
+
+    calls = count_calls(monkeypatch, network_predictor_class(network), "predict")
     protein = Protein(SEQUENCE)
-    predict = getattr(protein.predictor, method)
-    first = predict(mode="both", threshold=0.4, **{length_argument: 2})
-    assert same_value(predict(mode="both", threshold=0.4, **{length_argument: 2}), first)
-    assert len(calls) == 1
-
-    fresh = getattr(Protein(SEQUENCE).predictor, method)(mode="both", threshold=0.4, **{length_argument: 2})
-    assert same_value(first, fresh)
-
-    # a different threshold is computed again rather than given the cached classes
-    predict(mode="class", threshold=0.6, **{length_argument: 2})
-    assert len(calls) == 3
+    for method, arguments in NETWORK_READS[network]:
+        result = getattr(protein.predictor, method)(**arguments)
+        assert same_value(result, getattr(Protein(SEQUENCE).predictor, method)(**arguments)), (method, arguments)
+    # once for this protein, and once for each fresh protein compared against
+    assert len(calls) == 1 + len(NETWORK_READS[network])
 
 
 def test_nardini_composition_is_cached_by_background_and_raw(monkeypatch):
