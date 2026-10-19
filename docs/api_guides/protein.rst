@@ -211,18 +211,18 @@ Domains, motifs & isoforms
    :nosignatures:
 
    sparrow.protein.Protein.low_complexity_domains
+   sparrow.protein.Protein.low_complexity_mask
    sparrow.protein.Protein.plaac_prion_like_domains
    sparrow.protein.Protein.elms
    sparrow.protein.Protein.generate_phosphoisoforms
-   sparrow.predictors.Predictor.low_complexity_domains
 
 .. code-block:: python
 
    # LCD boundaries: [[subsequence, start, end], ...]
    p.low_complexity_domains(residue_selector="Q", minimum_length=15)
 
-   # the same call as a per-residue 1/0 mask
-   p.predictor.low_complexity_domains(residue_selector="Q")
+   # the same domains as a per-residue 1/0 mask
+   p.low_complexity_mask(residue_selector="Q", minimum_length=15)
 
    # prion-like domains via the bundled pure-Python PLAAC implementation
    p.plaac_prion_like_domains(core_length=60)

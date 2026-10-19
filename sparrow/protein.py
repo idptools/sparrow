@@ -1356,10 +1356,13 @@ class Protein:
         Parameters
         ----------
         mode : {'holt', 'holt-permissive'}
-            Extraction method (both based on the Gutierrez et al. approach).
-            ``'holt'`` counts only target residues toward an LCD; in
-            ``'holt-permissive'`` bridged interruption residues also count toward
-            the LCD length and fraction. Default is ``'holt'``.
+            What counts towards a domain's fraction (both follow Gutierrez et
+            al.). In ``'holt'`` only the residues in ``residue_selector`` count.
+            In ``'holt-permissive'`` the interruptions between them count too, so
+            every domain's fraction is 1, ``fractional_threshold`` has no effect
+            below 1, and each stretch at least ``minimum_length`` long is reported
+            whole. :meth:`low_complexity_mask` explains how the domains are found.
+            Default is ``'holt'``.
         **kwargs
             Passed through to the underlying extractor
             (:func:`sparrow.sequence_analysis.sequence_complexity.low_complexity_domains_holt`
@@ -1373,13 +1376,18 @@ class Protein:
                 Maximum number of consecutive residues NOT in ``residue_selector`` permitted
                 inside an LCD (Gutierrez et al. used 17).
             ``fractional_threshold`` : float, default 0.25
-                Minimum fraction (0-1) of residues from ``residue_selector`` required in the LCD.
+                The fraction (0-1) of the LCD's length that residues from
+                ``residue_selector`` must exceed.
 
         Returns
         -------
         list[list]
             Each LCD represented as ``[sequence, start, end]`` where ``start`` is 0-indexed
             and ``end`` is exclusive (``sequence[start:end]`` equals the LCD substring).
+
+        See Also
+        --------
+        low_complexity_mask : The same domains, as a 1 or 0 for each residue.
 
         Examples
         --------
@@ -1396,6 +1404,102 @@ class Protein:
                 self.__results[key] = sequence_complexity.low_complexity_domains_holt_permissive(
                     self.sequence, **kwargs
                 )
+
+        return utilities.copy_of(self.__results[key])
+
+    # .................................................................
+    #
+    def low_complexity_mask(self, mode="holt", **kwargs):
+        """Mark each residue as inside a low-complexity domain (1) or not (0).
+
+        The mask is :meth:`low_complexity_domains` as one value per residue:
+        called with the same arguments, a residue is 1 if it lies inside one of
+        the domains that method returns and 0 otherwise, so ``mask[start:end]``
+        is all ones for each ``[subsequence, start, end]`` domain. Like the
+        domains, it comes from the sequence's composition alone, with no
+        network involved.
+
+        A low-complexity domain (LCD) is found in three steps, following
+        Gutierrez et al. (hence the mode names, after the Holt lab):
+
+        1. The residues in ``residue_selector`` are the chosen residues. Every
+           run of more than ``max_interruption`` other residues is a break, so
+           the sequence splits into stretches, each starting and ending at a
+           chosen residue, with no run of more than ``max_interruption`` other
+           residues inside it.
+        2. In each stretch, every region that starts at the stretch's first
+           chosen residue and ends at a later one is a candidate. A candidate
+           passes if it is at least ``minimum_length`` residues long and more
+           than ``fractional_threshold`` of its length counts (see ``mode``).
+        3. The longest candidate that passes is the stretch's domain. A stretch
+           with no candidate that passes has no domain.
+
+        A domain therefore starts and ends at a chosen residue and holds at
+        least two of them, and the other residues inside it are marked 1 too.
+
+        Parameters
+        ----------
+        mode : {'holt', 'holt-permissive'}
+            What counts towards a candidate's fraction. In ``'holt'`` only the
+            chosen residues count. In ``'holt-permissive'`` the interruptions
+            between them count too, so every residue of a candidate counts, its
+            fraction is always 1, and each stretch at least ``minimum_length``
+            long is a domain in full, whatever ``fractional_threshold`` below 1
+            is. Default is ``'holt'``.
+        **kwargs
+            What defines a domain, passed through to
+            :func:`~sparrow.sequence_analysis.sequence_complexity.low_complexity_domains_holt`
+            (or :func:`~sparrow.sequence_analysis.sequence_complexity.low_complexity_domains_holt_permissive`):
+
+            ``residue_selector`` : str
+                The chosen residues, as one-letter codes, such as ``'Q'`` or
+                ``'ED'``. Required.
+            ``minimum_length`` : int, default 15
+                The shortest domain, in residues.
+            ``max_interruption`` : int, default 5
+                The longest run of other residues allowed inside a domain.
+                Gutierrez et al. used 17.
+            ``fractional_threshold`` : float, default 0.25
+                The fraction of a domain's length that must count, which it
+                must exceed.
+
+        Returns
+        -------
+        list of int
+            One value per residue, in sequence order: 1 for a residue inside a
+            low-complexity domain and 0 for one outside.
+
+        Raises
+        ------
+        sparrow.sparrow_exceptions.SparrowException
+            If ``mode`` is neither ``'holt'`` nor ``'holt-permissive'``.
+
+        See Also
+        --------
+        low_complexity_domains : The domains themselves, as ``[subsequence, start, end]``.
+
+        References
+        ----------
+        Gutierrez JI, et al. SWI/SNF senses carbon starvation with a
+        pH-sensitive low-complexity sequence. eLife. 2022;11:e70344.
+
+        Examples
+        --------
+        The A between the Qs is inside the domain, so it is marked too:
+
+        >>> from sparrow import Protein
+        >>> Protein("SSQQAQQQSS").low_complexity_mask(residue_selector="Q", minimum_length=5)
+        [0, 0, 1, 1, 1, 1, 1, 1, 0, 0]
+        """
+        key = utilities.cache_key("low_complexity_mask", mode, kwargs)
+        if key not in self.__results:
+            # low_complexity_domains checks the mode, and caches the domains
+            domains = self.low_complexity_domains(mode=mode, **kwargs)
+
+            mask = [0] * len(self.sequence)
+            for _subsequence, start, end in domains:
+                mask[start:end] = [1] * (end - start)
+            self.__results[key] = mask
 
         return utilities.copy_of(self.__results[key])
 

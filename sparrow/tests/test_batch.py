@@ -50,7 +50,7 @@ ARGUMENTS = {
     "linear_property_profile": {"mode": "hydropathy-kyte-1982"},
     "linear_sequence_profile": {"mode": "FCR"},
     "low_complexity_domains": {"residue_selector": "Q", "minimum_length": 5},
-    "predictor.low_complexity_domains": {"residue_selector": "Q", "minimum_length": 5},
+    "low_complexity_mask": {"residue_selector": "Q", "minimum_length": 5},
     "nardini.vector": NARDINI_ARGUMENTS,
     "nardini.patterning": NARDINI_ARGUMENTS,
     "nardini.gin_cluster": NARDINI_ARGUMENTS,

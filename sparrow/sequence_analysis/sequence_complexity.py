@@ -15,11 +15,14 @@ interruptions of up to 17 residues, where the default here is 5.
 The two variants differ only in what counts towards the fraction:
 :func:`low_complexity_domains_holt` counts only the chosen residues, while
 :func:`low_complexity_domains_holt_permissive` also counts the bridged
-interruptions, so it finds more and longer domains.
+interruptions, so every domain's fraction is 1, ``fractional_threshold`` has no
+effect below 1, and each stretch at least ``minimum_length`` long is reported
+whole.
 
 From a :class:`~sparrow.protein.Protein`,
 ``Protein.low_complexity_domains(mode='holt', residue_selector=...)`` (or
-``mode='holt-permissive'``) calls these.
+``mode='holt-permissive'``) calls these, and ``Protein.low_complexity_mask``
+gives the same domains as a 1 or 0 for each residue.
 """
 
 
@@ -31,8 +34,9 @@ def low_complexity_domains_holt_permissive(
 
     This is the "permissive" variant of :func:`low_complexity_domains_holt`: the
     bridged interruption residues also count towards the domain's residue count,
-    so a domain interrupted by non-selector residues clears the
-    ``fractional_threshold`` more easily and more/longer domains are reported.
+    so every residue of a domain counts and its fraction is always 1. Below 1,
+    ``fractional_threshold`` therefore has no effect, and each stretch at least
+    ``minimum_length`` long is reported whole.
 
     Parameters
     ----------

@@ -18,7 +18,7 @@ functions in ``sparrow.sequence_analysis``:
      - ``p.plaac_prion_like_domains()``
      - :mod:`sparrow.sequence_analysis.plaac.plaac`
    * - Low-complexity domains
-     - ``p.low_complexity_domains()``
+     - ``p.low_complexity_domains()``, ``p.low_complexity_mask()``
      - :mod:`sparrow.sequence_analysis.sequence_complexity`
    * - Phosphoisoforms
      - ``p.generate_phosphoisoforms()``
@@ -131,7 +131,8 @@ from the Holt lab (*eLife* 2022), hence the mode names:
 
 In ``mode='holt'`` (the default) only the chosen residues count towards the
 fraction; in ``mode='holt-permissive'`` the bridged interruptions count too, so
-more and longer domains clear the threshold:
+every domain's fraction is 1: ``fractional_threshold`` has no effect below 1, and
+each stretch at least ``minimum_length`` long is a domain in full:
 
 .. code-block:: python
 
@@ -144,6 +145,19 @@ more and longer domains clear the threshold:
    # []  - one Q in three is below the threshold
    low_complexity_domains_holt_permissive("QAAQAAQAAQAAQAAQ", "Q", minimum_length=10, fractional_threshold=0.5)
    # [['QAAQAAQAAQAAQAAQ', 0, 16]]
+
+``p.low_complexity_mask()`` takes the same arguments and gives the same domains
+as a 1 or 0 for each residue, which is easier to plot along the sequence or to
+line up with a per-residue prediction:
+
+.. code-block:: python
+
+   p = Protein("SSQQAQQQSS")
+   p.low_complexity_mask(residue_selector="Q", minimum_length=5)
+   # [0, 0, 1, 1, 1, 1, 1, 1, 0, 0]  - the A between the Qs is inside the domain
+
+:meth:`~sparrow.protein.Protein.low_complexity_mask` sets out how the domains
+are found, step by step.
 
 Phosphoisoforms
 ---------------

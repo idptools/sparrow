@@ -27,6 +27,7 @@
 
 import functools
 import importlib
+import warnings
 from collections.abc import Callable, Hashable
 from dataclasses import dataclass
 
@@ -119,6 +120,11 @@ _PSCORE_MAXIMUM = 6.0
 # for each set of its arguments, under this prefix (see _binary_disorder_key).
 _DISORDER_KEY = "metapredict-disorder"
 _PLDDT_KEY = "metapredict-pLDDT"
+
+# The name Protein.low_complexity_mask had here, before it moved to Protein since
+# it is not a prediction. The old name still works, with a DeprecationWarning,
+# for one release.
+_OLD_LOW_COMPLEXITY_MASK_NAME = "low_complexity_domains"
 
 
 def network_predictor_class(network):
@@ -346,6 +352,77 @@ class Predictor:
         # every prediction made, so that none is made twice: a network's under
         # its name (see _prediction), and metapredict's under its key
         self.__precomputed = {}
+
+    def __getattr__(self, name: str) -> Callable[..., list[int]]:
+        """Resolve ``low_complexity_domains``, now ``Protein.low_complexity_mask``, with a ``DeprecationWarning``.
+
+        Python calls this only for a name the object does not otherwise have,
+        so the old name is not listed among the predictions, by ``dir`` or by
+        :func:`sparrow.batch`.
+
+        Parameters
+        ----------
+        name : str
+            The attribute asked for.
+
+        Returns
+        -------
+        Callable[..., list[int]]
+            :meth:`_old_low_complexity_mask`, which takes the old method's
+            arguments.
+
+        Raises
+        ------
+        AttributeError
+            If ``name`` is not ``low_complexity_domains``.
+        """
+        if name != _OLD_LOW_COMPLEXITY_MASK_NAME:
+            raise AttributeError(f"{type(self).__name__!r} object has no attribute {name!r}")
+        warnings.warn(
+            "Protein.predictor.low_complexity_domains has moved to Protein.low_complexity_mask, since it is not a "
+            "prediction: call p.low_complexity_mask(residue_selector=...) instead. The old name still works, but "
+            "will be removed in a future release of sparrow.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._old_low_complexity_mask
+
+    def _old_low_complexity_mask(
+        self, residue_selector, minimum_length=15, max_interruption=5, fractional_threshold=0.25
+    ):
+        """``Protein.low_complexity_mask``, called as the old ``Predictor.low_complexity_domains`` was.
+
+        The old method took the chosen residues as its first argument and had
+        only the ``'holt'`` mode, so this passes them on by name with that mode.
+        Its defaults are the old method's, which are also those of
+        :func:`~sparrow.sequence_analysis.sequence_complexity.low_complexity_domains_holt`.
+
+        Parameters
+        ----------
+        residue_selector : str
+            The chosen residues, as one-letter codes, such as ``'Q'`` or ``'ED'``.
+        minimum_length : int
+            The shortest domain, in residues. Default is 15.
+        max_interruption : int
+            The longest run of other residues allowed inside a domain. Default
+            is 5.
+        fractional_threshold : float
+            The fraction of a domain's length its chosen residues must exceed.
+            Default is 0.25.
+
+        Returns
+        -------
+        list of int
+            1 for each residue inside a low-complexity domain and 0 for one
+            outside, as ``Protein.low_complexity_mask`` gives it.
+        """
+        return self.__protein.low_complexity_mask(
+            mode="holt",
+            residue_selector=residue_selector,
+            minimum_length=minimum_length,
+            max_interruption=max_interruption,
+            fractional_threshold=fractional_threshold,
+        )
 
     # .................................................................
     #
@@ -649,90 +726,6 @@ class Predictor:
 
     # .................................................................
     #
-    def low_complexity_domains(
-        self,
-        residue_selector,
-        minimum_length=15,
-        max_interruption=5,
-        fractional_threshold=0.25,
-    ):
-        """
-        Function that returns a binary classifier as to if a residue is in a
-        low-complexity regions. Specifically, low-complexity domains here are
-        defined based on their amino acid composition, defined by the residues
-        passed in the residue_selector.
-
-        Parameters
-        -------------
-
-        residue_selector : str
-            A string of one or more one-letter amino acid codes used to define
-            the type of residues to find in LCD. (str). For example 'Q' or 'ED' for
-            glutamic acid and aspartic acid.
-
-        minimum_length : int
-            An integer that defines the shortes possible LCD (int). Must be a
-            positive integer greater than 0. Default=15
-
-        max_interruption : int
-            An integer that defines the longest possible interruption allowed between
-            any two residues defined by the residue selector within the LCD. This is
-            related to but independent of the fractional threshold. Default = 5.
-
-        fractional_threshold : float
-            A fraction between 0 and 1 that defines the minimum fraction of amino
-            acids found in the residue selector that must be present in the LCD.
-            Note this is a strict threshold (the LCD fraction must exceed it).
-            Default = 0.25.
-
-        Returns
-        -------------
-        list
-            A list of length equal to the sequence, where each element is 1 if
-            that residue falls inside a low-complexity domain and 0 if not.
-
-        See Also
-        -------------
-        sparrow.protein.Protein.low_complexity_domains : Returns the LCD
-            boundaries and subsequences instead of a per-residue mask, and also
-            offers the 'holt-permissive' mode.
-
-        """
-
-        boundaries = self.__protein.low_complexity_domains(
-            mode="holt",
-            residue_selector=residue_selector,
-            minimum_length=minimum_length,
-            max_interruption=max_interruption,
-            fractional_threshold=fractional_threshold,
-        )
-
-        # this is where we construct our binary mask - may be a more efficient way to do this, but I think this scales
-        # as O(n*m) where n=number of residues in sequence and m is number domains and given m is typically < 10 this
-        # basically scales as a for loop over n which is not bad...
-        lcd_pos = []
-        for i in range(0, len(self.__protein.sequence)):
-            found = False
-            for d in boundaries:
-                # if i is within this IDR
-                if i >= d[1] and i < d[2]:
-                    lcd_pos.append(1)
-                    found = True
-                    break
-
-                # domains are ordered so if the position i is smaller than
-                # the end of the current domain the remaining domains are
-                # irrelevant
-                if i < d[2]:
-                    break
-
-            if found is False:
-                lcd_pos.append(0)
-
-        return lcd_pos
-
-    # .................................................................
-    #
     def disorder_domains(self, recompute=False, return_boundaries=False):
         """
         Returns per-residue binary classification for if a residue is
@@ -916,8 +909,6 @@ class Predictor:
         # this option is no longer supported by metapredict's IDR-definition
         # algorithm; warn rather than silently ignoring a value the user set
         if override_folded_domain_minsize:
-            import warnings
-
             warnings.warn(
                 "override_folded_domain_minsize is deprecated and has no effect: "
                 "metapredict's predict_disorder_domains() no longer supports it. "
@@ -1437,8 +1428,7 @@ class Predictor:
         Returns
         -------
         _Source or None
-            None for a method that reads no prediction, such as
-            :meth:`low_complexity_domains`.
+            None for a method that reads no prediction.
         """
         if method in METHOD_NETWORKS:
             network_arguments = {name: arguments[name] for name in ("use_scaled", "safe") if name in arguments}

@@ -102,6 +102,13 @@ METHOD_CALLS = [
         {"residue_selector": "Q", "minimum_length": 5},
         {"residue_selector": "S", "minimum_length": 5},
     ),
+    (
+        "low_complexity_mask",
+        sparrow.sequence_analysis.sequence_complexity,
+        "low_complexity_domains_holt",
+        {"residue_selector": "Q", "minimum_length": 5},
+        {"residue_selector": "S", "minimum_length": 5},
+    ),
     ("linear_sequence_profile", sparrow.properties.profiles, "window_profile", {"mode": "FCR"}, {"mode": "NCPR"}),
     (
         "linear_composition_profile",
@@ -125,6 +132,7 @@ CHANGEABLE_RESULTS = {
     "elms": lambda p: p.elms,
     "generate_phosphoisoforms": lambda p: p.generate_phosphoisoforms(),
     "low_complexity_domains": lambda p: p.low_complexity_domains(residue_selector="Q", minimum_length=5),
+    "low_complexity_mask": lambda p: p.low_complexity_mask(residue_selector="Q", minimum_length=5),
     "linear_sequence_profile": lambda p: p.linear_sequence_profile("FCR"),
     "linear_composition_profile": lambda p: p.linear_composition_profile(["Q"]),
     "linear_property_profile": lambda p: p.linear_property_profile("hydropathy-kyte-1982"),
