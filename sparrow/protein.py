@@ -1356,12 +1356,12 @@ class Protein:
         Parameters
         ----------
         mode : {'holt', 'holt-permissive'}
-            What counts towards a domain's fraction (both follow Gutierrez et
-            al.). In ``'holt'`` only the residues in ``residue_selector`` count.
-            In ``'holt-permissive'`` the interruptions between them count too, so
-            every domain's fraction is 1, ``fractional_threshold`` has no effect
-            below 1, and each stretch at least ``minimum_length`` long is reported
-            whole. :meth:`low_complexity_mask` explains how the domains are found.
+            Which regions can be domains (both follow Gutierrez et al.).
+            ``'holt'`` splits the sequence at every run of more than
+            ``max_interruption`` residues not in ``residue_selector``.
+            ``'holt-permissive'`` has no such limit, so ``fractional_threshold``
+            alone decides how far a domain extends.
+            :meth:`low_complexity_mask` explains how the domains are found.
             Default is ``'holt'``.
         **kwargs
             Passed through to the underlying extractor
@@ -1373,8 +1373,9 @@ class Protein:
             ``minimum_length`` : int, default 15
                 Minimum allowed LCD length.
             ``max_interruption`` : int, default 5
-                Maximum number of consecutive residues NOT in ``residue_selector`` permitted
-                inside an LCD (Gutierrez et al. used 17).
+                ``'holt'`` only: maximum number of consecutive residues NOT in
+                ``residue_selector`` permitted inside an LCD (Gutierrez et al.
+                used 17). ``'holt-permissive'`` refuses it.
             ``fractional_threshold`` : float, default 0.25
                 The fraction (0-1) of the LCD's length that residues from
                 ``residue_selector`` must exceed.
@@ -1419,33 +1420,35 @@ class Protein:
         domains, it comes from the sequence's composition alone, with no
         network involved.
 
-        A low-complexity domain (LCD) is found in three steps, following
-        Gutierrez et al. (hence the mode names, after the Holt lab):
+        A low-complexity domain (LCD) is a region rich in the residues in
+        ``residue_selector``, the chosen residues. A region is a candidate if
+        it starts and ends at a chosen residue, and it passes if it is at least
+        ``minimum_length`` residues long and its chosen residues make up more
+        than ``fractional_threshold`` of its length. The domains are found by
+        a search:
 
-        1. The residues in ``residue_selector`` are the chosen residues. Every
-           run of more than ``max_interruption`` other residues is a break, so
-           the sequence splits into stretches, each starting and ending at a
-           chosen residue, with no run of more than ``max_interruption`` other
-           residues inside it.
-        2. In each stretch, every region that starts at the stretch's first
-           chosen residue and ends at a later one is a candidate. A candidate
-           passes if it is at least ``minimum_length`` residues long and more
-           than ``fractional_threshold`` of its length counts (see ``mode``).
-        3. The longest candidate that passes is the stretch's domain. A stretch
-           with no candidate that passes has no domain.
+        1. From the first chosen residue, the candidates are the regions from
+           it to each later chosen residue.
+        2. The longest candidate that passes is a domain, and the search starts
+           again from the first chosen residue after it. If no candidate
+           passes, the search starts again from the next chosen residue.
 
-        A domain therefore starts and ends at a chosen residue and holds at
+        The two modes, which follow Gutierrez et al. (from the Holt lab, hence
+        the names), differ in where the search runs. ``'holt'`` splits the
+        sequence into stretches at every run of more than ``max_interruption``
+        other residues and searches each stretch on its own, so no domain
+        holds such a run. ``'holt-permissive'`` searches the whole sequence at
+        once, so a run of other residues of any length can sit inside a
+        domain, and ``fractional_threshold`` alone decides how far a domain
+        extends.
+
+        Either way a domain starts and ends at a chosen residue and holds at
         least two of them, and the other residues inside it are marked 1 too.
 
         Parameters
         ----------
         mode : {'holt', 'holt-permissive'}
-            What counts towards a candidate's fraction. In ``'holt'`` only the
-            chosen residues count. In ``'holt-permissive'`` the interruptions
-            between them count too, so every residue of a candidate counts, its
-            fraction is always 1, and each stretch at least ``minimum_length``
-            long is a domain in full, whatever ``fractional_threshold`` below 1
-            is. Default is ``'holt'``.
+            Where the search runs, as above. Default is ``'holt'``.
         **kwargs
             What defines a domain, passed through to
             :func:`~sparrow.sequence_analysis.sequence_complexity.low_complexity_domains_holt`
@@ -1457,11 +1460,12 @@ class Protein:
             ``minimum_length`` : int, default 15
                 The shortest domain, in residues.
             ``max_interruption`` : int, default 5
-                The longest run of other residues allowed inside a domain.
-                Gutierrez et al. used 17.
+                ``'holt'`` only: the longest run of other residues allowed
+                inside a domain. Gutierrez et al. used 17. ``'holt-permissive'``
+                refuses it.
             ``fractional_threshold`` : float, default 0.25
-                The fraction of a domain's length that must count, which it
-                must exceed.
+                The fraction of a domain's length that its chosen residues must
+                exceed.
 
         Returns
         -------
@@ -1472,7 +1476,8 @@ class Protein:
         Raises
         ------
         sparrow.sparrow_exceptions.SparrowException
-            If ``mode`` is neither ``'holt'`` nor ``'holt-permissive'``.
+            If ``mode`` is neither ``'holt'`` nor ``'holt-permissive'``, or if
+            ``max_interruption`` is given in ``'holt-permissive'`` mode.
 
         See Also
         --------

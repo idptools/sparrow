@@ -117,11 +117,11 @@ amino acid composition. *Bioinformatics.* 2014;30(17):2501-2502.
 Low-complexity domains
 ----------------------
 
-A low-complexity domain (LCD) here is a stretch made of residues from a chosen
-set, interrupted by runs of no more than ``max_interruption`` other residues, at
-least ``minimum_length`` long, and in which the chosen residues make up more than
-``fractional_threshold`` of its length. The approach follows Gutierrez et al.
-from the Holt lab (*eLife* 2022), hence the mode names:
+A low-complexity domain (LCD) here is a region rich in residues from a chosen
+set: it starts and ends at a chosen residue, is at least ``minimum_length``
+long, and the chosen residues make up more than ``fractional_threshold`` of its
+length. The approach follows Gutierrez et al. from the Holt lab (*eLife* 2022),
+hence the mode names:
 
 .. code-block:: python
 
@@ -129,10 +129,11 @@ from the Holt lab (*eLife* 2022), hence the mode names:
    p.low_complexity_domains(residue_selector="Q", minimum_length=10)
    # [['QQQQQQQQQQQQQQQQ', 13, 29]]
 
-In ``mode='holt'`` (the default) only the chosen residues count towards the
-fraction; in ``mode='holt-permissive'`` the bridged interruptions count too, so
-every domain's fraction is 1: ``fractional_threshold`` has no effect below 1, and
-each stretch at least ``minimum_length`` long is a domain in full:
+In ``mode='holt'`` (the default) a run of more than ``max_interruption`` other
+residues (5 by default; Gutierrez et al. used 17) always ends a domain. In
+``mode='holt-permissive'`` there is no such limit, so a run of any length can sit
+inside a domain, and ``fractional_threshold`` alone decides how far a domain
+extends:
 
 .. code-block:: python
 
@@ -141,10 +142,13 @@ each stretch at least ``minimum_length`` long is a domain in full:
        low_complexity_domains_holt_permissive,
    )
 
-   low_complexity_domains_holt("QAAQAAQAAQAAQAAQ", "Q", minimum_length=10, fractional_threshold=0.5)
-   # []  - one Q in three is below the threshold
-   low_complexity_domains_holt_permissive("QAAQAAQAAQAAQAAQ", "Q", minimum_length=10, fractional_threshold=0.5)
-   # [['QAAQAAQAAQAAQAAQ', 0, 16]]
+   sequence = "QQQQQQQQ" + "AAAAAAAA" + "QQQQQQQQ"
+   low_complexity_domains_holt(sequence, "Q", minimum_length=5)
+   # [['QQQQQQQQ', 0, 8], ['QQQQQQQQ', 16, 24]]  - the eight As split them
+   low_complexity_domains_holt_permissive(sequence, "Q", minimum_length=5)
+   # [['QQQQQQQQAAAAAAAAQQQQQQQQ', 0, 24]]  - 16/24 = 67% Q passes 0.25
+   low_complexity_domains_holt_permissive(sequence, "Q", minimum_length=5, fractional_threshold=0.7)
+   # [['QQQQQQQQ', 0, 8], ['QQQQQQQQ', 16, 24]]  - but not 0.7
 
 ``p.low_complexity_mask()`` takes the same arguments and gives the same domains
 as a 1 or 0 for each residue, which is easier to plot along the sequence or to
