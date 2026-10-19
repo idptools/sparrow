@@ -25,14 +25,12 @@ from tqdm import tqdm
 
 import sparrow
 from sparrow.data.configs import MIN_LENGTH_ALBATROSS_RE_RG
+from sparrow.predictors.devices import DEFAULT_DEVICE, full_float32_precision, resolve_device
 from sparrow.sparrow_exceptions import SparrowException
 
 #: Sequences per forward pass when none is given. Larger is faster on a GPU, and
 #: changes predictions only at the networks' 32-bit precision.
 DEFAULT_BATCH_SIZE = 32
-
-#: The CUDA device used when none is given, where CUDA is available.
-DEFAULT_GPU_ID = 0
 
 #: The batch algorithm used when none is given: pad-n-pack where PyTorch has it.
 DEFAULT_BATCH_ALGORITHM = "default"
@@ -57,23 +55,6 @@ _ONE_HOT_ENCODING = "onehot"
 # ....................................................................................
 #
 #
-def device_for(gpuid):
-    """The device to run networks on: CUDA device ``gpuid`` if CUDA is available, else the CPU.
-
-    Parameters
-    ----------
-    gpuid : int
-        Index of the CUDA device.
-
-    Returns
-    -------
-    torch.device
-    """
-    if torch.cuda.is_available():
-        return torch.device(f"cuda:{gpuid}")
-    return torch.device("cpu")
-
-
 def resolve_batch_algorithm(batch_algorithm):
     """The batch algorithm to use, with ``'default'`` resolved and availability checked.
 
@@ -259,24 +240,75 @@ def run_network(
         raise SparrowException(f"Unknown network architecture '{architecture}' (expected 'MtO' or 'MtM')")
     batch_algorithm = resolve_batch_algorithm(batch_algorithm)
 
+    # on an NVIDIA GPU, in full float32 precision, as PARROT 2 runs its networks
+    with full_float32_precision():
+        if batch_algorithm == "size-collect":
+            return _run_by_length(network, sequences, device, batch_size, show_progress_bar)
+        return _run_in_mixed_batches(network, sequences, architecture, device, batch_size, show_progress_bar)
+
+
+def _run_by_length(network, sequences, device, batch_size, show_progress_bar):
+    """Run a network over sequences batched by length (size-collect), for :func:`run_network`.
+
+    Parameters
+    ----------
+    network : torch.nn.Module
+        The network, on ``device``.
+    sequences : list of str
+        The sequences.
+    device : torch.device
+        Where the network runs.
+    batch_size : int
+        Sequences per forward pass.
+    show_progress_bar : bool
+        Show a progress bar over the lengths.
+
+    Returns
+    -------
+    list of numpy.ndarray
+        The output for each sequence, in order, as :func:`run_network` returns it.
+    """
     outputs = [None] * len(sequences)
 
-    if batch_algorithm == "size-collect":
-        # the positions of the sequences of each length, lengths in order of first appearance
-        positions_by_length = {}
-        for position, seq in enumerate(sequences):
-            positions_by_length.setdefault(len(seq), []).append(position)
+    # the positions of the sequences of each length, lengths in order of first appearance
+    positions_by_length = {}
+    for position, seq in enumerate(sequences):
+        positions_by_length.setdefault(len(seq), []).append(position)
 
-        lengths = tqdm(positions_by_length) if show_progress_bar else positions_by_length
-        for length in lengths:
-            for batch in DataLoader(positions_by_length[length], batch_size=batch_size, shuffle=False):
-                batch_positions = batch.tolist()
-                batch_outputs = _run_same_length(
-                    network, [sequences[position] for position in batch_positions], device
-                )
-                for position, output in zip(batch_positions, batch_outputs):
-                    outputs[position] = output
-        return outputs
+    lengths = tqdm(positions_by_length) if show_progress_bar else positions_by_length
+    for length in lengths:
+        for batch in DataLoader(positions_by_length[length], batch_size=batch_size, shuffle=False):
+            batch_positions = batch.tolist()
+            batch_outputs = _run_same_length(network, [sequences[position] for position in batch_positions], device)
+            for position, output in zip(batch_positions, batch_outputs):
+                outputs[position] = output
+    return outputs
+
+
+def _run_in_mixed_batches(network, sequences, architecture, device, batch_size, show_progress_bar):
+    """Run a network over sequences in mixed-length batches (pad-n-pack), for :func:`run_network`.
+
+    Parameters
+    ----------
+    network : torch.nn.Module
+        The network, on ``device``.
+    sequences : list of str
+        The sequences.
+    architecture : {'MtO', 'MtM'}
+        The network's architecture.
+    device : torch.device
+        Where the network runs.
+    batch_size : int
+        Sequences per forward pass.
+    show_progress_bar : bool
+        Show a progress bar over the batches.
+
+    Returns
+    -------
+    list of numpy.ndarray
+        The output for each sequence, in order, as :func:`run_network` returns it.
+    """
+    outputs = [None] * len(sequences)
 
     # torch declares DataLoader(dataset: Dataset[_T_co]) nominally, but a map-style
     # dataset only needs __len__/__getitem__, which a list has (isinstance([],
@@ -305,9 +337,10 @@ def predict_many(
     *,
     version=None,
     batch_size=DEFAULT_BATCH_SIZE,
-    gpuid=DEFAULT_GPU_ID,
+    gpuid=None,
     batch_algorithm=DEFAULT_BATCH_ALGORITHM,
     show_progress_bar=False,
+    device=DEFAULT_DEVICE,
 ):
     """Predict many sequences with one of sparrow's networks, by name.
 
@@ -321,12 +354,17 @@ def predict_many(
         The network version. Default None, the predictor's default.
     batch_size : int, optional
         Sequences per forward pass. Default 32.
-    gpuid : int, optional
-        The CUDA device, where CUDA is available. Default 0.
+    gpuid : int or None, optional
+        The NVIDIA GPU to run on; see ``device``. Default None.
     batch_algorithm : {'default', 'size-collect', 'pad-n-pack'}, optional
         As for :func:`run_network`. Default ``'default'``.
     show_progress_bar : bool, optional
         Show a progress bar over the batches. Default False.
+    device : {'auto', 'cpu', 'cuda', 'mps'} or torch.device, optional
+        Where to run the network, as PARROT's ``Predictor`` takes it (see
+        :func:`~sparrow.predictors.devices.resolve_device`). Default
+        ``'auto'``: CUDA if this machine has it (the GPU ``gpuid`` names, or
+        the current one), and the CPU otherwise.
 
     Returns
     -------
@@ -337,13 +375,14 @@ def predict_many(
     Raises
     ------
     sparrow.sparrow_exceptions.SparrowException
-        If ``network`` is not one of sparrow's networks.
+        If ``network`` is not one of sparrow's networks, or the device asked
+        for is not valid or not on this machine.
     """
     from sparrow.predictors import load_network_predictor
 
     if version is not None:
         version = str(version)
-    predictor = load_network_predictor(network, version=version, device=device_for(gpuid))
+    predictor = load_network_predictor(network, version=version, device=resolve_device(device, gpuid))
     return predictor.predict_many(
         sequences,
         batch_size=batch_size,
@@ -391,7 +430,7 @@ def _one_hot_module(predictor, network):
     return parrot_predictor.network
 
 
-def prepare_model(network, version, gpuid):
+def prepare_model(network, version=None, gpuid=None, device=DEFAULT_DEVICE):
     """
     Given a network name and version, load the network weights and parameters
     to the appropriate device.
@@ -401,36 +440,46 @@ def prepare_model(network, version, gpuid):
     encoded sequences, ``(batch, length, 20)``, it returns the network's raw
     output, ``(batch, number_of_classes)`` for a network that predicts one value
     per sequence or ``(batch, length, number_of_classes)`` for one per residue.
+    sparrow runs its networks on an NVIDIA GPU in full float32 precision; to
+    run this one as sparrow does, call it inside
+    :func:`~sparrow.predictors.devices.full_float32_precision`.
 
     Parameters
     ----------
     network : str
         One of :data:`~sparrow.predictors.NETWORK_PREDICTORS`.
 
-    version : int or str or None
-        The version of the network you want to use for predictions; None for
-        the predictor's default.
+    version : int or str or None, optional
+        The version of the network you want to use for predictions. Default
+        None, the predictor's default.
 
-    gpuid : int
-        Index of the CUDA device to load the network onto. Only used when CUDA is
-        available; otherwise the network is loaded onto the CPU.
+    gpuid : int or None, optional
+        The NVIDIA GPU to load the network onto; see ``device``. Default None.
+
+    device : {'auto', 'cpu', 'cuda', 'mps'} or torch.device, optional
+        Where to load the network, as PARROT's ``Predictor`` takes it (see
+        :func:`~sparrow.predictors.devices.resolve_device`). Default
+        ``'auto'``: CUDA if this machine has it (the GPU ``gpuid`` names, or
+        the current one), and the CPU otherwise.
 
     Returns
     -------
     tuple
-        returns the available device and the appropriately versioned network model.
+        ``(device, network)``: the ``torch.device`` the network is on, and the
+        network.
 
     Raises
     ------
     SparrowException
         An exception is raised if there is no weights file corresponding to the
-        network and version requested, or if the network was trained with
-        PARROT 2 on an encoding other than one-hot, so it cannot be run on
-        one-hot encoded sequences.
+        network and version requested, if the device asked for is not valid or
+        not on this machine, or if the network was trained with PARROT 2 on an
+        encoding other than one-hot, so it cannot be run on one-hot encoded
+        sequences.
     """
     from sparrow.predictors import load_network_predictor
 
-    device = device_for(gpuid)
+    device = resolve_device(device, gpuid)
     predictor = load_network_predictor(network, version=None if version is None else str(version), device=device)
     return (device, _one_hot_module(predictor, network))
 
@@ -482,7 +531,7 @@ def __short_seq_fix(
     batch_size: int,
     network: Optional[str] = None,
     version=None,
-    gpuid: int = DEFAULT_GPU_ID,
+    device: torch.device | None = None,
     batch_algorithm: str = DEFAULT_BATCH_ALGORITHM,
     return_seq2prediction: bool = False,
     show_progress_bar: bool = True,
@@ -517,8 +566,9 @@ def __short_seq_fix(
     version : int, str or None, optional
         Network version number, by default None, the network's default
 
-    gpuid : int, optional
-        GPU ID to use for predictions, by default 0
+    device : torch.device or None, optional
+        The device to run on, as :func:`batch_predict` resolved it. Default
+        None, which ``batch_predict`` reads as ``'auto'``.
 
     batch_algorithm : str
         As for :func:`batch_predict`.
@@ -585,7 +635,7 @@ def __short_seq_fix(
             batch_size=batch_size,
             network=_SCALED_COUNTERPARTS[network],
             version=version,
-            gpuid=gpuid,
+            device=device,
             batch_algorithm=batch_algorithm,
             return_seq2prediction=return_seq2prediction,
             show_progress_bar=show_progress_bar,
@@ -599,7 +649,7 @@ def __short_seq_fix(
                 batch_size=batch_size,
                 network=network,
                 version=version,
-                gpuid=gpuid,
+                device=device,
                 batch_algorithm=batch_algorithm,
                 return_seq2prediction=return_seq2prediction,
                 show_progress_bar=show_progress_bar,
@@ -617,7 +667,7 @@ def __short_seq_fix(
             batch_size=batch_size,
             network=network,
             version=version,
-            gpuid=gpuid,
+            device=device,
             batch_algorithm=batch_algorithm,
             return_seq2prediction=return_seq2prediction,
             show_progress_bar=show_progress_bar,
@@ -671,11 +721,12 @@ def batch_predict(
     network: Optional[str] = None,
     batch_size: int = DEFAULT_BATCH_SIZE,
     version=None,
-    gpuid: int = DEFAULT_GPU_ID,
+    gpuid: int | None = None,
     batch_algorithm=DEFAULT_BATCH_ALGORITHM,
     return_seq2prediction: bool = False,
     show_progress_bar: bool = True,
     safe: bool = True,
+    device: str | torch.device | None = DEFAULT_DEVICE,
 ) -> dict:
     """Perform batch predictions with one of sparrow's networks.
 
@@ -772,8 +823,8 @@ def batch_predict(
         Network version, by default None, the network's default (2 for the
         ALBATROSS networks, released May 21st 2023).
 
-    gpuid : int, optional
-        GPU ID to use for predictions, by default 0
+    gpuid : int or None, optional
+        The NVIDIA GPU to run on; see ``device``. Default None.
 
     batch_algorithm : str
         Selector which defines the approach used to batch processes
@@ -815,6 +866,15 @@ def batch_predict(
         regardless of the sequence length. NOT RECOMMENDED.
         Default = True.
 
+    device : {'auto', 'cpu', 'cuda', 'mps'} or torch.device, optional
+        Where to run the network, as PARROT's ``Predictor`` takes it (see
+        :func:`~sparrow.predictors.devices.resolve_device`). Default
+        ``'auto'``: CUDA if this machine has it (the GPU ``gpuid`` names, or
+        the current one), and the CPU otherwise. ``'auto'`` never chooses an
+        Apple-silicon GPU, on which sparrow's networks run several times
+        slower than on the CPU, but ``'mps'`` runs on one. None is read as
+        ``'auto'``.
+
     Returns
     -------
     dict
@@ -823,7 +883,9 @@ def batch_predict(
     Raises
     ------
     SparrowException
-        An exception is raised if the requested network is not one of the available options.
+        An exception is raised if the requested network is not one of the
+        available options, or the device asked for is not valid or not on
+        this machine.
     """
     from sparrow.predictors import NETWORK_PREDICTORS
 
@@ -838,8 +900,9 @@ def batch_predict(
             f"For option 'network': Please choose a valid network for batch predictions, one of {list(NETWORK_PREDICTORS)}"
         )
 
-    # check a valid batch algorithm was passed, before anything is run
+    # check a valid batch algorithm and device were passed, before anything is run
     resolve_batch_algorithm(batch_algorithm)
+    device = resolve_device(DEFAULT_DEVICE if device is None else device, gpuid)
 
     # if we've requested to use rg/re predictions, this function ensures short sequences are appropriately
     # dealt with (this is a recurisve function that calls batch_predict)
@@ -849,7 +912,7 @@ def batch_predict(
             batch_size=batch_size,
             network=network,
             version=version,
-            gpuid=gpuid,
+            device=device,
             batch_algorithm=batch_algorithm,
             return_seq2prediction=return_seq2prediction,
             show_progress_bar=show_progress_bar,
@@ -912,9 +975,9 @@ def batch_predict(
         sequence_list,
         version=version,
         batch_size=batch_size,
-        gpuid=gpuid,
         batch_algorithm=batch_algorithm,
         show_progress_bar=show_progress_bar,
+        device=device,
     )
     pred_dict = dict(zip(sequence_list, predictions))
 

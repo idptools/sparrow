@@ -121,6 +121,11 @@ _PSCORE_MAXIMUM = 6.0
 _DISORDER_KEY = "metapredict-disorder"
 _PLDDT_KEY = "metapredict-pLDDT"
 
+# The device the batch functions use when none is given:
+# sparrow.predictors.devices.DEFAULT_DEVICE, written out so that importing sparrow
+# does not import torch
+_DEFAULT_DEVICE = "auto"
+
 # The name Protein.low_complexity_mask had here, before it moved to Protein since
 # it is not a prediction. The old name still works, with a DeprecationWarning,
 # for one release.
@@ -161,8 +166,10 @@ def load_network_predictor(network, version=None, device=None):
         One of :data:`NETWORK_PREDICTORS`.
     version : str or None, optional
         The network version. Default None, the predictor's default.
-    device : torch.device, str or None, optional
-        The device to load it onto. Default None, the CPU.
+    device : {'auto', 'cpu', 'cuda', 'mps'}, torch.device, str or None, optional
+        The device to load it onto, as
+        :func:`~sparrow.predictors.devices.resolve_device` takes it, or a
+        device as torch names it, such as ``'cuda:1'``. Default None, the CPU.
 
     Returns
     -------
@@ -172,8 +179,8 @@ def load_network_predictor(network, version=None, device=None):
     Raises
     ------
     sparrow.sparrow_exceptions.SparrowException
-        If ``network`` is not one of sparrow's networks, or its weights file
-        does not exist.
+        If ``network`` is not one of sparrow's networks, its weights file does
+        not exist, or the device is not valid or not on this machine.
     """
     return network_predictor_class(network)(version=version, device=device)
 
@@ -192,7 +199,7 @@ def _binary_disorder_key(disorder_threshold, minimum_IDR_size, minimum_folded_do
     return f"{_DISORDER_KEY}-{disorder_threshold}-{minimum_IDR_size}-{minimum_folded_domain}-{gap_closure}-{override}"
 
 
-def _batch_options(batch_size, gpuid, show_progress):
+def _batch_options(batch_size, gpuid, show_progress, device):
     """The options to pass on to a batch function: only those given.
 
     Returns
@@ -205,10 +212,37 @@ def _batch_options(batch_size, gpuid, show_progress):
     if gpuid is not None:
         options["gpuid"] = gpuid
     options["show_progress_bar"] = show_progress
+    options["device"] = device
     return options
 
 
-def _predict_network(network, sequences, *, batch_size=None, gpuid=None, show_progress=False):
+def _metapredict_device(device, gpuid):
+    """The device to give metapredict, from the device and GPU sparrow was given.
+
+    For ``'auto'`` with no GPU named, None, so metapredict chooses for itself,
+    as it does for each of its networks; for anything else, the device it
+    resolves to, as metapredict names devices (``'cpu'``, ``'mps'`` or
+    ``'cuda:1'``).
+
+    Parameters
+    ----------
+    device : {'auto', 'cpu', 'cuda', 'mps'} or torch.device
+        As :func:`~sparrow.predictors.devices.resolve_device` takes it.
+    gpuid : int or None
+        As ``resolve_device`` takes it.
+
+    Returns
+    -------
+    str or None
+    """
+    from sparrow.predictors.devices import resolve_device
+
+    if isinstance(device, str) and device == _DEFAULT_DEVICE and gpuid is None:
+        return None
+    return str(resolve_device(device, gpuid))
+
+
+def _predict_network(network, sequences, *, batch_size=None, gpuid=None, show_progress=False, device=_DEFAULT_DEVICE):
     """One of sparrow's networks' prediction for each of many sequences, in batches.
 
     Returns
@@ -218,13 +252,13 @@ def _predict_network(network, sequences, *, batch_size=None, gpuid=None, show_pr
     """
     from sparrow.predictors.batch_predictor import predict_many
 
-    return predict_many(network, sequences, **_batch_options(batch_size, gpuid, show_progress))
+    return predict_many(network, sequences, **_batch_options(batch_size, gpuid, show_progress, device))
 
 
-def _predict_disorder_domains(sequences, *, batch_size=None, gpuid=None, show_progress=False, **domain_arguments):
+def _predict_disorder_domains(
+    sequences, *, batch_size=None, gpuid=None, show_progress=False, device=_DEFAULT_DEVICE, **domain_arguments
+):
     """metapredict's disorder and disorder domains for each of many sequences, in batches.
-
-    metapredict chooses its own device, so ``gpuid`` is not passed to it.
 
     Returns
     -------
@@ -236,6 +270,7 @@ def _predict_disorder_domains(sequences, *, batch_size=None, gpuid=None, show_pr
     options = {"batch_size": batch_size} if batch_size is not None else {}
     return meta.predict_disorder(
         sequences,
+        device=_metapredict_device(device, gpuid),
         return_domains=True,
         return_numpy=False,
         show_progress_bar=show_progress,
@@ -244,7 +279,7 @@ def _predict_disorder_domains(sequences, *, batch_size=None, gpuid=None, show_pr
     )
 
 
-def _predict_plddt(sequences, *, batch_size=None, gpuid=None, show_progress=False):
+def _predict_plddt(sequences, *, batch_size=None, gpuid=None, show_progress=False, device=_DEFAULT_DEVICE):
     """metapredict's predicted pLDDT for each of many sequences, in batches.
 
     Returns
@@ -255,7 +290,13 @@ def _predict_plddt(sequences, *, batch_size=None, gpuid=None, show_progress=Fals
     from metapredict import meta
 
     options = {"batch_size": batch_size} if batch_size is not None else {}
-    predictions = meta.predict_pLDDT(sequences, normalized=True, show_progress_bar=show_progress, **options)
+    predictions = meta.predict_pLDDT(
+        sequences,
+        device=_metapredict_device(device, gpuid),
+        normalized=True,
+        show_progress_bar=show_progress,
+        **options,
+    )
     return [scores for _, scores in predictions]
 
 
@@ -299,7 +340,7 @@ class _Source:
         Where the prediction is cached.
     predict_many : callable
         Makes it for a list of sequences at once:
-        ``predict_many(sequences, batch_size=..., gpuid=..., show_progress=...)``
+        ``predict_many(sequences, batch_size=..., gpuid=..., show_progress=..., device=...)``
         returns one prediction per sequence.
     """
 

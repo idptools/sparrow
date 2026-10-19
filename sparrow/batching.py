@@ -47,6 +47,11 @@ __all__ = ["batch", "ACCESSORS"]
 #: ``"predictor.disorder"``.
 ACCESSORS = ("predictor", "polymeric", "nardini")
 
+# The device the networks run on when none is given:
+# sparrow.predictors.devices.DEFAULT_DEVICE, written out so that importing sparrow
+# does not import torch
+_DEFAULT_DEVICE = "auto"
+
 # Protein's public attributes that are not values to compute: the sequence
 # itself, the accessors (whose own methods are named instead), the plugin
 # manager and the sequence display
@@ -109,6 +114,7 @@ def batch(
     show_progress: bool = False,
     batch_size: int | None = None,
     gpuid: int | None = None,
+    device: str | Any = _DEFAULT_DEVICE,
 ) -> dict[Hashable, Protein] | list[Protein]:
     """Make a Protein for every sequence, with the values you name already computed.
 
@@ -120,9 +126,9 @@ def batch(
     and every other value is computed on demand, as for any ``Protein``.
 
     Values that sparrow can compute for a whole batch at once are computed that
-    way: the 20 scalar properties, the ALBATROSS polymer dimensions and the
-    NARDINI scrambles. The rest are computed one protein at a time, by the
-    method itself.
+    way: the 20 scalar properties, every network's and metapredict's
+    predictions, and the NARDINI scrambles. The rest are computed one protein at
+    a time, by the method itself.
 
     Parameters
     ----------
@@ -149,12 +155,19 @@ def batch(
         scrambles, and for each value computed one protein at a time. Default
         False.
     batch_size : int or None, optional
-        Sequences per forward pass of an ALBATROSS network. Default None, which
-        uses the default of
-        :func:`~sparrow.predictors.batch_predictor.batch_predict`.
+        Sequences per forward pass of a network. Default None, which uses the
+        default of :func:`~sparrow.predictors.batch_predictor.batch_predict`
+        for sparrow's networks, and metapredict's own for its.
     gpuid : int or None, optional
-        The CUDA device for the ALBATROSS networks, where CUDA is available.
-        Default None, which uses ``batch_predict``'s default.
+        The NVIDIA GPU to run the networks on; see ``device``. Default None.
+    device : {'auto', 'cpu', 'cuda', 'mps'} or torch.device, optional
+        Where to run the networks, sparrow's and metapredict's, as PARROT's
+        ``Predictor`` takes it (see
+        :func:`~sparrow.predictors.devices.resolve_device`). Default
+        ``'auto'``: sparrow's networks run on CUDA if this machine has it (the
+        GPU ``gpuid`` names, or the current one) and on the CPU otherwise, and
+        metapredict chooses for itself unless ``gpuid`` is given. A device
+        named is used by both.
 
     Returns
     -------
@@ -167,9 +180,10 @@ def batch(
     ------
     sparrow.sparrow_exceptions.SparrowException
         If there are no sequences or no names, if an item is neither a string
-        nor a ``Protein``, if a single string is not the path to a file, or if
-        a name is not something a ``Protein`` computes or its arguments do not
-        fit. Every name and its arguments are checked before anything is
+        nor a ``Protein``, if a single string is not the path to a file, if a
+        name is not something a ``Protein`` computes or its arguments do not
+        fit, or if the device is not valid or not on this machine. Every name
+        and its arguments, and the device, are checked before anything is
         computed. A value that fails to compute raises as its method does.
 
     Notes
@@ -197,6 +211,7 @@ def batch(
     """
     keys, proteins = _as_proteins(sequences)
     requests = _requests(names)
+    _check_device(device, gpuid)
 
     # what the batch functions compute: each value asked for that one of them
     # covers, and each such value that another value asked for reads
@@ -212,7 +227,7 @@ def batch(
     if properties:
         _compute_properties(proteins, properties)
     if predicted:
-        _predict(proteins, predicted, show_progress=show_progress, batch_size=batch_size, gpuid=gpuid)
+        _predict(proteins, predicted, show_progress=show_progress, batch_size=batch_size, gpuid=gpuid, device=device)
     if scrambled:
         _score_nardini(proteins, scrambled, n_processes=n_processes, show_progress=show_progress)
 
@@ -575,6 +590,33 @@ def _compute_properties(proteins: list[Protein], requests: list[_Request]) -> No
             protein._store(name, value)
 
 
+def _check_device(device: str | Any, gpuid: int | None) -> None:
+    """Check the device and GPU asked for, before anything is computed.
+
+    The default, ``'auto'`` with no GPU named, is always valid, so it is not
+    checked, which keeps torch from being imported for a batch with no
+    predictions.
+
+    Parameters
+    ----------
+    device : str or torch.device
+        As :func:`batch` was given it.
+    gpuid : int or None
+        As :func:`batch` was given it.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If the device is not valid or not on this machine.
+    """
+    if isinstance(device, str) and device == _DEFAULT_DEVICE and gpuid is None:
+        return
+
+    from sparrow.predictors.devices import resolve_device
+
+    resolve_device(device, gpuid)
+
+
 def _predict(
     proteins: list[Protein],
     requests: list[_Request],
@@ -582,6 +624,7 @@ def _predict(
     show_progress: bool,
     batch_size: int | None,
     gpuid: int | None,
+    device: str | Any,
 ) -> None:
     """Make the predictions the requested methods read for the whole batch, and store each protein's.
 
@@ -603,6 +646,8 @@ def _predict(
         Show a progress bar for each prediction.
     batch_size, gpuid : int or None
         Passed on unless None.
+    device : str or torch.device
+        Passed on, as :func:`batch` was given it.
     """
     # each prediction, with how to make it and the proteins that need it
     pending: dict[Hashable, tuple[Any, list[Protein]]] = {}
@@ -622,6 +667,7 @@ def _predict(
             batch_size=batch_size,
             gpuid=gpuid,
             show_progress=show_progress,
+            device=device,
         )
         for protein, prediction in zip(members, predictions):
             protein.predictor._store(key, prediction)

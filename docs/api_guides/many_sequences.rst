@@ -147,8 +147,12 @@ Options
   scrambles, and each value computed one protein at a time.
 * ``batch_size`` -- sequences per forward pass, for the networks and for
   metapredict, if given.
-* ``gpuid`` -- the CUDA device for the networks, if given and CUDA is
-  available. metapredict chooses its own device.
+* ``device`` and ``gpuid`` -- where to run the networks, sparrow's and
+  metapredict's, as :func:`~sparrow.predictors.batch_predictor.batch_predict`
+  takes them (:doc:`batch`): ``device="auto"`` (the default) runs sparrow's
+  networks on an NVIDIA GPU where there is one and on the CPU otherwise, and
+  leaves metapredict to choose for itself unless ``gpuid`` is given; any other
+  device is used by both.
 
 When you want arrays instead
 ----------------------------

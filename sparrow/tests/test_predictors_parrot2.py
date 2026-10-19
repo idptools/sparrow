@@ -29,6 +29,12 @@ from sparrow.predictors.batch_predictor import DEFAULT_BATCH_SIZE, batch_predict
 from sparrow.predictors.network_loader import PARROT2_INSTALL_COMMAND, load_parrot_network
 from sparrow.predictors.rg.radius_of_gyration_predictor import RgPredictor
 from sparrow.sparrow_exceptions import SparrowException
+from sparrow.tests.device_markers import (
+    DEVICE_ABSOLUTE_TOLERANCE,
+    DEVICE_RELATIVE_TOLERANCE,
+    DEVICES,
+    requires_two_gpus,
+)
 from sparrow.tools.utilities import copy_of
 
 # The module that reads PARROT 2 checkpoints, which PARROT 1 does not have
@@ -54,6 +60,11 @@ BATCHED_SEQUENCES = [*SEQUENCES, SEQUENCES[0]]
 #: summed in a different order: by at most 1.2e-6 for these networks, over 200
 #: random sequences of 5 to 400 residues.
 BATCH_ABSOLUTE_TOLERANCE = 1e-5
+
+#: The device PARROT's own Predictor, the reference here, predicts on: the CPU,
+#: where sparrow's predictors run by default. Given no device, PARROT runs on a
+#: GPU if there is one, whose 32-bit rounding differs from the CPU's.
+REFERENCE_DEVICE = "cpu"
 
 #: The name a test network is registered under, as a contributor would register
 #: theirs, and the module and class its predictor is put in.
@@ -136,7 +147,7 @@ def test_the_template_predicts_what_parrot2_does(tmp_path, name):
     save_parrot2_network(tmp_path / "network_v1.pt", architecture, datatype, num_classes, hyperparameters)
 
     predictor = filled_in_template(str(tmp_path / "network_v{version}.pt"))()
-    reference = Predictor(tmp_path / "network_v1.pt")
+    reference = Predictor(tmp_path / "network_v1.pt", device=REFERENCE_DEVICE)
 
     assert predictor.saved_by_parrot2
     assert predictor.number_of_classes == num_classes
@@ -156,7 +167,7 @@ def test_the_template_predicts_many_as_parrot2_does(tmp_path, name):
     save_parrot2_network(tmp_path / "network_v1.pt", architecture, datatype, num_classes, hyperparameters)
 
     predictor = filled_in_template(str(tmp_path / "network_v{version}.pt"))()
-    reference = Predictor(tmp_path / "network_v1.pt")
+    reference = Predictor(tmp_path / "network_v1.pt", device=REFERENCE_DEVICE)
 
     batched = predictor.predict_many(BATCHED_SEQUENCES)
     expected = reference.predict_batch(BATCHED_SEQUENCES, batch_size=DEFAULT_BATCH_SIZE)
@@ -167,6 +178,75 @@ def test_the_template_predicts_many_as_parrot2_does(tmp_path, name):
         alone = predictor.predict(sequence)
         assert prediction.shape == alone.shape
         np.testing.assert_allclose(prediction, alone, rtol=0, atol=BATCH_ABSOLUTE_TOLERANCE)
+
+
+@requires_parrot2
+@pytest.mark.parametrize("device", DEVICES)
+@pytest.mark.parametrize("name", list(NETWORKS))
+def test_the_template_predicts_on_each_device_as_parrot2_does_there(tmp_path, name, device):
+    from parrot import Predictor
+
+    architecture, datatype, num_classes, hyperparameters = NETWORKS[name]
+    save_parrot2_network(tmp_path / "network_v1.pt", architecture, datatype, num_classes, hyperparameters)
+    template = filled_in_template(str(tmp_path / "network_v{version}.pt"))
+
+    predictor = template(device=device)
+    reference = Predictor(tmp_path / "network_v1.pt", device=device)
+    on_cpu = template(device="cpu")
+    assert predictor.device.type == device
+    assert next(predictor.network.network.parameters()).device.type == device
+
+    # PARROT's own prediction on the same device, to the last bit, and the CPU's to float32 rounding
+    for sequence in SEQUENCES:
+        prediction = predictor.predict_my_property(sequence)
+        np.testing.assert_array_equal(prediction, reference.predict(sequence))
+        np.testing.assert_allclose(
+            prediction,
+            on_cpu.predict_my_property(sequence),
+            rtol=DEVICE_RELATIVE_TOLERANCE,
+            atol=DEVICE_ABSOLUTE_TOLERANCE,
+        )
+    expected = reference.predict_batch(BATCHED_SEQUENCES, batch_size=DEFAULT_BATCH_SIZE)
+    for prediction, expected_prediction in zip(predictor.predict_many(BATCHED_SEQUENCES), expected):
+        np.testing.assert_array_equal(prediction, expected_prediction)
+
+
+@requires_parrot2
+@pytest.mark.parametrize("device", DEVICES)
+def test_a_registered_parrot2_network_runs_on_each_device_through_the_batch_functions(tmp_path, monkeypatch, device):
+    from parrot import Predictor
+
+    register_network(tmp_path, monkeypatch)
+    expected = Predictor(tmp_path / "network_v1.pt", device=device).predict_batch(
+        BATCHED_SEQUENCES, batch_size=DEFAULT_BATCH_SIZE
+    )
+
+    model_device, model = prepare_model(REGISTERED_NETWORK, device=device)
+    assert model_device.type == device
+    assert next(model.parameters()).device.type == device
+
+    by_name = batch_predict(BATCHED_SEQUENCES, network=REGISTERED_NETWORK, device=device, show_progress_bar=False)
+    proteins = sparrow.batch(BATCHED_SEQUENCES, ["predictor.my_property"], device=device)
+    for index, expected_prediction in enumerate(expected):
+        np.testing.assert_array_equal(by_name[index][1], expected_prediction)
+        np.testing.assert_array_equal(proteins[index].predictor.my_property(), expected_prediction)
+
+
+@requires_parrot2
+@requires_two_gpus
+def test_a_parrot2_network_runs_on_the_gpu_named(tmp_path, monkeypatch):
+    register_network(tmp_path, monkeypatch)
+    second_gpu = torch.device("cuda", 1)
+
+    predictor = filled_in_template(str(tmp_path / "network_v{version}.pt"))(device="cuda:1")
+    assert predictor.device == second_gpu
+    assert next(predictor.network.network.parameters()).device == second_gpu
+
+    model_device, model = prepare_model(REGISTERED_NETWORK, gpuid=1)
+    assert model_device == second_gpu
+    assert next(model.parameters()).device == second_gpu
+    by_name = batch_predict(SEQUENCES, network=REGISTERED_NETWORK, device="cuda", gpuid=1, show_progress_bar=False)
+    assert len(by_name) == len(SEQUENCES)
 
 
 @requires_parrot2
@@ -207,7 +287,7 @@ def test_prepare_model_gives_a_parrot2_network_to_run_on_one_hot_sequences(tmp_p
 
     register_network(tmp_path, monkeypatch)
     device, model = prepare_model(REGISTERED_NETWORK, None, 0)
-    reference = Predictor(tmp_path / "network_v1.pt")
+    reference = Predictor(tmp_path / "network_v1.pt", device=REFERENCE_DEVICE)
 
     assert isinstance(model, torch.nn.Module)
     assert not model.training
@@ -303,7 +383,7 @@ def test_the_device_is_passed_on_to_parrot2_by_type_and_index(tmp_path, monkeypa
 
         def __init__(self, saved_weights, device="cpu", gpu_id=None):
             asked.append((device, gpu_id))
-            super().__init__(saved_weights)
+            super().__init__(saved_weights, device="cpu")
 
     monkeypatch.setattr(parrot.py_predictor, "Predictor", Recording)
     save_parrot2_network(tmp_path / "network.pt", "brnn", "residues", 1, {})

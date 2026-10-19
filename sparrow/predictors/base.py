@@ -34,6 +34,7 @@ from sparrow.predictors.batch_predictor import (
     resolve_batch_algorithm,
     run_network,
 )
+from sparrow.predictors.devices import full_float32_precision, resolve_device
 from sparrow.predictors.network_loader import load_parrot_network
 from sparrow.sparrow_exceptions import SparrowException
 
@@ -73,13 +74,23 @@ class BaseNetworkPredictor:
             Specific network version to load. When ``None`` (default), uses
             :attr:`DEFAULT_VERSION`. The value is substituted into
             :attr:`NETWORK_PATH` (no leading ``"v"`` or ``.pt`` extension).
-        device : torch.device, str or None, optional
-            The device to load the network onto and predict on. Default None,
-            the CPU.
+        device : {'auto', 'cpu', 'cuda', 'mps'}, torch.device, str or None, optional
+            The device to load the network onto and predict on: one of the
+            choices :func:`~sparrow.predictors.devices.resolve_device` takes,
+            as the batch functions take them, or a device as torch names it,
+            such as ``'cuda:1'``. Default None, the CPU.
+
+        Raises
+        ------
+        sparrow.sparrow_exceptions.SparrowException
+            If the device is not valid or not on this machine, or the network
+            cannot be loaded (see
+            :func:`~sparrow.predictors.network_loader.load_parrot_network`).
         """
         if version is None:
             version = self.DEFAULT_VERSION
 
+        device = resolve_device("cpu" if device is None else device)
         relative_path = self.NETWORK_PATH.format(version=version)
         self.network, meta = load_parrot_network(relative_path, self.ARCHITECTURE, device=device)
 
@@ -260,8 +271,10 @@ class BaseNetworkPredictor:
         seq = seq.upper()
         seq_vector = encode_sequence.one_hot(seq)
         seq_vector = seq_vector.view(1, len(seq_vector), -1)
-        # to the network's device and back; both are no-ops on the CPU
-        return self.network(seq_vector.float().to(self.device)).detach().cpu().numpy()
+        # to the network's device and back, both no-ops on the CPU, and on an
+        # NVIDIA GPU in full float32 precision, as run_network runs it
+        with full_float32_precision():
+            return self.network(seq_vector.float().to(self.device)).detach().cpu().numpy()
 
     def _predict(self, seq):
         """Predict with a PARROT 2 network, as PARROT's own ``Predictor`` does.

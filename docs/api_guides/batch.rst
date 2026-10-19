@@ -133,8 +133,19 @@ Key options
 * ``version`` -- network version (default None, each network's own default; 2,
   released May 21st 2023, for the ALBATROSS networks). Version 1 weights also
   ship with sparrow for reproducing older results.
-* ``gpuid`` -- CUDA device index to use when CUDA is available (default 0).
-  Ignored on machines without CUDA, where inference runs on the CPU.
+* ``device`` -- where to run the network, the same choice PARROT's ``Predictor``
+  takes: ``"auto"`` (the default), ``"cpu"``, ``"cuda"`` or ``"mps"``, or a
+  device as torch names it, such as ``"cuda:1"``. ``"auto"`` runs on an NVIDIA
+  GPU where there is one and on the CPU otherwise; it never chooses an
+  Apple-silicon GPU, on which sparrow's networks run 4.5 to 7 times slower than
+  on the CPU, but ``"mps"`` runs on one. A device the machine does not have is an
+  error, not a silent fall back to the CPU. ``prepare_model``, ``predict_many``
+  and :func:`sparrow.batch` take it too, and the predictor classes take it as
+  their ``device``.
+* ``gpuid`` -- which NVIDIA GPU to run on (default None, the current one), as
+  PARROT's ``gpu_id`` chooses. With ``device="auto"`` it is used only where CUDA
+  is available, so code written for a GPU runs unchanged on a laptop; with
+  ``"cpu"`` or ``"mps"`` it is an error.
 * ``batch_algorithm`` -- ``"default"`` (recommended) selects ``"pad-n-pack"`` on
   PyTorch 1.11+, which batches mixed-length sequences together via
   ``pack_padded_sequence``, and falls back to ``"size-collect"`` on older
@@ -171,7 +182,12 @@ above.
   packs it, so the LSTM runs over each sequence's own residues: the network's
   forward pass, on packed input. It is typically several times faster than
   ``size-collect`` on sequence sets with varied lengths, and equal when all
-  lengths match. Inference runs under ``torch.no_grad()`` in evaluation mode.
+  lengths match. Inference runs under ``torch.no_grad()`` in evaluation mode,
+  and on an NVIDIA GPU in full float32 precision
+  (:func:`~sparrow.predictors.devices.full_float32_precision`), as PARROT 2 runs
+  its networks: PyTorch otherwise lets cuDNN compute the LSTM in TF32, which
+  PARROT measured moving predictions up to ~1e-2 from the CPU's, against ~1e-4
+  in full precision.
 * A network saved by PARROT 2 is run by PARROT's own ``Predictor.predict_batch``,
   which batches sequences of similar length together and masks the padding, and
   returns each sequence's prediction as PARROT makes it alone, to the same 32-bit
@@ -183,4 +199,9 @@ API Reference
 
 .. autofunction:: sparrow.predictors.batch_predictor.batch_predict
 
+.. autofunction:: sparrow.predictors.batch_predictor.prepare_model
+
 .. autofunction:: sparrow.predictors.batch_predictor.run_network
+
+.. automodule:: sparrow.predictors.devices
+   :members: resolve_device, full_float32_precision, DEVICE_CHOICES, DEFAULT_DEVICE
