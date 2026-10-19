@@ -25,8 +25,8 @@ from sparrow import Protein
 from sparrow.predictors import METHOD_NETWORKS, NETWORK_PREDICTORS
 from sparrow.predictors import Predictor as ProteinPredictor
 from sparrow.predictors.base import BaseNetworkPredictor
-from sparrow.predictors.batch_predictor import DEFAULT_BATCH_SIZE, batch_predict
-from sparrow.predictors.network_loader import PARROT2_INSTALL_COMMAND, _parrot2_device_type, load_parrot_network
+from sparrow.predictors.batch_predictor import DEFAULT_BATCH_SIZE, batch_predict, prepare_model
+from sparrow.predictors.network_loader import PARROT2_INSTALL_COMMAND, load_parrot_network
 from sparrow.predictors.rg.radius_of_gyration_predictor import RgPredictor
 from sparrow.sparrow_exceptions import SparrowException
 from sparrow.tools.utilities import copy_of
@@ -79,14 +79,15 @@ NETWORKS = {
 }
 
 
-def save_parrot2_network(path, architecture, datatype, num_classes, hyperparameters):
+def save_parrot2_network(path, architecture, datatype, num_classes, hyperparameters, encoding="onehot"):
     """Build an untrained network and save it as parrot-train does."""
     from parrot import Task, build_network, save_network
     from parrot.encode_sequence import get_encoder
 
+    encoder = get_encoder(encoding)
     torch.manual_seed(WEIGHTS_SEED)
-    network = build_network(architecture, ONE_HOT_WIDTH, Task(datatype, num_classes), hyperparameters)
-    save_network(str(path), network, get_encoder("onehot"))
+    network = build_network(architecture, encoder.input_size, Task(datatype, num_classes), hyperparameters)
+    save_network(str(path), network, encoder)
 
 
 def filled_in_template(weights_path_template):
@@ -101,9 +102,9 @@ def filled_in_template(weights_path_template):
     return FilledIn
 
 
-def register_network(tmp_path, monkeypatch):
+def register_network(tmp_path, monkeypatch, encoding="onehot"):
     """Save a PARROT 2 network and register it in sparrow as docs/predictors.rst says to, until the test ends."""
-    save_parrot2_network(tmp_path / "network_v1.pt", "brnn", "residues", 1, {})
+    save_parrot2_network(tmp_path / "network_v1.pt", "brnn", "residues", 1, {}, encoding=encoding)
 
     # the predictor module a contributor would add
     module = types.ModuleType(REGISTERED_MODULE)
@@ -200,12 +201,50 @@ def test_a_bad_batch_algorithm_is_refused_for_a_parrot2_network_too(tmp_path):
 
 
 @requires_parrot2
-def test_a_parrot2_without_predict_batch_says_to_update_it(tmp_path, monkeypatch):
+def test_prepare_model_gives_a_parrot2_network_to_run_on_one_hot_sequences(tmp_path, monkeypatch):
+    from parrot import Predictor
+    from parrot.encode_sequence import one_hot
+
+    register_network(tmp_path, monkeypatch)
+    device, model = prepare_model(REGISTERED_NETWORK, None, 0)
+    reference = Predictor(tmp_path / "network_v1.pt")
+
+    assert isinstance(model, torch.nn.Module)
+    assert not model.training
+    for sequence in SEQUENCES:
+        # called as a network saved by PARROT 1 is, on one sequence, one-hot encoded
+        with torch.no_grad():
+            raw = model(one_hot(sequence).float().view(1, len(sequence), -1).to(device)).cpu().numpy()
+        assert raw.shape == (1, len(sequence), 1)
+        np.testing.assert_allclose(raw[0, :, 0], reference.predict(sequence), rtol=0, atol=BATCH_ABSOLUTE_TOLERANCE)
+
+
+@requires_parrot2
+def test_prepare_model_refuses_a_parrot2_network_trained_on_another_encoding(tmp_path, monkeypatch):
+    register_network(tmp_path, monkeypatch, encoding="biophysics")
+    with pytest.raises(SparrowException, match="'biophysics' encoding"):
+        prepare_model(REGISTERED_NETWORK, None, 0)
+
+
+def predictor_without_gpu_id(
+    self, saved_weights, dtype=None, device="cpu", embedding_cache=None, embed_in_isolation=False
+):
+    """Predictor.__init__ as earlier development versions of PARROT 2 have it."""
+    raise AssertionError("sparrow should refuse this PARROT 2 before creating a Predictor")
+
+
+@requires_parrot2
+@pytest.mark.parametrize("missing", ["predict_batch", "gpu_id"])
+def test_a_parrot2_without_what_sparrow_needs_says_to_update_it(tmp_path, monkeypatch, missing):
     from parrot.py_predictor import Predictor
 
     save_parrot2_network(tmp_path / "network.pt", "brnn", "residues", 1, {})
-    monkeypatch.delattr(Predictor, "predict_batch")  # as in earlier development versions
-    with pytest.raises(SparrowException, match="predict_batch") as error:
+    # as in earlier development versions
+    if missing == "predict_batch":
+        monkeypatch.delattr(Predictor, "predict_batch")
+    else:
+        monkeypatch.setattr(Predictor, "__init__", predictor_without_gpu_id)
+    with pytest.raises(SparrowException, match=missing) as error:
         load_parrot_network(str(tmp_path / "network.pt"))
     assert PARROT2_INSTALL_COMMAND in str(error.value)
 
@@ -247,26 +286,29 @@ def test_raw_output_is_not_offered_for_a_parrot2_network(tmp_path):
 
 
 @requires_parrot2
-def test_a_device_index_is_refused_for_a_parrot2_network(tmp_path):
+@pytest.mark.parametrize(
+    ("device", "expected"),
+    [("cuda:1", ("cuda", 1)), ("cuda", ("cuda", None)), ("cpu", ("cpu", None)), ("mps", ("mps", None))],
+)
+def test_the_device_is_passed_on_to_parrot2_by_type_and_index(tmp_path, monkeypatch, device, expected):
     # called directly: through load_parrot_network, torch.load would first have to
     # map the weights onto that device, which needs one to exist
+    import parrot.py_predictor
     from sparrow.predictors.network_loader import _load_parrot2_network
 
+    asked = []
+
+    class Recording(parrot.py_predictor.Predictor):
+        """PARROT 2's Predictor, noting the device it is asked for and loading on the CPU, which every machine has."""
+
+        def __init__(self, saved_weights, device="cpu", gpu_id=None):
+            asked.append((device, gpu_id))
+            super().__init__(saved_weights)
+
+    monkeypatch.setattr(parrot.py_predictor, "Predictor", Recording)
     save_parrot2_network(tmp_path / "network.pt", "brnn", "residues", 1, {})
-    with pytest.raises(SparrowException, match="current CUDA device"):
-        _load_parrot2_network(str(tmp_path / "network.pt"), "cuda:1")
-
-
-def test_the_current_cuda_device_can_be_named_by_index(monkeypatch):
-    # as on a machine with CUDA, whose current device is cuda:0: what sparrow asks
-    # for by default there (gpuid=0), and what PARROT runs 'cuda' on
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
-    monkeypatch.setattr(torch.cuda, "current_device", lambda: 0)
-    assert _parrot2_device_type("cuda:0") == "cuda"
-    assert _parrot2_device_type(torch.device("cuda")) == "cuda"
-    assert _parrot2_device_type("cpu") == "cpu"
-    with pytest.raises(SparrowException, match="current CUDA device"):
-        _parrot2_device_type("cuda:1")
+    _load_parrot2_network(str(tmp_path / "network.pt"), device)
+    assert asked == [expected]
 
 
 def test_a_parrot1_network_is_not_run_through_parrot2():

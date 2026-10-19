@@ -49,6 +49,10 @@ _RESIDUE_ARCHITECTURE = "MtM"
 # rg and re have a scaled counterpart, which is more accurate for short sequences
 _SCALED_COUNTERPARTS = {"rg": "scaled_rg", "re": "scaled_re"}
 
+# The name PARROT 2 gives the one-hot encoding (OneHotEncoder.name), which every
+# network saved by PARROT 1 reads
+_ONE_HOT_ENCODING = "onehot"
+
 
 # ....................................................................................
 #
@@ -351,10 +355,52 @@ def predict_many(
 # ....................................................................................
 #
 #
+def _one_hot_module(predictor, network):
+    """A loaded network as a torch module run on one-hot encoded sequences, whichever PARROT saved it.
+
+    Parameters
+    ----------
+    predictor : sparrow.predictors.base.BaseNetworkPredictor
+        The loaded predictor.
+    network : str
+        Its name, for the error message.
+
+    Returns
+    -------
+    torch.nn.Module
+        The network: a PARROT 1 BRNN, or the architecture PARROT 2 saved.
+
+    Raises
+    ------
+    sparrow.sparrow_exceptions.SparrowException
+        If the network was saved by PARROT 2 and trained on an encoding other
+        than one-hot, so it cannot be run on one-hot encoded sequences.
+    """
+    if not predictor.saved_by_parrot2:
+        return predictor.network
+
+    # predictor.network is PARROT 2's Predictor, which holds the network and the
+    # encoding it was trained on
+    parrot_predictor = predictor.network
+    if parrot_predictor.encoder.name != _ONE_HOT_ENCODING:
+        raise SparrowException(
+            f"The {network!r} network was trained on the {parrot_predictor.encoder.name!r} encoding, so it cannot be "
+            "run on one-hot encoded sequences as prepare_model's network is. Predict with it by name instead: "
+            f"batch_predict(sequences, network={network!r}) or predict_many({network!r}, sequences)"
+        )
+    return parrot_predictor.network
+
+
 def prepare_model(network, version, gpuid):
     """
     Given a network name and version, load the network weights and parameters
     to the appropriate device.
+
+    The network is returned as a ``torch.nn.Module`` in evaluation mode, which
+    is called the same way whichever PARROT saved it: on a batch of one-hot
+    encoded sequences, ``(batch, length, 20)``, it returns the network's raw
+    output, ``(batch, number_of_classes)`` for a network that predicts one value
+    per sequence or ``(batch, length, number_of_classes)`` for one per residue.
 
     Parameters
     ----------
@@ -378,13 +424,15 @@ def prepare_model(network, version, gpuid):
     ------
     SparrowException
         An exception is raised if there is no weights file corresponding to the
-        network and version requested.
+        network and version requested, or if the network was trained with
+        PARROT 2 on an encoding other than one-hot, so it cannot be run on
+        one-hot encoded sequences.
     """
     from sparrow.predictors import load_network_predictor
 
     device = device_for(gpuid)
     predictor = load_network_predictor(network, version=None if version is None else str(version), device=device)
-    return (device, predictor.network)
+    return (device, _one_hot_module(predictor, network))
 
 
 # ....................................................................................

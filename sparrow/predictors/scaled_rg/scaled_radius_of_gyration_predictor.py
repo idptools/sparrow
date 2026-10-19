@@ -1,8 +1,9 @@
 """Scaled radius-of-gyration predictor (ALBATROSS).
 
 Thin wrapper over :class:`sparrow.predictors.base.BaseNetworkPredictor`; all
-network loading is handled by the shared loader. The length-rescaling
-(``* sqrt(N)``) is applied by the caller in :mod:`sparrow.predictors`.
+network loading is handled by the shared loader. The network predicts the
+radius of gyration divided by sqrt(N), and ``_from_raw`` multiplies it back by sqrt(N),
+so ``predict`` and ``predict_many`` give the radius of gyration itself.
 """
 
 import numpy as np

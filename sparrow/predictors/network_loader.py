@@ -28,6 +28,7 @@ load a network saved by it, and until it is released it is installed with
 """
 
 import importlib.util
+import inspect
 import os
 from dataclasses import dataclass
 
@@ -52,10 +53,12 @@ _PARROT2_CHECKPOINT_KEY = "parrot_checkpoint_format"
 # The module that reads PARROT 2 checkpoints; it does not exist in PARROT 1
 _PARROT2_CHECKPOINT_MODULE = "parrot.checkpoint"
 
-# The PARROT 2 Predictor method that predicts many sequences at once, which
-# BaseNetworkPredictor.predict_many uses; earlier development versions of
-# PARROT 2 do not have it
+# What sparrow needs of PARROT 2's Predictor, which earlier development versions
+# of PARROT 2 do not have: the method that predicts many sequences at once, which
+# BaseNetworkPredictor.predict_many uses, and the argument that chooses a CUDA
+# device by index, as sparrow's gpuid does
 _PARROT2_BATCH_METHOD = "predict_batch"
+_PARROT2_GPU_ARGUMENT = "gpu_id"
 
 #: How to install PARROT 2, which loading a network saved by it requires. PARROT 2
 #: is not yet on PyPI, where ``idptools-parrot`` is PARROT 1.
@@ -132,37 +135,25 @@ def _is_parrot2_checkpoint(saved):
     return isinstance(saved, dict) and _PARROT2_CHECKPOINT_KEY in saved
 
 
-def _parrot2_device_type(device):
-    """The device type to give PARROT 2's ``Predictor``, which chooses a device by type.
-
-    PARROT runs ``"cuda"`` on the current CUDA device, so a CUDA device index
-    is accepted if it names that device - as sparrow's default, ``cuda:0``,
-    does unless the current device has been changed.
+def _missing_parrot2_features(predictor_class):
+    """What sparrow needs of PARROT 2's ``Predictor`` that the one installed does not have.
 
     Parameters
     ----------
-    device : torch.device or str
-        The device asked for.
+    predictor_class : type
+        ``parrot.py_predictor.Predictor``.
 
     Returns
     -------
-    str
-        ``"cpu"``, ``"cuda"`` or ``"mps"``.
-
-    Raises
-    ------
-    sparrow.sparrow_exceptions.SparrowException
-        If ``device`` names a device index other than the current CUDA device.
+    list of str
+        Empty if it has everything.
     """
-    device = torch.device(device)
-    if device.index is None:
-        return device.type
-    if device.type == "cuda" and torch.cuda.is_available() and device.index == torch.cuda.current_device():
-        return device.type
-    raise SparrowException(
-        f"A network saved by PARROT 2 runs on a device chosen by type ('cpu', 'cuda' or 'mps'), where 'cuda' is the "
-        f"current CUDA device, so it cannot run on '{device}'"
-    )
+    missing = []
+    if not hasattr(predictor_class, _PARROT2_BATCH_METHOD):
+        missing.append(f"Predictor.{_PARROT2_BATCH_METHOD}")
+    if _PARROT2_GPU_ARGUMENT not in inspect.signature(predictor_class).parameters:
+        missing.append(f"Predictor's {_PARROT2_GPU_ARGUMENT} argument")
+    return missing
 
 
 def _load_parrot2_network(saved_weights, device):
@@ -173,9 +164,8 @@ def _load_parrot2_network(saved_weights, device):
     saved_weights : str
         Absolute path to the checkpoint.
     device : torch.device or str
-        Device to run predictions on. PARROT chooses the device by type
-        (``"cpu"``, ``"cuda"`` or ``"mps"``), so a device index can be given
-        only for the current CUDA device.
+        Device to run predictions on: ``"cpu"``, ``"mps"``, or ``"cuda"``, with
+        or without a device index (without one, the current CUDA device).
 
     Returns
     -------
@@ -187,8 +177,7 @@ def _load_parrot2_network(saved_weights, device):
     ------
     sparrow.sparrow_exceptions.SparrowException
         If PARROT 2 is not installed, or is a development version without
-        ``Predictor.predict_batch``; or ``device`` names a device index other
-        than the current CUDA device.
+        ``Predictor.predict_batch`` or ``Predictor``'s ``gpu_id`` argument.
     """
     if importlib.util.find_spec(_PARROT2_CHECKPOINT_MODULE) is None:
         raise SparrowException(
@@ -198,15 +187,19 @@ def _load_parrot2_network(saved_weights, device):
     # imported here because this Predictor reads PARROT 2 checkpoints only in PARROT 2
     from parrot.py_predictor import Predictor
 
-    # refused at loading, so a network that loads can predict many sequences as well as one
-    if not hasattr(Predictor, _PARROT2_BATCH_METHOD):
+    # refused at loading, so a network that loads can be used as any network sparrow ships can be
+    missing = _missing_parrot2_features(Predictor)
+    if missing:
         raise SparrowException(
             f"{saved_weights} was saved by PARROT 2, and the PARROT 2 installed is a development version without "
-            f"Predictor.{_PARROT2_BATCH_METHOD}, which sparrow needs to predict many sequences with it. Update PARROT "
-            f"2 to use this network: {PARROT2_INSTALL_COMMAND}"
+            f"{' or '.join(missing)}, which sparrow needs to run it. Update PARROT 2 to use this network: "
+            f"{PARROT2_INSTALL_COMMAND}"
         )
 
-    predictor = Predictor(saved_weights, device=_parrot2_device_type(device))
+    # PARROT takes the device by type, and a CUDA device's index separately
+    device = torch.device(device)
+    gpu_id = device.index if device.type == "cuda" else None
+    predictor = Predictor(saved_weights, device=device.type, gpu_id=gpu_id)
     meta = NetworkMeta(
         number_of_classes=predictor.n_classes,
         input_size=predictor.network.input_size,
@@ -255,8 +248,8 @@ def load_parrot_network(relative_path, architecture="MtO", device=None):
     sparrow.sparrow_exceptions.SparrowException
         If the weights file does not exist or an unknown architecture is given;
         or, for a network saved by PARROT 2, if PARROT 2 is not installed, or
-        is a development version without ``Predictor.predict_batch``, or
-        ``device`` names a device index other than the current CUDA device.
+        is a development version without ``Predictor.predict_batch`` or
+        ``Predictor``'s ``gpu_id`` argument.
     """
     if device is None:
         device = torch.device("cpu")
