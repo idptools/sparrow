@@ -50,6 +50,9 @@ source sparrow-env/bin/activate          # Windows: sparrow-env\Scripts\activate
 
 # install the latest version from GitHub
 pip install git+https://github.com/idptools/sparrow.git
+
+# or with multiple sequence alignment (SequenceAlignment), which adds pyFAMSA
+pip install "idptools-sparrow[alignment] @ git+https://github.com/idptools/sparrow.git"
 ```
 
 > Earlier releases shipped Cython extensions and required a C compiler. Those have been replaced by vectorized NumPy implementations, so installation is now a plain pure-Python wheel with no build step.

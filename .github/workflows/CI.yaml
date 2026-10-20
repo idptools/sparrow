@@ -105,8 +105,10 @@ jobs:
       # conda setup requires this special shell
       shell: bash -l {0}
       run: |
-        # sparrow is pure Python - no compiler or build-time extensions needed
-        python -m pip install .
+        # sparrow is pure Python - no compiler or build-time extensions needed.
+        # The alignment extra adds pyfamsa, so test_alignment.py runs rather
+        # than skipping.
+        python -m pip install '.[alignment]'
         conda list
 
 

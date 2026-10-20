@@ -39,16 +39,22 @@ dependencies = [
     # requires Python >= 3.10, which is why sparrow does too.
     "afrc>=0.4.2",
     "tqdm",
-    "pyfamsa",
 ]
 
 [project.optional-dependencies]
+alignment = [
+  # only sparrow.sequence_analysis.alignment (SequenceAlignment) uses it, and
+  # nothing else in sparrow imports it, so it is installed only for alignment
+  "pyfamsa",
+]
 test = [
   "pytest>=6.1.2",
   # test_sparrow_vs_localcider.py imports this at module scope, so without it
   # `pytest sparrow/tests` fails during *collection* and no tests run at all;
   # test_kappa.py also needs it. It is the suite's only external oracle.
   "localcider",
+  # so the suite tests SequenceAlignment too; test_alignment.py skips without it
+  "idptools-sparrow[alignment]",
 ]
 dev = [
   # must match [project] name -- a bare "sparrow[test]" resolves to an unrelated

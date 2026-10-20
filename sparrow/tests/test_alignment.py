@@ -5,13 +5,17 @@ There were none, which is why `SequenceAlignment(...)` shipped raising
 ``medoid_threshold`` to 0, and pyFAMSA rejects any threshold below its
 ``medoid_seeds`` (100). Nothing exercised the constructor, so nothing caught it.
 
-pyfamsa is a hard dependency, so these are not guarded by importorskip.
+pyfamsa is installed only with sparrow's alignment extra, so these are skipped,
+with the reason, where it is not installed. The test extra includes it, and CI
+installs it, so they run there.
 """
 
 import pytest
 
-from sparrow import Protein
-from sparrow.sequence_analysis.alignment import SequenceAlignment
+pytest.importorskip("pyfamsa", reason="pyfamsa is not installed: it comes with sparrow's alignment extra")
+
+from sparrow import Protein  # noqa: E402
+from sparrow.sequence_analysis.alignment import SequenceAlignment  # noqa: E402
 
 SEQUENCES = {
     "alpha": "MEEEKKKKSSSTTTDDDQQQ",

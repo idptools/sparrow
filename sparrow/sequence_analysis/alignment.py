@@ -1,7 +1,18 @@
 from typing import Dict, List, Literal, Union, cast
 
 from protfasta import read_fasta, write_fasta
-from pyfamsa import Aligner, Alignment, Sequence
+
+try:
+    from pyfamsa import Aligner, Alignment, Sequence
+except ModuleNotFoundError as error:
+    # pyfamsa is installed only with sparrow's alignment extra
+    raise ModuleNotFoundError(
+        "sparrow.sequence_analysis.alignment needs pyfamsa, which sparrow installs only with its alignment "
+        "extra: pip install 'idptools-sparrow[alignment] @ git+https://github.com/idptools/sparrow.git', "
+        "or pip install pyfamsa.",
+        name="pyfamsa",
+    ) from error
+
 
 from sparrow import Protein
 from sparrow.visualize.sequence_visuals import show_sequence

@@ -129,6 +129,24 @@ Core sequence analysis works out of the box. The deep-learning predictors
 dependency, which is installed automatically; the first call to a given
 predictor loads its network lazily.
 
+Multiple sequence alignment
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+:class:`~sparrow.sequence_analysis.alignment.SequenceAlignment` aligns
+sequences with `pyFAMSA <https://github.com/althonos/pyfamsa>`_, which sparrow
+installs only if you ask for its ``alignment`` extra:
+
+.. code-block:: bash
+
+   pip install "idptools-sparrow[alignment] @ git+https://github.com/idptools/sparrow.git"
+
+   # or, in a clone
+   pip install -e ".[alignment]"
+
+Nothing else in sparrow needs pyFAMSA. Without it, importing
+``sparrow.sequence_analysis.alignment`` raises an error saying how to install
+it. The ``test`` extra includes it, so the test suite covers alignment too.
+
 Next steps
 ----------
 
