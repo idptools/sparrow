@@ -32,4 +32,4 @@ The trained networks behind sparrow's predictors, one directory per predictor. E
 
 Every network here was trained with PARROT 1, which saves only a bidirectional LSTM's weights, so its predictor also declares its `ARCHITECTURE`: `"MtO"` (many-to-one) for one value per sequence, or `"MtM"` (many-to-many) for one per residue. A network trained with PARROT 2 records its own architecture, task and encoding, and sparrow loads it with PARROT 2's `Predictor`; both kinds are used the same way.
 
-Older versions stay here so earlier results can be reproduced. To load one, give the version: `batch_predict(sequences, network="rg", version=1)`, or `RgPredictor(version="1")`. To add a network, see the developer guide on predictors (`docs/predictors.rst`).
+Older versions stay here so earlier results can be reproduced. To load one, give the version: `batch_predict(sequences, network="rg", version=1)`, or `RgPredictor(version="1")`. To add a network, see the developer guide on predictors (`docs/adding_a_predictor.rst`).

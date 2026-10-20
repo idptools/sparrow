@@ -72,9 +72,9 @@ instance/
 # Sphinx documentation
 docs/_build/
 docs/generated/
-docs/api_guides/generated/
-# auto-generated at build time by docs/conf.py
-docs/api_guides/_property_index_table.rst
+# auto-generated at build time by docs/conf.py and docs/_ext/batch_analyses.py
+docs/power_user/_property_index_table.rst
+docs/batch/_analyses_*.rst
 
 # PyBuilder
 target/

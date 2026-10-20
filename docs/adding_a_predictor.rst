@@ -1,10 +1,10 @@
-Predictors
-=================
+Adding a Predictor
+==================
 
 .. note::
-   This page is a focused guide for **adding** a predictor. To **use** the
-   existing predictors from a ``Protein`` object, see
-   :doc:`The Protein Object <api_guides/protein>`.
+   This page is a guide to **adding** a predictor. To **use** the existing
+   predictors from a ``Protein``, see :doc:`protein/predictor`, and to run
+   them directly, :doc:`power_user/networks`.
 
 sparrow implements a set of different sequence-based predictors in a modular, extendable way that enables additional predictors to be easily added. 
 
@@ -134,13 +134,10 @@ One important thing is to document these predictors clearly. In particular:
 * If a predictor memoizes its result, make the memoization key include **every** argument that can change the returned value. A selector that ignores an argument will silently hand back a result computed with different settings - see ``binary_disorder()`` for the pattern to follow.
 * State the return type and units explicitly (for example, Rg and Re are returned in Angstroms).
 
-Reference: the shared predictor machinery
------------------------------------------
+Reference
+---------
 
-.. automodule:: sparrow.predictors.base
-
-.. automodule:: sparrow.predictors.network_loader
-   :exclude-members: number_of_classes, input_size, number_of_layers, hidden_vector_size, device,
-                     saved_by_parrot2, datatype
-
-.. automodule:: sparrow.predictors.outputs
+The machinery every predictor shares - :mod:`sparrow.predictors.base`,
+:mod:`sparrow.predictors.network_loader` and :mod:`sparrow.predictors.outputs` -
+and the registries are documented in full in :doc:`api/predictors`, and the
+template, :mod:`sparrow.predictors.predictor_template`, with them.

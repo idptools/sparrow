@@ -1,5 +1,5 @@
-Amino-Acid Property Profiles (AAindex)
-======================================
+Amino-Acid Scales (AAindex)
+===========================
 
 sparrow ships the `AAindex1 <https://www.genome.jp/aaindex/>`_ database: 500+
 published indices that each assign a numerical value to every amino acid
@@ -77,12 +77,9 @@ Notes
   raises a ``ProteinException`` rather than returning a misleading number.
 * The profile is the mean index value within each ``window_size`` window;
   ``end_mode`` and ``smooth`` behave exactly as in ``linear_sequence_profile``.
-
-Module reference
-----------------
-
-.. automodule:: sparrow.data.aaindex
-   :members:
+* :mod:`sparrow.data.aaindex` is documented in full in :doc:`../api/data`. The
+  same AAindex release, with the pairwise matrices of AAindex2 and AAindex3, is
+  also readable through :mod:`sparrow.data.properties`; see :doc:`data`.
 
 Property Index Reference
 ------------------------

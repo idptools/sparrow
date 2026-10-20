@@ -105,7 +105,7 @@ proteins["IDR1"].kappa                              # already computed
 proteins = sparrow.batch(sequences, ["FCR", {"charge_at_pH": {"pH": 6.0}}, {"nardini.vector": {"seed": 42}}], n_processes=8)
 ```
 
-It takes a dict or a list of sequences or `Protein` objects, or the path to a FASTA file, and returns the same shape (a dict keyed by header, for a file). On the 6,067 yeast proteins, all 20 scalar properties take 0.46 s this way, against 2.8 s one `Protein` at a time; for 300 of them, all 21 deep-learning predictions — the ALBATROSS polymer dimensions, DSSP, transmembrane regions, localization signals, transactivation domains, PScore, phosphorylation, and metapredict's disorder and pLDDT — take 10.8 s on a CPU, against 103 s. See [the guide](https://idptools-sparrow.readthedocs.io/en/latest/api_guides/many_sequences.html).
+It takes a dict or a list of sequences or `Protein` objects, or the path to a FASTA file, and returns the same shape (a dict keyed by header, for a file). On the 6,067 yeast proteins, all 20 scalar properties take 0.46 s this way, against 2.8 s one `Protein` at a time; for 300 of them, all 21 deep-learning predictions — the ALBATROSS polymer dimensions, DSSP, transmembrane regions, localization signals, transactivation domains, PScore, phosphorylation, and metapredict's disorder and pLDDT — take 10.8 s on a CPU, against 103 s. See [the guide](https://idptools-sparrow.readthedocs.io/en/latest/batch/index.html).
 
 When you want arrays rather than `Protein` objects — a feature matrix, say — the functions underneath return them. Every `Protein` property is calculated by a batch function in `sparrow.properties`, which takes a list of sequences and returns one value per sequence. `compute()` gives any of them by their `Protein` name — the same values, to the last bit, without making a `Protein` for each sequence:
 
@@ -119,7 +119,7 @@ qn = fraction_in_set(sequences, ["Q", "N"])
 fcr_profiles = window_profile(sequences, composition.fraction_charged, window_size=8)
 ```
 
-For the 24,508 human IDRs, all 20 `Protein` properties take 0.28 s this way. See [the guide](https://idptools-sparrow.readthedocs.io/en/latest/api_guides/sequence_properties.html).
+For the 24,508 human IDRs, all 20 `Protein` properties take 0.28 s this way. See [the guide](https://idptools-sparrow.readthedocs.io/en/latest/power_user/properties.html).
 
 ## ALBATROSS predictions
 
@@ -159,7 +159,7 @@ Networks available for batch predict are: `rg`, `scaled_rg`, `re`, `scaled_re`, 
 default `safe=True`, the `rg` and `re` networks automatically hand sequences shorter
 than 35 residues to their scaled counterparts.
 
-See [the batch prediction guide](https://idptools-sparrow.readthedocs.io/en/latest/api_guides/batch.html)
+See [the batch prediction guide](https://idptools-sparrow.readthedocs.io/en/latest/power_user/networks.html)
 for all options.
 
 ## NARDINI / NARDINI+ molecular grammars
@@ -276,7 +276,7 @@ The bundled per-species backgrounds and GIN centroids are redistributed from the
 [GIN resource](https://github.com/kierstenruff/RUFF_KING_Grammars_of_IDRs_using_NARDINI-)
 under the MIT licence. **Please cite the original work** (Cohan et al. 2022 for
 NARDINI; Ruff et al. 2025 for GIN) — see
-[the NARDINI guide](https://idptools-sparrow.readthedocs.io/en/latest/api_guides/nardini.html)
+[the NARDINI guide](https://idptools-sparrow.readthedocs.io/en/latest/power_user/nardini.html)
 for the full citation list.
 
 ## Amino-acid property profiles
@@ -294,12 +294,9 @@ by AAindex accession; see `sparrow.data.aaindex.list_property_indices()`.
 
 ## Documentation
 
-Full documentation is built with [Sphinx](https://www.sphinx-doc.org/) and lives
-in [`docs/`](docs). It is available online at (https://idptools-sparrow.readthedocs.io/en/latest/). 
+Full documentation is built with [Sphinx](https://www.sphinx-doc.org/) and lives in [`docs/`](docs). It is available online at https://idptools-sparrow.readthedocs.io/en/latest/.
 
-
-
-The documentation  includes an installation guide, worked examples (including plotting a linear NCPR profile), and a complete, capability-organized reference for everything reachable from a `Protein`. 
+It has five sections - an overview of what sparrow is, how it is organized and how to install it; the `Protein` object, with a page for each kind of thing it gives you; `sparrow.batch`, with every analysis it can be asked for, its arguments and their defaults; the power-user functions underneath; and the full API reference - and pages of worked examples, guides to adding predictors and plugins, how to cite sparrow, and the changelog.
 
 To build it locally:
 

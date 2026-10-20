@@ -150,6 +150,7 @@ it. The ``test`` extra includes it, so the test suite covers alignment too.
 Next steps
 ----------
 
-* New to sparrow? See :doc:`examples` for worked, runnable walkthroughs.
+* New to sparrow? See :doc:`../examples` for worked, runnable
+  walkthroughs.
 * Looking for a specific call? Everything you can do with a protein is in
-  :doc:`api_guides/protein`.
+  :doc:`../protein/index`, and with many in :doc:`../batch/index`.

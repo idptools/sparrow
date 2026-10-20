@@ -39,29 +39,19 @@ been removed -- see :ref:`nardini-migration`.
 From a ``Protein``
 ------------------
 
-For a single sequence, everything is reachable from the
-:attr:`~sparrow.protein.Protein.nardini` accessor:
+For a single sequence, everything is reachable from ``protein.nardini``, which
+:doc:`../protein/nardini` covers:
 
 .. code-block:: python
 
    from sparrow import Protein
 
-   p = Protein("MENDPRVRKFASDGAQWAIKWQKK...")
-
+   p = Protein("MENDPRVRKFASDGAQWAIKWQKKSSGSPRNTTASSGEKSSDRPRSTSSGRRSSASS")
    p.nardini.vector(seed=42)        # 90-feature NARDINI+ vector
-   p.nardini.patterning(seed=42)    # just the 36 patterning z-scores
-   p.nardini.composition()          # just the 54 compositional z-scores
    p.nardini.gin_cluster(seed=42)   # nearest human GIN grammar
-   print(p.nardini.gin_report(seed=42))
 
-Compositional z-scores need a reference IDR set, and for one protein there is
-nothing to build one from, so these default to the **published human IDRome
-background** bundled with sparrow -- which is also the space the GIN centroids
-live in. Override with ``background="yeast"``, a saved ``.npz`` path, or a
-:class:`~sparrow.nardini.background.NardiniBackground`. The patterning half never
-uses it.
-
-See :ref:`nardini-protein` for the full accessor.
+This page is about NARDINI+ for sets of sequences, and about what the numbers
+mean.
 
 The batch workflow
 ------------------
@@ -1326,131 +1316,10 @@ that work too:
   (2025). Molecular grammars of predicted intrinsically disordered regions that
   span the human proteome. *Cell*.
 
-API Reference
--------------
+Reference
+---------
 
-.. py:module:: sparrow.nardini
-
-Everything below can also be imported from :mod:`sparrow.nardini` itself, which
-re-exports the public functions, classes and constants of its submodules.
-
-.. _nardini-protein:
-
-The ``Protein.nardini`` accessor
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. autoclass:: sparrow.nardini.protein_interface.ProteinNardini
-   :members:
-
-Labelled containers
-^^^^^^^^^^^^^^^^^^^
-
-.. autoclass:: sparrow.nardini.table.FeatureVector
-   :members:
-
-.. autoclass:: sparrow.nardini.table.FeatureTable
-   :members:
-
-Background construction
-^^^^^^^^^^^^^^^^^^^^^^^
-
-.. py:module:: sparrow.nardini.background
-
-.. autofunction:: sparrow.nardini.background.build_background
-
-.. autofunction:: sparrow.nardini.background.load_reference_background
-
-.. autoclass:: sparrow.nardini.background.NardiniBackground
-   :members:
-
-.. autodata:: sparrow.nardini.background.REFERENCE_SPECIES
-
-.. autodata:: sparrow.nardini.background.MIN_RECOMMENDED_SEQUENCES
-
-.. autodata:: sparrow.nardini.background.MAX_DEGENERATE_FRACTION
-
-GIN cluster assignment
-^^^^^^^^^^^^^^^^^^^^^^
-
-.. py:module:: sparrow.nardini.gin
-
-.. autofunction:: sparrow.nardini.gin.assign_gin_clusters
-
-.. autofunction:: sparrow.nardini.gin.gin_cluster_definitions
-
-.. autofunction:: sparrow.nardini.gin.load_gin_reference
-
-.. autodata:: sparrow.nardini.gin.GIN_REFERENCES
-
-.. autodata:: sparrow.nardini.gin.GIN_CLIP
-
-.. autodata:: sparrow.nardini.gin.TYPICAL_COMPOSITION_RMS_Z
-
-.. autodata:: sparrow.nardini.gin.TYPICAL_MAX_SATURATED
-
-.. autoclass:: sparrow.nardini.gin.GINAssignment
-   :members:
-
-.. autoclass:: sparrow.nardini.gin.GINReference
-   :members:
-
-Vector calculation
-^^^^^^^^^^^^^^^^^^
-
-.. autofunction:: sparrow.nardini.vectors.nardini_vectors
-
-.. autoclass:: sparrow.nardini.vectors.NardiniResult
-   :members:
-
-Patterning
-^^^^^^^^^^
-
-.. automodule:: sparrow.nardini.patterning
-   :members: patterning_zscores, patterning_values, resolve_backend,
-             encode_types, type_fractions, PATTERNING_BACKENDS
-
-Composition
-^^^^^^^^^^^
-
-.. automodule:: sparrow.nardini.composition
-   :members: composition_values, composition_matrix, composition_feature_names,
-             PATCH_INTERRUPTION, PATCH_MIN_TARGET_COUNT, PATCH_RESIDUES,
-             RG_PATCH_RESIDUES, RG_MOTIF, RG_MIN_ADJACENT_PAIRS
-
-Clustering
-^^^^^^^^^^
-
-.. automodule:: sparrow.nardini.clustering
-   :members: build_gin_reference, compare_gin_references, describe_centroid,
-             MIN_SEQUENCES_PER_CLUSTER, DEFAULT_NUM_CLUSTERS
-
-Parallel computation
-^^^^^^^^^^^^^^^^^^^^
-
-.. autofunction:: sparrow.nardini.batch.nardini_proteins
-
-Errors and warnings
-^^^^^^^^^^^^^^^^^^^
-
-Everything sparrow raises deliberately derives from
-:class:`~sparrow.sparrow_exceptions.SparrowException`, so one ``except`` clause
-covers it. The advisory warnings below are not errors: the call still returns a
-usable result, and they flag a result you probably should not trust. They share a
-base class so you can silence them as a group::
-
-    import warnings
-    from sparrow.sparrow_exceptions import SparrowWarning
-
-    warnings.filterwarnings("ignore", category=SparrowWarning)
-
-.. autoclass:: sparrow.sparrow_exceptions.SparrowWarning
-
-.. autoclass:: sparrow.sparrow_exceptions.BackgroundQualityWarning
-
-.. autoclass:: sparrow.sparrow_exceptions.ClusteringQualityWarning
-
-Residue groupings
-^^^^^^^^^^^^^^^^^
-
-.. automodule:: sparrow.nardini.groups
-   :members: resolve_typeset, type_names, patterning_feature_names
+Every function, class and constant of :mod:`sparrow.nardini` is documented in
+full in :doc:`../api/nardini`, and the ``Protein.nardini`` accessor in
+:doc:`../protein/nardini`. The advisory warnings NARDINI+ gives are documented
+with sparrow's exceptions, in :doc:`../api/exceptions`.

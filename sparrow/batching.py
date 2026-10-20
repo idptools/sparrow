@@ -1,6 +1,6 @@
 """Many sequences in, :class:`~sparrow.protein.Protein` objects out.
 
-:func:`batch` is how sparrow takes a set of sequences of any size. You name the
+:func:`sparrow.batch` is how sparrow takes a set of sequences of any size. You name the
 values you want by the path you would read them back by - ``"FCR"``,
 ``"predictor.radius_of_gyration"``, ``"nardini.vector"`` - and get back one
 ``Protein`` per sequence with those values already computed, so reading them

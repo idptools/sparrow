@@ -13,7 +13,6 @@ except ModuleNotFoundError as error:
         name="pyfamsa",
     ) from error
 
-
 from sparrow import Protein
 from sparrow.visualize.sequence_visuals import show_sequence
 
@@ -32,18 +31,46 @@ class SequenceAlignment:
         refine: Union[bool, None] = None,
     ):
         """
-        Initialize the SequenceAlignment object.
+        Set up a multiple sequence alignment of a set of proteins, made with pyFAMSA.
+
+        Nothing is aligned until :meth:`construct_msa` or :attr:`alignment` is
+        first used. The arguments after ``input_data`` are FAMSA's, passed to
+        ``pyfamsa.Aligner``.
 
         Parameters
         ----------
-        input_data : Union[List[Protein], str, Dict[str, str]]
-            A list of Protein objects, a path to a FASTA file, or a dictionary
-            of FASTA headers to sequences.
+        input_data : str or dict of sparrow.protein.Protein
+            The path to a FASTA file, or a dict of ``Protein`` objects keyed by
+            the names the alignment gives them.
+        threads : int, optional
+            Threads to align with. Default 0, one for each CPU.
+        scoring_matrix : str, optional
+            The substitution matrix, by name. Default ``'BLOSUM62'``.
+        guide_tree : {'sl', 'slink', 'upgma', 'nj'}, optional
+            How the guide tree is built: single linkage (by MST and Prim's
+            algorithm, or by SLINK), UPGMA or neighbour joining. Default
+            ``'upgma'``.
+        tree_heuristic : {'medoid', 'parttree'} or None, optional
+            A heuristic for building the guide tree of a large set, or None
+            for none. Default None.
         medoid_threshold : int or None, optional
             Number of sequences at or above which pyFAMSA switches to medoid-seeded
             guide-tree construction. ``None`` (the default) leaves pyFAMSA's own
             default in place, currently 2000. If you do set it, pyFAMSA requires it
             to be at least ``medoid_seeds`` (100 by default) and raises otherwise.
+        n_refinements : int, optional
+            Refinement iterations. Default 200.
+        keep_duplicates : bool, optional
+            Keep duplicate sequences, rather than discarding them before the
+            guide tree is built. Default False.
+        refine : bool or None, optional
+            True to refine the alignment, False not to, or None (the default)
+            to let pyFAMSA decide: it refines sets of up to 1000 sequences.
+
+        Notes
+        -----
+        ``input_data`` is read when the proteins are aligned, which raises a
+        ``ValueError`` if it is neither a path nor a dict.
         """
         self.input_data = input_data
         self.threads = threads
@@ -89,8 +116,7 @@ class SequenceAlignment:
 
     def _load_sequences(self) -> List[Sequence]:
         """
-        Load sequences from either a list of Protein objects, a FASTA file, or
-        a dictionary of header-sequence mappings.
+        Load the sequences from a FASTA file or a dict of Protein objects.
 
         Returns
         -------
@@ -113,8 +139,8 @@ class SequenceAlignment:
             ]
         else:
             raise ValueError(
-                "Invalid input_data format. Must be either a list of Protein objects, "
-                "a path to a FASTA file, or a dictionary of header-sequence mappings."
+                "Invalid input_data format. Must be the path to a FASTA file, or a dict of Protein objects keyed by "
+                "name."
             )
 
         return sequences

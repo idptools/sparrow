@@ -1195,16 +1195,13 @@ class Protein:
             is always used
 
         end_mode : str
-            Selector that defines how ends are dealt with. Empty string means nothing is
-            done, but extend-ends and zero-ends ensure the track length equals the sequence
-            length which can often be useful. Default is 'extend-ends'.
+            Selector that defines how ends are dealt with. Default is
+            ``'extend-ends'``. Both ``'extend-ends'`` and ``'zero-ends'`` make
+            the track as long as the sequence.
 
-            'extend-ends'   |    The leading/lagging track values are copied from
-                                 the first and last and values.
-
-            ''              |    Empty string means they're ignored,
-
-            'zero-ends'     |    Means leading/lagging track values are set to zero.
+            * ``'extend-ends'`` : The leading/lagging track values are copied from the first and last values.
+            * ``''`` : Empty string means they're ignored.
+            * ``'zero-ends'`` : Leading/lagging track values are set to zero.
 
         smooth : int or None
             Selector which allows you to smooth the data over a windowsize. Note window

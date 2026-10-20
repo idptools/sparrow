@@ -11,11 +11,10 @@ NARDINI's patterning features.
 Every function takes a batch of sequences and returns one value per sequence;
 a single string is a batch of one.
 
-Public Functions Covered
-------------------------
+The functions
+-------------
 
 .. autosummary::
-   :toctree: generated
    :nosignatures:
 
    sparrow.properties.patterning.kappa
@@ -185,30 +184,8 @@ is the compiled code's precision rather than an error here.
    statistically equivalent - set of shuffles. Do not compare a stored
    percentile from the compiled version against one computed now; recompute.
 
-Installation notes
-------------------
+Reference
+---------
 
-* There is **no build step**. sparrow is pure Python, so there are no extensions
-  to compile and no compiler to install.
-* If you are updating a checkout from before ``sparrow.patterning`` was removed,
-  delete that directory - ``rm -r sparrow/patterning`` from the repository root.
-  Python would otherwise still find any compiled ``kappa.cpython-*.so`` left in
-  it, and ``import sparrow.patterning.kappa`` would silently run the old compiled
-  code instead of failing.
-
-Reference: ``sparrow.properties.patterning``
---------------------------------------------
-
-The functions listed at the top of this page each have a page of their own;
-everything else in the module is documented here.
-
-.. automodule:: sparrow.properties.patterning
-   :members:
-   :exclude-members: kappa, kappa_x, sigma, delta, patterning_percentile, iwd,
-                     iwd_charged_weighted, bivariate_iwd_charged_weighted, scd, shd
-
-Reference: ``sparrow.properties.windows``
------------------------------------------
-
-.. automodule:: sparrow.properties.windows
-   :members:
+:mod:`sparrow.properties.patterning` and :mod:`sparrow.properties.windows` are
+documented in full in :doc:`../api/properties`.

@@ -14,6 +14,10 @@ sequences or ``Protein`` objects. :func:`sparrow.batch` uses it for every
 network-backed value it is asked for.
 """
 
+# torch is mocked when the docs are built on Read the Docs, and a mock cannot be part
+# of a union such as ``str | torch.device``, so annotations are not evaluated
+from __future__ import annotations
+
 from typing import Optional
 
 import torch
@@ -32,7 +36,7 @@ from sparrow.sparrow_exceptions import SparrowException
 #: changes predictions only at the networks' 32-bit precision.
 DEFAULT_BATCH_SIZE = 32
 
-#: The batch algorithm used when none is given: pad-n-pack where PyTorch has it.
+#: The batch algorithm used when none is given, which is pad-n-pack where PyTorch has it.
 DEFAULT_BATCH_ALGORITHM = "default"
 
 BATCH_ALGORITHMS = ("default", "size-collect", "pad-n-pack")

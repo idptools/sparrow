@@ -15,7 +15,7 @@ To add a predictor called, say, ``my_property``:
 
 That is everything the predictor needs: a PARROT 2 network file records its
 architecture, task and sequence encoding, so none of them is declared here.
-``docs/predictors.rst`` explains how to make the predictor available as
+``docs/adding_a_predictor.rst`` explains how to make the predictor available as
 ``Protein(seq).predictor.my_property()``.
 
 Loading a network saved by PARROT 2 needs PARROT 2 installed; until it is

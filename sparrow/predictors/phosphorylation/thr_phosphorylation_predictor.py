@@ -18,7 +18,7 @@ class ThrPhosphorylationPredictor(PhosphoPredictor):
     def predict_thr_phosphorylation(self, seq, raw_values=False, return_sites_only=False, windowsize=4, threshold=0.6):
         """Predict phosphothreonine sites for a sequence.
 
-        See :meth:`PhosphoPredictor._predict_phospho` for parameter and return
+        See :meth:`~sparrow.predictors.phosphorylation.base.PhosphoPredictor._predict_phospho` for parameter and return
         semantics.
         """
         return self._predict_phospho(

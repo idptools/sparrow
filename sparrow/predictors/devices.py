@@ -30,6 +30,10 @@ On an NVIDIA GPU, sparrow runs its networks in full float32 precision
 predictions on every device up to float32 rounding, whichever PARROT saved it.
 """
 
+# torch is mocked when the docs are built on Read the Docs, and a mock cannot be part
+# of a union such as ``str | torch.device``, so annotations are not evaluated
+from __future__ import annotations
+
 import contextlib
 from collections.abc import Iterator
 from typing import Any

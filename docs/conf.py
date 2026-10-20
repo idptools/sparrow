@@ -18,6 +18,11 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+# sparrow's own Sphinx extensions, in docs/_ext
+EXTENSIONS_DIRECTORY = Path(__file__).resolve().parent / "_ext"
+if str(EXTENSIONS_DIRECTORY) not in sys.path:
+    sys.path.insert(0, str(EXTENSIONS_DIRECTORY))
+
 # -- Project information -----------------------------------------------------
 
 project = "sparrow"
@@ -49,21 +54,29 @@ extensions = [
     "sphinx.ext.intersphinx",
     "sphinx.ext.todo",
     "sphinx.ext.mathjax",
-    "sphinxcontrib.bibtex",
+    # the reference for every analysis sparrow.batch can be asked for
+    "batch_analyses",
+    # warns about any public member or module no page documents
+    "docs_coverage",
+    # sends the old address of each page that moved to its new one
+    "redirects",
 ]
 
+# Markdown, for the changelog page, which includes CHANGELOG.md
+extensions.append("myst_parser")
+
+# Extensions used where they are installed, as they are on Read the Docs (from
+# docs/requirements.txt); a build without them is otherwise the same
 OPTIONAL_EXTENSIONS = [
-    "myst_parser",
     "sphinx_copybutton",
-    "sphinx_autodoc_typehints",
     "sphinxcontrib.bibtex",
 ]
 for ext_name in OPTIONAL_EXTENSIONS:
     try:
         importlib.import_module(ext_name)
     except ImportError:  # pragma: no cover
-        if ext_name in extensions:
-            extensions.remove(ext_name)
+        continue
+    extensions.append(ext_name)
 
 autosummary_generate = True
 autosummary_imported_members = True
@@ -90,10 +103,13 @@ intersphinx_mapping = {
     "python": ("https://docs.python.org/3", None),
     "numpy": ("https://numpy.org/doc/stable/", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
+    "protfasta": ("https://protfasta.readthedocs.io/en/latest/", None),
 }
 
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
+# A file whose name starts with an underscore is included by a page rather than
+# being a page of its own, such as the generated tables
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "**/_*.rst", "README.md", "**/README.md"]
 pygments_style = "default"
 
 # -- Options for HTML output -------------------------------------------------
@@ -145,6 +161,10 @@ suppress_warnings = [
     "ref.python",
     "bibtex.duplicate_citation",
     "bibtex.duplicate_label",
+    # CHANGELOG.md, included by changelog.rst, starts its sections at H2
+    # beneath the page's own title, and its older entries skip from H2 to H4;
+    # both render as intended
+    "myst.header",
 ]
 
 # numpy-style docstrings describe types in prose ("int, optional", "sequence of
@@ -161,7 +181,7 @@ _TYPE_PROSE = [
     r"callable",
     r"array_like",
     r"arrays?",
-    r"str to .*",
+    r"str to.*",
     r".* object",
     r"numpy dtype",
     # the pieces of a set of allowed values, such as {'raise', 'skip'}
@@ -180,6 +200,8 @@ _UNDOCUMENTED_EXTERNAL_TYPES = [
     r"Alignment",
 ]
 nitpick_ignore_regex = [("py:class", pattern) for pattern in _TYPE_PROSE + _UNDOCUMENTED_EXTERNAL_TYPES]
+# protfasta's inventory has read_fasta but not its exception class
+nitpick_ignore_regex.append(("py:exc", r"protfasta\.protfasta_exceptions\..*"))
 
 # -- Options for sphinxcontrib-bibtex ---------------------------------------
 
@@ -190,7 +212,7 @@ bibtex_reference_style = "author_year"
 
 # -- Auto-generated AAindex property index reference table ------------------
 def _generate_property_index_table(app):
-    """Write the AAindex property reference table included by api_guides/properties.
+    """Write the AAindex property reference table included by power_user/aaindex.
 
     Regenerated on every build so the table always matches the shipped database.
     Importing sparrow needs the same third-party mocks as autodoc on Read the Docs.
@@ -211,7 +233,7 @@ def _generate_property_index_table(app):
         # pipes break table cells
         return text.replace("\\", "").replace("_", r"\_").replace("|", r"\|").replace("`", "'")
 
-    out_path = Path(app.srcdir) / "api_guides" / "_property_index_table.rst"
+    out_path = Path(app.srcdir) / "power_user" / "_property_index_table.rst"
     lines = [
         ".. list-table::",
         "   :header-rows: 1",

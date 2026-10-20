@@ -77,7 +77,7 @@ The cluster descriptions (`'high Frac Q, Q patches'`) are generated from each ce
 
 ## Documentation
 
-The full guide is in the sparrow docs under [NARDINI / NARDINI+](https://idptools-sparrow.readthedocs.io/en/latest/api_guides/nardini.html); see "Building your own clusters" for the API this notebook uses, and `sparrow/nardini/architecture.md` if you are working on the module itself.
+The full guide is in the sparrow docs under [NARDINI / NARDINI+](https://idptools-sparrow.readthedocs.io/en/latest/power_user/nardini.html); see "Building your own clusters" for the API this notebook uses, and `sparrow/nardini/architecture.md` if you are working on the module itself.
 
 ## Citation
 

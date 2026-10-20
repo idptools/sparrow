@@ -3,7 +3,7 @@
 The three phosphorylation predictors are identical apart from their weights file
 and the target residue (``S``/``T``/``Y``). They all turn the network output into
 per-residue positive-class probabilities and then optionally mask those to
-phosphosites via :func:`phospho_predictor_utils.return_hits`.
+phosphosites via :func:`~sparrow.predictors.phosphorylation.phospho_predictor_utils.return_hits`.
 """
 
 from typing import ClassVar

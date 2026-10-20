@@ -8,7 +8,7 @@ fractions, SCD and the linear profiles -- is calculated in one place,
 their own.
 
 To get ``Protein`` objects with these values already computed, use
-:func:`sparrow.batch` (:doc:`many_sequences`), which calls these functions for
+:func:`sparrow.batch` (:doc:`../batch/index`), which calls these functions for
 you. This page is for when you want the arrays themselves.
 
 Every function there takes a **batch** of sequences and returns an array with
@@ -223,34 +223,7 @@ paths were not kept:
 Reference
 ---------
 
-.. py:module:: sparrow.properties
-
-.. autofunction:: sparrow.properties.compute
-
-.. autodata:: sparrow.properties.PROPERTY_NAMES
-   :no-value:
-
-.. automodule:: sparrow.properties.composition
-   :members:
-   :exclude-members: counts, lengths
-
-.. automodule:: sparrow.properties.charge
-   :members: charge_at_pH, isoelectric_point, DEFAULT_PH, PI_THRESHOLD
-
-.. automodule:: sparrow.properties.encoding
-   :members:
-   :exclude-members: codes, lengths
-
-.. automodule:: sparrow.properties.patches
-   :members:
-
-.. automodule:: sparrow.properties.profiles
-   :members:
-
-The residue sets and scales these functions use:
-
-.. automodule:: sparrow.data.amino_acids
-   :members: VALID_AMINO_ACIDS, POS, NEG, CHARGE, ARO, ALI, POLAR, NARDINI_POLAR,
-             EXPANDING, DISORDER_PROMOTING, TITRATABLE_BASES, TITRATABLE_ACIDS,
-             AA_PKA, AA_MOLECULAR_WEIGHT, AA_hydro_KD, AA_hydro_KD_normalized,
-             AA_hydro_HPS, AA_PPII_HILSER
+:func:`~sparrow.properties.compute`, :data:`~sparrow.properties.PROPERTY_NAMES`
+and every module of :mod:`sparrow.properties` are documented in full in
+:doc:`../api/properties`, and the residue sets and scales they use in
+:doc:`../api/data`.

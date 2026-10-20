@@ -1,5 +1,13 @@
-Batch Prediction (``batch_predict``)
-====================================
+Running the Networks
+====================
+
+This page is about running sparrow's networks yourself: over many sequences
+with :func:`~sparrow.predictors.batch_predictor.batch_predict`, through a
+predictor class, pinned to a network version, on a GPU, or as a bare PyTorch
+module. For predictions from a ``Protein``, see :doc:`../protein/predictor`.
+
+Batch prediction
+----------------
 
 :func:`sparrow.predictors.batch_predictor.batch_predict` runs one of sparrow's
 networks over a whole set of sequences in batched forward passes - the
@@ -11,12 +19,9 @@ constructing one ``Protein`` per sequence and calling its ``predictor``: over 30
 yeast proteins, 7 to 16 times faster for each network.
 
 To get ``Protein`` objects with these predictions already made, use
-:func:`sparrow.batch` (:doc:`many_sequences`), which runs the same networks the
+:func:`sparrow.batch` (:doc:`../batch/index`), which runs the same networks the
 same way for you, and metapredict's disorder and pLDDT predictions in
 metapredict's own batches.
-
-Quick start
------------
 
 .. code-block:: python
 
@@ -35,7 +40,7 @@ Quick start
    #   {"p1": ["MEEEKKKKSSSTTTDDD", array of shape (17, 3)], ...}
 
 The networks
-------------
+^^^^^^^^^^^^
 
 Each network's prediction is what its predictor makes for one sequence. The
 ``Protein.predictor`` methods return these, or values made from them.
@@ -82,7 +87,7 @@ Each network's prediction is what its predictor makes for one sequence. The
      - ``serine_phosphorylation()`` and its relatives, which apply a threshold
 
 How exact the predictions are
------------------------------
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 A prediction made in a batch is not always the one made for the sequence alone
 to the last bit: the networks compute in 32-bit arithmetic, and a batch is
@@ -100,7 +105,7 @@ summed in a different order than one sequence alone. Over 300 yeast proteins
   1.3e-4.
 
 Inputs and outputs
-------------------
+^^^^^^^^^^^^^^^^^^
 
 * **Input** -- a ``dict`` (keys preserved in the output) or a ``list`` (mapped to
   0-based integer keys ``0..n-1``). Values may be sequence strings or
@@ -123,7 +128,7 @@ Inputs and outputs
    from_list = batch_predict(["MEEEKKKKSSSTTTDDD", "QQQQQQAASSSSTTTTQQQQQ"], network="asphericity")
 
 Key options
------------
+^^^^^^^^^^^
 
 * ``network`` -- which network to run (see the table above). Required.
 * ``batch_size`` -- forward-pass batch size (default 32). Larger values are
@@ -162,6 +167,115 @@ Key options
   this ``True`` (the default) unless you have a specific reason not to. Has no
   effect for the other networks.
 
+Predictor classes and network versions
+--------------------------------------
+
+Each network has a predictor class, which loads the network once and predicts
+one sequence (``predict``) or many (``predict_many``), as ``batch_predict`` and
+``Protein.predictor`` do. :func:`~sparrow.predictors.load_network_predictor`
+loads one by its network name, and
+:func:`~sparrow.predictors.batch_predictor.predict_many` predicts many
+sequences with one in a single call:
+
+.. code-block:: python
+
+   from sparrow.predictors import load_network_predictor
+   from sparrow.predictors.batch_predictor import predict_many
+
+   rg = load_network_predictor("scaled_rg")          # loaded onto the CPU by default
+   rg.predict("MEEEKKKKSSSTTTDDDQQQQNNNNGGGGSSSS")
+   rg.predict_many(["MEEEKKKKSSSTTTDDD", "GRGRGGYGGRGGYGGSRGGYGG"])
+
+   predict_many("dssp", ["MEEEKKKKSSSTTTDDD", "GRGRGGYGGRGGYGGSRGGYGG"], device="cpu")
+
+Every network's predictor uses its newest version by default, and the older
+versions sparrow ships can be asked for by number, to reproduce earlier
+results:
+
+.. code-block:: python
+
+   from sparrow.predictors.rg.radius_of_gyration_predictor import RgPredictor
+
+   RgPredictor(version=1).predict("MEEEKKKKSSSTTTDDDQQQQNNNNGGGGSSSS")
+   batch_predict(sequences, network="rg", version=1)
+
+.. list-table::
+   :header-rows: 1
+   :widths: 28 36 18 18
+
+   * - ``network``
+     - Predictor class
+     - Default version
+     - Versions shipped
+   * - ``rg``, ``scaled_rg``, ``re``, ``scaled_re``
+     - ``RgPredictor``, ``ScaledRgPredictor``, ``RePredictor``,
+       ``ScaledRePredictor``
+     - 2
+     - 1, 2
+   * - ``asphericity``, ``prefactor``
+     - ``AsphericityPredictor``, ``PrefactorPredictor``
+     - 2
+     - 1, 2
+   * - ``scaling_exponent``
+     - ``ScalingExponentPredictor``
+     - 2
+     - 1, 1.5, 2
+   * - ``dssp``
+     - ``DSSPPredictor``
+     - 2
+     - 1, 2
+   * - ``transmembrane``
+     - ``TransmembranePredictor``
+     - 4
+     - 1, 4
+   * - ``pscore``
+     - ``PScorePredictor``
+     - 4
+     - 2, 3, 4
+   * - ``mitochondrial_targeting``, ``nes``, ``nls``, ``tad``
+     - ``MitochondrialTargetingPredictor``, ``NESPredictor``, ``NLSPredictor``,
+       ``TADPredictor``
+     - 1
+     - 1
+   * - ``ser_phosphorylation``, ``thr_phosphorylation``, ``tyr_phosphorylation``
+     - ``SerPhosphorylationPredictor``, ``ThrPhosphorylationPredictor``,
+       ``TyrPhosphorylationPredictor``
+     - 1
+     - 1
+
+Each class lives in its own module under :mod:`sparrow.predictors`, listed in
+:doc:`../api/predictors`, and :data:`~sparrow.predictors.NETWORK_PREDICTORS`
+maps each network's name to its class. The predictor classes are loaded onto
+the CPU unless you pass ``device``.
+
+The network as a PyTorch module
+-------------------------------
+
+:func:`~sparrow.predictors.batch_predictor.prepare_model` gives a network as the
+``torch.nn.Module`` it is, in evaluation mode, with the device it was loaded
+onto, for when you want to run it yourself - inside a larger model, say:
+
+.. code-block:: python
+
+   import torch
+   from parrot import encode_sequence
+
+   from sparrow.predictors.batch_predictor import prepare_model
+   from sparrow.predictors.devices import full_float32_precision
+
+   device, network = prepare_model("scaled_rg", device="cpu")
+
+   sequence = "MEEEKKKKSSSTTTDDDQQQQNNNNGGGGSSSS"
+   one_hot = encode_sequence.one_hot(sequence).float().unsqueeze(0).to(device)   # (1, length, 20)
+   with torch.no_grad(), full_float32_precision():
+       raw = network(one_hot)          # (1, 1): Rg / sqrt(N), before sparrow rescales it
+
+It takes a batch of one-hot encoded sequences, ``(batch, length, 20)``, in
+float32, and returns the network's raw output, before the predictor turns it
+into a prediction. Run it inside
+:func:`~sparrow.predictors.devices.full_float32_precision` to compute as sparrow
+does on an NVIDIA GPU.
+
 How it works
 ------------
 
@@ -194,14 +308,11 @@ above.
   precision. PARROT batches these networks its own way, so ``batch_algorithm``
   does not apply to them.
 
-API Reference
--------------
+Reference
+---------
 
-.. autofunction:: sparrow.predictors.batch_predictor.batch_predict
-
-.. autofunction:: sparrow.predictors.batch_predictor.prepare_model
-
-.. autofunction:: sparrow.predictors.batch_predictor.run_network
-
-.. automodule:: sparrow.predictors.devices
-   :members: resolve_device, full_float32_precision, DEVICE_CHOICES, DEFAULT_DEVICE
+:func:`~sparrow.predictors.batch_predictor.batch_predict`,
+:func:`~sparrow.predictors.batch_predictor.predict_many`,
+:func:`~sparrow.predictors.batch_predictor.prepare_model`,
+:func:`~sparrow.predictors.batch_predictor.run_network`, the devices module
+and every predictor class are documented in full in :doc:`../api/predictors`.

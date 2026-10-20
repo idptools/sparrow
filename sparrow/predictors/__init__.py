@@ -372,15 +372,15 @@ class Predictor:
     # .................................................................
     #
     def __init__(self, protein_obj):
-        """
-        Parent object for wrangling the various sequence predictors implemented in
-        sparrow.
+        """Make the predictor accessor for a protein.
 
-        This object is accessible under teh Protein.predictor dot operator. Public
-        facing functions should be a single name that refers to the predictor type,
-        and those functions should return a np.array of length equal to the
-        sequence with per-residue predicted values
+        A ``Predictor`` is not normally made directly: it is reached as the
+        cached ``Protein.predictor`` accessor.
 
+        Parameters
+        ----------
+        protein_obj : sparrow.protein.Protein
+            The protein whose sequence is predicted.
         """
 
         # note the predictor object obtains a reference to the Protein object
@@ -479,7 +479,7 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         Returns
@@ -546,7 +546,7 @@ class Predictor:
     #
     def dssp_coil(self, mode="class", threshold=0.5, minimum_coil_length=1):
         """
-        Prediction as to whethere a residue will be found in a coil-state or not (i.e.
+        Prediction as to whether a residue will be found in a coil-state or not (i.e.
         not a helix or an extended/beta structure).
 
         Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. The
@@ -595,7 +595,7 @@ class Predictor:
     #
     def dssp_extended(self, mode="class", threshold=0.5, minimum_extended_length=5):
         """
-        Prediction as to whethere a residue will be found in an extended/beta-state or not (i.e.
+        Prediction as to whether a residue will be found in an extended/beta-state or not (i.e.
         not a helix or a coil region).
 
         Predictor trained by Stephen Plassmeyer on DSSP scores from AlphaFold2. The
@@ -651,7 +651,7 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         Returns
@@ -675,7 +675,7 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         Returns
@@ -699,7 +699,7 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         Returns
@@ -722,7 +722,7 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         Returns
@@ -740,12 +740,13 @@ class Predictor:
     #
     def disorder(self, recompute=False):
         """
-        Returns per-residue disorder prediction using metapredict (V2)
+        Returns per-residue disorder prediction using metapredict, with its
+        default disorder network (V3, from metapredict 3 on).
 
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         Returns
@@ -770,14 +771,14 @@ class Predictor:
     def disorder_domains(self, recompute=False, return_boundaries=False):
         """
         Returns per-residue binary classification for if a residue is
-        predicted to be in an IDR (1) or not 0. Note this uses metapredicts'
+        predicted to be in an IDR (1) or not 0. Note this uses metapredict's
         disorder domain prediction which is more sophisticated than just
         taking the binary classification of each
 
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         return_boundaries : bool
@@ -847,7 +848,7 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         Returns
@@ -884,7 +885,7 @@ class Predictor:
         """
         Returns binary classification as to if a residue is in an IDR or not
         using metapredict's IDR definition algorithm. The same parameters
-        that are fed into metapredicts' predict_disorder_domains() function
+        that are fed into metapredict's predict_disorder_domains() function
         can be provided here.
 
         Results are memoized per unique combination of the parameters below, so
@@ -894,7 +895,7 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of
+            Flag which, if set to true, means the predictor re-runs regardless of
             if the prediction has run already
 
         disorder_threshold : float
@@ -922,10 +923,10 @@ class Predictor:
 
         gap_closure : int
             Defines the largest gap that would be 'closed'. Gaps here refer to a
-            scenario in which you have two groups of disordered residues seprated
+            scenario in which you have two groups of disordered residues separated
             by a 'gap' of un-disordered residues. In general large gap sizes will
-            favour larger contigous IDRs. It's worth noting that gap_closure
-            becomes  relevant only when minimum_region_size becomes very small
+            favour larger contiguous IDRs. It's worth noting that gap_closure
+            becomes relevant only when minimum_region_size becomes very small
             (i.e. < 5)  because  really gaps emerge when the smoothed disorder
             fit is "noisy", but when smoothed gaps are increasingly rare.
             Default = 10.
@@ -939,12 +940,10 @@ class Predictor:
 
 
         Returns
-        -------------
-            list
-            returns a list with per-residue classification, where 1
-            means IDR and 0 means not IDR.
-
-
+        -------
+        list
+            A per-residue classification, where 1 means IDR and 0 means not
+            IDR.
         """
 
         # this option is no longer supported by metapredict's IDR-definition
@@ -1035,7 +1034,7 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         normalized : bool
@@ -1067,12 +1066,12 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         raw_values : bool
-            By default, this function takes an initial per-residue probility profile and
-            breaks that into dicrete residues that are predicted to be phosphorylated.
+            By default, this function takes an initial per-residue probability profile and
+            breaks that into discrete residues that are predicted to be phosphorylated.
             If you just want the raw per-residue phosphoprofile then raw_values can be
             set to true, and the function will return an array with values between 0
             and 1 per residue
@@ -1091,7 +1090,7 @@ class Predictor:
             If raw_values is set to true, instead the array elements contain
             probabilities between 0 and 1
 
-            if retrn_sites_only is set to True then instead a list with index
+            if return_sites_only is set to True then instead a list with index
             positions of phosphosites is provided.
 
         """
@@ -1112,12 +1111,12 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         raw_values : bool
-            By default, this function takes an initial per-residue probility profile and
-            breaks that into dicrete residues that are predicted to be phosphorylated.
+            By default, this function takes an initial per-residue probability profile and
+            breaks that into discrete residues that are predicted to be phosphorylated.
             If you just want the raw per-residue phosphoprofile then raw_values can be
             set to true, and the function will return an array with values between 0
             and 1 per residue
@@ -1136,7 +1135,7 @@ class Predictor:
             If raw_values is set to true, instead the array elements contain
             probabilities between 0 and 1
 
-            if retrn_sites_only is set to True then instead a list with index
+            if return_sites_only is set to True then instead a list with index
             positions of phosphosites is provided.
 
         """
@@ -1157,12 +1156,12 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         raw_values : bool
-            By default, this function takes an initial per-residue probility profile and
-            breaks that into dicrete residues that are predicted to be phosphorylated.
+            By default, this function takes an initial per-residue probability profile and
+            breaks that into discrete residues that are predicted to be phosphorylated.
             If you just want the raw per-residue phosphoprofile then raw_values can be
             set to true, and the function will return an array with values between 0
             and 1 per residue
@@ -1181,7 +1180,7 @@ class Predictor:
             If raw_values is set to true, instead the array elements contain
             probabilities between 0 and 1
 
-            if retrn_sites_only is set to True then instead a list with index
+            if return_sites_only is set to True then instead a list with index
             positions of phosphosites is provided.
 
         """
@@ -1223,7 +1222,7 @@ class Predictor:
             as True. Default = True.
 
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         safe : bool
@@ -1273,7 +1272,7 @@ class Predictor:
             as True. Default = True.
 
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         safe : bool
@@ -1300,7 +1299,7 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         Returns
@@ -1319,7 +1318,7 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         Returns
@@ -1338,7 +1337,7 @@ class Predictor:
         Parameters
         --------------
         recompute : bool
-            Flag which, of set to true, means the predictor re-runs regardless of if
+            Flag which, if set to true, means the predictor re-runs regardless of if
             the prediction has run already
 
         Returns

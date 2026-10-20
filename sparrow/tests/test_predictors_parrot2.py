@@ -6,7 +6,7 @@ loading and predicting do not depend on the weights being any good), save them
 as PARROT 2 does, and check that the template in
 sparrow/predictors/predictor_template.py, with only its weights path changed,
 predicts exactly what PARROT 2's own Predictor does, one sequence at a time and
-in batches, and that a network registered as docs/predictors.rst describes runs
+in batches, and that a network registered as docs/adding_a_predictor.rst describes runs
 in batch_predict and sparrow.batch as a network saved by PARROT 1 does. They are
 skipped when PARROT 2 is not installed, except those that do not need it.
 """
@@ -114,7 +114,7 @@ def filled_in_template(weights_path_template):
 
 
 def register_network(tmp_path, monkeypatch, encoding="onehot"):
-    """Save a PARROT 2 network and register it in sparrow as docs/predictors.rst says to, until the test ends."""
+    """Save a PARROT 2 network and register it in sparrow as docs/adding_a_predictor.rst says to, until the test ends."""
     save_parrot2_network(tmp_path / "network_v1.pt", "brnn", "residues", 1, {}, encoding=encoding)
 
     # the predictor module a contributor would add

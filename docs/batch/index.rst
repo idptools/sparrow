@@ -5,11 +5,20 @@ For one sequence, make a :class:`~sparrow.protein.Protein`. For many - fifty or
 fifty thousand - use :func:`sparrow.batch`: it makes a ``Protein`` for every
 sequence, with the values you name already computed, so reading them back
 costs nothing. Everything you do afterwards is the ordinary ``Protein`` API
-(:doc:`protein`), and any value you did not name is computed on demand, as for
+(:doc:`../protein/index`), and any value you did not name is computed on demand, as for
 any ``Protein``.
 
 Where sparrow can compute a value for a whole batch at once, ``batch`` does,
 so you get the speed of the batch functions without having to use them.
+
+:doc:`analyses` lists every name ``batch`` accepts, with its arguments and their
+defaults, what it returns, and how ``batch`` computes it.
+
+.. toctree::
+   :maxdepth: 2
+   :hidden:
+
+   analyses
 
 Quick start
 -----------
@@ -32,7 +41,7 @@ method (``"FCR"``, ``"charge_at_pH"``, ``"linear_sequence_profile"``), or one of
 the ``predictor``, ``polymeric`` and ``nardini`` accessors followed by its
 method (``"predictor.disorder"``, ``"polymeric.mean_afrc_radius_of_gyration"``,
 ``"nardini.gin_cluster"``). Every property and method that computes something
-can be named.
+can be named; :doc:`analyses` lists them all.
 
 A name on its own is computed with its method's defaults. To give a name
 arguments, pair it with them in a dict; a list can mix plain names and such
@@ -41,7 +50,7 @@ dicts:
 .. code-block:: python
 
    proteins = sparrow.batch(
-       sequences,
+       "idrs.fasta",
        [
            "FCR",
            {"charge_at_pH": {"pH": 6.0}},
@@ -135,7 +144,7 @@ can differ from one made for the sequence alone at the networks' 32-bit
 precision, because a batch is summed in a different order: about 1e-7
 relative for the ALBATROSS values, and one place in the last rounded decimal
 for the per-residue probabilities and metapredict's scores (see
-:doc:`batch` for the measurements). A prediction that a ``Protein`` you pass in
+:doc:`../power_user/networks` for the measurements). A prediction that a ``Protein`` you pass in
 has already made is kept, so a value you have already read does not change.
 
 Options
@@ -149,7 +158,7 @@ Options
   metapredict, if given.
 * ``device`` and ``gpuid`` -- where to run the networks, sparrow's and
   metapredict's, as :func:`~sparrow.predictors.batch_predictor.batch_predict`
-  takes them (:doc:`batch`): ``device="auto"`` (the default) runs sparrow's
+  takes them (:doc:`../power_user/networks`): ``device="auto"`` (the default) runs sparrow's
   networks on an NVIDIA GPU where there is one and on the CPU otherwise, and
   leaves metapredict to choose for itself unless ``gpuid`` is given; any other
   device is used by both.
@@ -162,13 +171,13 @@ return arrays, which is what a feature matrix for machine learning, or a
 clustering, wants:
 
 * :func:`sparrow.properties.compute` -- any of the scalar properties as a dict
-  of arrays (:doc:`sequence_properties`);
+  of arrays (:doc:`../power_user/properties`);
 * :func:`~sparrow.predictors.batch_predictor.batch_predict` -- any one of
-  sparrow's networks over a set of sequences (:doc:`batch`);
+  sparrow's networks over a set of sequences (:doc:`../power_user/networks`);
 * :func:`~sparrow.nardini.vectors.nardini_vectors` -- NARDINI+ vectors as a
-  labelled matrix, with GIN assignment and clustering (:doc:`nardini`).
+  labelled matrix, with GIN assignment and clustering (:doc:`../power_user/nardini`).
 
-API reference
--------------
+Reference
+---------
 
 .. autofunction:: sparrow.batch

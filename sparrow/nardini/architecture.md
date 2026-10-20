@@ -1,6 +1,6 @@
 # Architecture of `sparrow.nardini`
 
-This describes how the files in this module fit together, and how they relate to the `Protein` object. It is for people changing the code; for how to *use* it, see the module docstrings or the [NARDINI guide](https://idptools-sparrow.readthedocs.io/en/latest/api_guides/nardini.html).
+This describes how the files in this module fit together, and how they relate to the `Protein` object. It is for people changing the code; for how to *use* it, see the module docstrings or the [NARDINI guide](https://idptools-sparrow.readthedocs.io/en/latest/power_user/nardini.html).
 
 ## The shape of the thing
 

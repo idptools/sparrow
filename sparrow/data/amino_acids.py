@@ -31,6 +31,9 @@ VALID_AMINO_ACIDS = [
     "W",
     "Y",
 ]
+
+#: The same 20 amino acids, ordered by their physicochemical character (aromatic,
+#: polar, small, hydrophobic, charged, then proline).
 VALID_AMINO_ACIDS_PHYS = [
     "W",
     "Y",
@@ -81,6 +84,7 @@ POS = ["R", "K"]
 #: Negatively charged residues.
 NEG = ["E", "D"]
 
+#: The one-letter code of each three-letter code (upper case).
 AA_THREE_TO_ONE = {
     "ALA": "A",
     "CYS": "C",
@@ -104,9 +108,8 @@ AA_THREE_TO_ONE = {
     "TYR": "Y",
 }
 
-AA_ONE_TO_THREE = {}
-for x in AA_THREE_TO_ONE:
-    AA_ONE_TO_THREE[AA_THREE_TO_ONE[x]] = x
+#: The three-letter code (upper case) of each one-letter code.
+AA_ONE_TO_THREE = {one_letter: three_letter for three_letter, one_letter in AA_THREE_TO_ONE.items()}
 
 
 # acetyl groups have 1C-2O, 4H prior to
@@ -140,6 +143,7 @@ AA_MOLECULAR_WEIGHT = {
 }
 
 
+#: The color ``show_sequence`` gives each residue, as a hex string.
 AA_COLOR = {
     "Y": "#ff9d00",
     "W": "#ff9d00",

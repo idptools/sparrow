@@ -103,7 +103,7 @@ Overlaying a hydropathy profile
 -------------------------------
 
 You can plot any number of profiles on shared axes. Here we add a Kyte-Doolittle
-hydropathy track (from the :doc:`AAindex property database <api_guides/properties>`)
+hydropathy track (from the :doc:`AAindex property database <power_user/aaindex>`)
 beneath the NCPR profile.
 
 .. code-block:: python
@@ -134,7 +134,7 @@ NARDINI+ vectors for a whole proteome
 
 The realistic molecular-grammar workflow: read IDRs from a FASTA, compute every
 NARDINI+ vector in parallel, and get back ``Protein`` objects with the results
-attached so nothing is recomputed afterwards. See :doc:`api_guides/nardini` for the
+attached so nothing is recomputed afterwards. See :doc:`power_user/nardini` for the
 full guide.
 
 Step 1 -- read the sequences
@@ -229,4 +229,4 @@ file efficiently, use :func:`~sparrow.predictors.batch_predictor.batch_predict`:
    for header, (sequence, rg) in rg_by_header.items():
        print(header, round(rg, 2))
 
-See :doc:`api_guides/batch` for all batch options.
+See :doc:`power_user/networks` for all batch options.
