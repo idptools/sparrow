@@ -18,7 +18,7 @@ SEQUENCES = [
 
 # Protein properties that are not one number per sequence, so compute() leaves
 # them out
-NOT_SCALAR = {"amino_acid_fractions", "sequence", "plugin", "nardini", "predictor", "polymeric", "elms"}
+NOT_SCALAR = {"amino_acid_fractions", "sequence", "plugin", "nardini", "predictor", "polymeric", "elms", "visualize"}
 
 
 @pytest.mark.parametrize("name", properties.PROPERTY_NAMES)

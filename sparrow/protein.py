@@ -110,6 +110,7 @@ class Protein:
         self.__polymeric_object = None
         self.__plugin_object = None
         self.__nardini_object = None
+        self.__visualizer_object = None
 
     # .................................................................
     #
@@ -1752,6 +1753,42 @@ class Protein:
 
             self.__nardini_object = ProteinNardini(self)
         return self.__nardini_object
+
+    @property
+    def visualize(self):
+        """
+        Plots of this protein along its length, drawn from its own analyses.
+
+        Name any of the protein's per-residue analyses - as :func:`sparrow.batch`
+        names them, such as ``'predictor.disorder'`` or
+        ``{'linear_sequence_profile': {'mode': 'NCPR'}}`` - and give values,
+        sites and domains of your own, and ``show_protein`` draws each as a
+        track along the protein, residue 1 on the left, while
+        ``save_protein`` draws and saves the figure. The accessor is created
+        on first access and cached, and each analysis is computed and cached
+        by the protein, as when you call it yourself.
+
+        Returns
+        -------
+        sparrow.visualize.protein_visualizer.ProteinVisualizer
+            Object providing ``show_protein()``, ``save_protein()``,
+            ``visual_protein()`` and ``available_analyses()``.
+
+        Examples
+        --------
+        >>> p = Protein("MENDPRVRKFASDGAQWAIKWQKK")                        # doctest: +SKIP
+        >>> figure, axes = p.visualize.show_protein(                       # doctest: +SKIP
+        ...     ["predictor.disorder", {"linear_sequence_profile": {"mode": "NCPR"}}],
+        ...     sites={"Phosphosites": [12]},
+        ...     domains={"Motif": [(5, 10, "M1")]},
+        ... )
+        >>> p.visualize.save_protein("protein.pdf", ["predictor.disorder"])  # doctest: +SKIP
+        """
+        if self.__visualizer_object is None:
+            from sparrow.visualize.protein_visualizer import ProteinVisualizer
+
+            self.__visualizer_object = ProteinVisualizer(self)
+        return self.__visualizer_object
 
     @property
     def predictor(self):

@@ -81,7 +81,9 @@ and documents every property and method in full.
      - ``protein.nardini``: the NARDINI+ feature vector, and assignment to the
        human GIN grammars.
    * - :doc:`visualization`
-     - Showing the sequence as colored HTML.
+     - Showing the sequence as colored HTML, and ``protein.visualize``:
+       plotting the protein along its length from its own analyses, with
+       values, sites and domains of your own.
    * - :doc:`plugins`
      - ``protein.plugin``: analyses contributed as plugins.
 

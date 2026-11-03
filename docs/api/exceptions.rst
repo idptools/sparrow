@@ -40,3 +40,6 @@ so you can silence them as a group::
 
 .. autoexception:: sparrow.sparrow_exceptions.ClusteringQualityWarning
    :no-inherited-members:
+
+.. autoexception:: sparrow.sparrow_exceptions.NullModelWarning
+   :no-inherited-members:

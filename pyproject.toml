@@ -39,6 +39,10 @@ dependencies = [
     # requires Python >= 3.10, which is why sparrow does too.
     "afrc>=0.4.2",
     "tqdm",
+    # sparrow.visualize.proteinvis draws with it. metapredict and PARROT bring it
+    # too, but sparrow imports it itself, so it says so; 3.8 is the first
+    # release with type hints, which ty checks proteinvis against.
+    "matplotlib>=3.8",
 ]
 
 [project.optional-dependencies]

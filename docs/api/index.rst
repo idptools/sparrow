@@ -38,7 +38,10 @@ them; this one is the full detail.
    * - :doc:`tools`
      - :mod:`sparrow.tools`: reading and fetching sequences, and utilities.
    * - :doc:`visualize`
-     - :mod:`sparrow.visualize`: sequence display.
+     - :mod:`sparrow.visualize`: sequence display, and plots of proteins
+       along their length.
+   * - :doc:`null`
+     - :mod:`sparrow.null`: null models, and what they share.
    * - :doc:`exceptions`
      - :mod:`sparrow.sparrow_exceptions`: the exceptions and warnings sparrow
        raises.
@@ -58,4 +61,5 @@ them; this one is the full detail.
    data
    tools
    visualize
+   null
    exceptions

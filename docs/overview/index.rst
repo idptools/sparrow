@@ -76,6 +76,11 @@ What sparrow can do
   backgrounds you can build yourself, assignment to the 30 human GIN grammars,
   clustering to derive your own, and parallel computation across a proteome.
   See :doc:`../protein/nardini` and :doc:`../power_user/nardini`.
+* **Null models** - sequences to compare a sequence with, each with its exact
+  composition: shuffles in blocks, shuffles that keep every dipeptide, and
+  sequences rebuilt from the k-mers or Markov chain of a background such as a
+  proteome, so with the background's grammar in place of the sequence's own.
+  See :doc:`../null/index`.
 * **Scale** - :func:`sparrow.batch` for ``Protein`` objects, and underneath it,
   every sequence parameter for a whole batch at once
   (:mod:`sparrow.properties`), batched network predictions, on the CPU or a

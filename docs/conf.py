@@ -104,6 +104,7 @@ intersphinx_mapping = {
     "numpy": ("https://numpy.org/doc/stable/", None),
     "scipy": ("https://docs.scipy.org/doc/scipy/", None),
     "protfasta": ("https://protfasta.readthedocs.io/en/latest/", None),
+    "matplotlib": ("https://matplotlib.org/stable/", None),
 }
 
 templates_path = ["_templates"]
@@ -142,6 +143,7 @@ if MOCK:
         "torch",
         "tqdm",
         "parrot",
+        "matplotlib",
     ]
     autodoc_mock_imports = []
     for module_name in candidates:

@@ -54,8 +54,8 @@ _DEFAULT_DEVICE = "auto"
 
 # Protein's public attributes that are not values to compute: the sequence
 # itself, the accessors (whose own methods are named instead), the plugin
-# manager and the sequence display
-_NOT_VALUES = frozenset({"sequence", "show_sequence", "plugin", *ACCESSORS})
+# manager, and the sequence display and plots
+_NOT_VALUES = frozenset({"sequence", "show_sequence", "plugin", "visualize", *ACCESSORS})
 
 # Values that read a value a batch function computes. Asking for one of these
 # computes what it reads for the whole batch first, so the value itself is cheap.

@@ -13,10 +13,10 @@ calculations for the whole batch.
    sparrow.batch(sequences, names)           many Protein objects, values filled in
           |
    Protein(sequence)                          one sequence, every value cached
-     .predictor  .polymeric  .nardini  .plugin
+     .predictor  .polymeric  .nardini  .plugin  .visualize
           |
    sparrow.properties    sparrow.predictors    sparrow.polymer
-   sparrow.nardini       sparrow.sequence_analysis
+   sparrow.nardini       sparrow.sequence_analysis    sparrow.null
                                               the calculations, which take sequences
           |
    sparrow.data                               bundled scales, networks and reference data
@@ -60,6 +60,11 @@ The packages
        phosphoisoforms - multiple sequence alignment, and the plugin system,
        :class:`~sparrow.sequence_analysis.plugins.PluginManager`, which is
        ``Protein.plugin``.
+   * - :mod:`sparrow.null`
+     - Null models: shuffles, and sequences rebuilt from a background's
+       k-mers or Markov chain, each with a sequence's composition, behind one
+       parent class, :class:`~sparrow.null.base.NullModel`. See
+       :doc:`../null/index`.
    * - :mod:`sparrow.data`
      - The data sparrow ships: amino-acid scales and residue sets, the AAindex
        databases, the trained networks, the ELM classes, and the NARDINI+
@@ -68,11 +73,14 @@ The packages
      - Reading sequences (:func:`sparrow.read_fasta`, ``uniprot_fetch``) and
        small utilities.
    * - :mod:`sparrow.visualize`
-     - Sequence display (``Protein.show_sequence``).
+     - Sequence display (``Protein.show_sequence``), and plots of proteins
+       along their length (:mod:`sparrow.visualize.proteinvis`).
+       :class:`~sparrow.visualize.protein_visualizer.ProteinVisualizer` is
+       ``Protein.visualize``, which draws them from a protein's own analyses.
    * - :mod:`sparrow.sparrow_exceptions`
      - :class:`~sparrow.sparrow_exceptions.SparrowException`, which every
        exception sparrow raises deliberately derives from, and the warnings
-       NARDINI+ gives.
+       NARDINI+ and the null models give.
 
 How a value is computed
 -----------------------
@@ -113,6 +121,19 @@ forward passes, metapredict's with its own batch functions, and the NARDINI+
 scrambles in several processes. It stores each result in its ``Protein``
 exactly where that ``Protein`` would have cached it, so reading it back
 computes nothing. Every other value is computed one ``Protein`` at a time.
+
+**A plot.** ``p.visualize.show_protein(...)`` reads the analyses it is given
+by the names :func:`sparrow.batch` uses, with the same code, and has the
+``Protein`` compute each one, so each is cached as if you had called it
+yourself. :mod:`sparrow.visualize.protein_visualizer` turns what each returns
+into a track - a line, boxes or sites - beside the tracks for any values,
+sites and domains of your own, and :mod:`sparrow.visualize.proteinvis` draws
+them. Each is a package whose code is in private modules by what it does:
+in ``proteinvis``, the look of a figure, the checks of its arguments, the
+features and tracks it is made of, drawing each track, laying out the
+sequence, and laying out the whole figure; in ``protein_visualizer``, the
+class, reading what it is given, and turning sparrow's analyses into tracks.
+Everything public is imported from the package itself.
 
 What sparrow depends on
 -----------------------

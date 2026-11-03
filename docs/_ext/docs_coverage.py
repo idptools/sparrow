@@ -4,8 +4,8 @@ Two things are checked once every page has been read, and each gap is reported
 as a warning, so the strict build (``-W``) fails until it is documented:
 
 * every public property and method of :class:`~sparrow.protein.Protein` and of
-  its ``predictor``, ``polymeric`` and ``nardini`` accessors has an entry - on
-  the Protein pages, where each is explained;
+  its ``predictor``, ``polymeric``, ``nardini`` and ``visualize`` accessors has
+  an entry - on the Protein pages, where each is explained;
 * every public module of sparrow has a page in the API reference, apart from
   those :data:`NOT_DOCUMENTED` names, each with its reason.
 
@@ -35,12 +35,17 @@ DOCUMENTED_CLASSES = {
     "sparrow.predictors.Predictor": ("sparrow.predictors", "Predictor"),
     "sparrow.polymer.Polymeric": ("sparrow.polymer", "Polymeric"),
     "sparrow.nardini.protein_interface.ProteinNardini": ("sparrow.nardini.protein_interface", "ProteinNardini"),
+    "sparrow.visualize.protein_visualizer.ProteinVisualizer": (
+        "sparrow.visualize.protein_visualizer",
+        "ProteinVisualizer",
+    ),
 }
 
 # Public modules the API reference leaves out, each with its reason
-NOT_DOCUMENTED = {
-    "sparrow.visualize.proteinvis": (
-        "being rewritten; importing it also changes matplotlib's settings for the whole session"
+NOT_DOCUMENTED: dict[str, str] = {
+    "sparrow.polymer.scaling_parameters": (
+        "deprecated: it only forwards the old Zheng et al. names to sparrow.polymer.zheng2020, with a "
+        "DeprecationWarning, and the old names are given on the polymer models page"
     ),
 }
 

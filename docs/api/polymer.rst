@@ -38,10 +38,3 @@ The ``Polymeric`` accessor
 -----------------------------
 
 .. automodule:: sparrow.polymer.zheng2020
-
-``sparrow.polymer.scaling_parameters``
---------------------------------------
-
-.. automodule:: sparrow.polymer.scaling_parameters
-   :no-members:
-   :no-inherited-members:

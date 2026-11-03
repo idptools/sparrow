@@ -47,6 +47,9 @@ same answers as the ``Protein`` it sits under, to the last bit.
    * - :doc:`utilities`
      - Reading sequences from FASTA files and UniProt, comparing sequences, and
        the other small tools.
+   * - :doc:`plotting`
+     - A figure of one or more proteins along their length: domains,
+       per-residue values, heatmaps and sequence, on a shared residue axis.
 
 .. toctree::
    :maxdepth: 1
@@ -62,6 +65,7 @@ same answers as the ``Protein`` it sits under, to the last bit.
    aaindex
    data
    utilities
+   plotting
 
 ``Protein`` or the functions?
 -----------------------------

@@ -25,6 +25,7 @@ __all__ = [
     "SparrowWarning",
     "BackgroundQualityWarning",
     "ClusteringQualityWarning",
+    "NullModelWarning",
 ]
 
 
@@ -77,4 +78,18 @@ class ClusteringQualityWarning(SparrowWarning):
     still assign every query sequence to something, and the labels will still look
     plausible. See
     :data:`sparrow.nardini.clustering.MIN_SEQUENCES_PER_CLUSTER`.
+    """
+
+
+class NullModelWarning(SparrowWarning):
+    """Raised by the null models of :mod:`sparrow.null` when they cannot do quite what was asked.
+
+    A background model warns when it is fit to a background with residues it
+    cannot count, or too few k-mers for their frequencies to mean much; when
+    it cannot weight the background to a sequence's composition; and when it
+    makes a null with some blocks or residues drawn from shorter k-mers than
+    asked for, because the background had none that fit. The nulls are still
+    exact in length and composition. See
+    :data:`sparrow.null.kmers.MIN_MEAN_KMER_COUNT` and
+    :data:`sparrow.null.tilt.TILT_TOLERANCE`.
     """

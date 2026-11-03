@@ -27,6 +27,7 @@ afrc==0.4.2
 pyfamsa==0.7.0
 tqdm==4.70.0
 ipython==9.16.1
+matplotlib==3.10.3
 
 # test extra
 pytest==9.1.1

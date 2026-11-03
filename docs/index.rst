@@ -41,11 +41,17 @@ How these docs are organized
    :doc:`every analysis it can be asked for <batch/analyses>`, with its
    arguments and their defaults.
 
+:doc:`null/index`
+   Null sequences to compare a sequence with, each with its exact composition:
+   shuffles in blocks, shuffles that keep every dipeptide, and sequences
+   rebuilt from the k-mers or Markov chain of a background such as a proteome.
+   How to choose one, how each works, and how to write your own.
+
 :doc:`power_user/index`
    The functions underneath, for when you want arrays rather than ``Protein``
    objects, or more control: properties for a whole batch at once, running the
    networks directly, NARDINI+ over a proteome, the polymer models,
-   annotations, alignment and the bundled data.
+   annotations, alignment, plotting and the bundled data.
 
 :doc:`api/index`
    Every module, class and function, documented from its docstring.
@@ -72,6 +78,7 @@ How these docs are organized
    overview/index
    protein/index
    batch/index
+   null/index
    power_user/index
    api/index
    examples

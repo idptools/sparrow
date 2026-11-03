@@ -96,6 +96,19 @@ The work sparrow builds on
      - Deorowicz S, Debudaj-Grabysz A, Gudyś A. FAMSA: Fast and accurate
        multiple sequence alignment of huge protein families. *Sci Rep.*
        2016;6:33964.
+   * - ``KletShuffle`` (:mod:`sparrow.null`)
+     - Altschul SF, Erickson BW. Significance of nucleotide sequence
+       alignments: a method for random sequence permutation that preserves
+       dinucleotide and codon usage. *Mol Biol Evol.* 1985;2(6):526-538; and,
+       for the algorithm, Kandel D, Matias Y, Unger R, Winkler P. Shuffling
+       biological sequences. *Discrete Appl Math.* 1996;71:171-185, and Jiang
+       M, Anderson J, Gillespie J, Mayo M. uShuffle: a useful tool for
+       shuffling biological sequences while preserving the k-let counts. *BMC
+       Bioinformatics.* 2008;9:192.
+   * - ``KmerBackground``, ``MarkovBackground`` (:mod:`sparrow.null`)
+     - For conditioning a background on a composition: Csiszár I, Cover TM,
+       Choi BS. Conditional limit theorems under Markov conditioning. *IEEE
+       Trans Inf Theory.* 1987;33(6):788-801.
 
 Each module's docstring gives the references for what it implements; the
 :doc:`api/index` shows them.
