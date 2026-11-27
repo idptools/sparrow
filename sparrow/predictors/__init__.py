@@ -59,6 +59,7 @@ NETWORK_PREDICTORS = {
     "nls": ("sparrow.predictors.nls.nuclear_import_signal_predictor", "NLSPredictor"),
     "tad": ("sparrow.predictors.tad.transactivation_domain_predictor", "TADPredictor"),
     "pscore": ("sparrow.predictors.pscore.pscore_predictor", "PScorePredictor"),
+    "plddt2": ("sparrow.predictors.plddt2.plddt2_predictor", "PLDDT2Predictor"),
     "ser_phosphorylation": (
         "sparrow.predictors.phosphorylation.ser_phosphorylation_predictor",
         "SerPhosphorylationPredictor",
@@ -91,6 +92,7 @@ METHOD_NETWORKS = {
     "nuclear_import_signal": "nls",
     "transactivation_domains": "tad",
     "pscore": "pscore",
+    "pLDDT2": "plddt2",
     "serine_phosphorylation": "ser_phosphorylation",
     "threonine_phosphorylation": "thr_phosphorylation",
     "tyrosine_phosphorylation": "tyr_phosphorylation",
@@ -854,8 +856,8 @@ class Predictor:
         Returns
         -------------
         np.ndarray
-            Returns an array of len(seq) with per-residue pLDDT scores. Note
-            these are normalized to fall between 0 and 1 rather than 0 and 100.
+            Returns an array of len(seq) with per-residue pLDDT scores, between
+            0 and 100 (metapredict's normalized=True clips them to that range).
 
         """
 
@@ -870,6 +872,46 @@ class Predictor:
             )
 
         return copy_of(self.__precomputed[selector])
+
+    # .................................................................
+    #
+    def pLDDT2(self, recompute=False):
+        """
+        Returns per-residue predicted pLDDT score from sparrow's own pLDDT
+        network - a prediction of the confidence AlphaFold2 would report for
+        each residue. pLDDT() gives metapredict's prediction of the same thing.
+
+        The network is a two-layer bidirectional LSTM (hidden size 64, 143,489
+        parameters) trained with PARROT 2 on the per-residue pLDDT of 1.86
+        million AlphaFold2 structures from the AlphaFold Protein Structure
+        Database (including its VADB viral collection), split into training,
+        validation and test sets by sequence and structure similarity. On the
+        100,081 held-out test proteins its per-residue RMSE was 15.8 pLDDT and
+        its Pearson R 0.76, against 20.2 and 0.58 for metapredict's network
+        (pLDDT()). sparrow/data/networks/plddt2/README.md describes it and how
+        it was trained.
+
+        Loading the network needs PARROT 2; without it, this raises an error
+        saying how to install it.
+
+        Parameters
+        --------------
+        recompute : bool
+            Flag which, if set to true, means the predictor re-runs regardless of if
+            the prediction has run already
+
+        Returns
+        -------------
+        np.ndarray
+            Returns a float32 array of len(seq) with per-residue pLDDT scores,
+            between 0 and 100 as pLDDT() returns them. The network is a
+            regression, so a few predictions fall just outside that range
+            (0.06% of test-set residues, all above 100); they are clipped to
+            it.
+
+        """
+
+        return copy_of(self._prediction("plddt2", recompute))
 
     # .................................................................
     #

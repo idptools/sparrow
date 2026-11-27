@@ -20,7 +20,8 @@ weights, so sparrow has to be told the architecture and assumes one-hot input.
 A PARROT 2 file records its architecture (which need not be a BRNN), its
 hyperparameters, its task and its sequence encoding, so it is loaded by PARROT
 2's own ``Predictor``, which rebuilds exactly the network that was trained. Every
-network sparrow ships was saved by PARROT 1 and takes the first path, unchanged.
+network sparrow ships but ``plddt2`` was saved by PARROT 1 and takes the first path,
+unchanged; ``plddt2`` takes the second.
 
 sparrow itself requires only PARROT 1.7.5 or newer; PARROT 2 is needed only to
 load a network saved by it, and until it is released it is installed with
@@ -215,7 +216,7 @@ def _load_parrot2_network(saved_weights, device):
 def load_parrot_network(relative_path, architecture="MtO", device=None):
     """Load a PARROT-trained network shipped inside ``sparrow/data``.
 
-    A network saved by PARROT 1 (every network sparrow ships) is rebuilt as a
+    A network saved by PARROT 1 (every network sparrow ships but ``plddt2``) is rebuilt as a
     BRNN with the given ``architecture`` and one-hot input. A network saved by
     PARROT 2 records its own architecture, task and encoding, so ``architecture``
     is ignored and the network is loaded by PARROT 2's ``Predictor`` instead.

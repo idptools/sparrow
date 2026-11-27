@@ -1,6 +1,6 @@
 # Networks (`networks`)
 
-The trained networks behind sparrow's predictors, one directory per predictor. Each directory holds every version of its network's weights, as `<file stem>_network_v<version>.pt`, and a README describing them. The disorder and pLDDT predictions are not here: they come from metapredict, which ships its own networks.
+The trained networks behind sparrow's predictors, one directory per predictor. Each directory holds every version of its network's weights, as `<file stem>_network_v<version>.pt`, and a README describing them. The disorder predictions and the `pLDDT()` predictions are not here: they come from metapredict, which ships its own networks. sparrow's own pLDDT network, behind `pLDDT2()`, is.
 
 ## The networks
 
@@ -14,6 +14,7 @@ The trained networks behind sparrow's predictors, one directory per predictor. E
 | [`phosphorylation`](phosphorylation/README.md) | `ser_phosphorylation` | Serine phosphorylation probability per residue | `serine_phosphorylation()` | 1 |
 | [`phosphorylation`](phosphorylation/README.md) | `thr_phosphorylation` | Threonine phosphorylation probability per residue | `threonine_phosphorylation()` | 1 |
 | [`phosphorylation`](phosphorylation/README.md) | `tyr_phosphorylation` | Tyrosine phosphorylation probability per residue | `tyrosine_phosphorylation()` | 1 |
+| [`plddt2`](plddt2/README.md) | `plddt2` | AlphaFold2's pLDDT per residue | `pLDDT2()` | 1 |
 | [`prefactor`](prefactor/README.md) | `prefactor` | Polymer scaling prefactor, R0 (ALBATROSS) | `prefactor()` | 2 |
 | [`pscore`](pscore/README.md) | `pscore` | PScore phase-separation propensity per residue | `pscore()` | 4 |
 | [`re`](re/README.md) | `re` | End-to-end distance (ALBATROSS) | `end_to_end_distance()` | 2 |
@@ -30,6 +31,6 @@ The trained networks behind sparrow's predictors, one directory per predictor. E
 
 `sparrow.predictors.NETWORK_PREDICTORS` names every network, and maps the name to the predictor class that loads it. Each predictor class (a subclass of `sparrow.predictors.base.BaseNetworkPredictor`, in a package under `sparrow/predictors`) declares where its weights are, as a `NETWORK_PATH` template relative to `sparrow/data` such as `networks/rg/rg_network_v{version}.pt`, and which version it loads by default, `DEFAULT_VERSION`. `sparrow.predictors.network_loader.load_parrot_network` reads the file. A predictor's module is imported, and its weights read, only when the network is first used.
 
-Every network here was trained with PARROT 1, which saves only a bidirectional LSTM's weights, so its predictor also declares its `ARCHITECTURE`: `"MtO"` (many-to-one) for one value per sequence, or `"MtM"` (many-to-many) for one per residue. A network trained with PARROT 2 records its own architecture, task and encoding, and sparrow loads it with PARROT 2's `Predictor`; both kinds are used the same way.
+Every network here but `plddt2` was trained with PARROT 1, which saves only a bidirectional LSTM's weights, so its predictor also declares its `ARCHITECTURE`: `"MtO"` (many-to-one) for one value per sequence, or `"MtM"` (many-to-many) for one per residue. A network trained with PARROT 2, as `plddt2` was, records its own architecture, task and encoding, and sparrow loads it with PARROT 2's `Predictor`, so using it needs PARROT 2 installed; both kinds are used the same way.
 
 Older versions stay here so earlier results can be reproduced. To load one, give the version: `batch_predict(sequences, network="rg", version=1)`, or `RgPredictor(version="1")`. To add a network, see the developer guide on predictors (`docs/adding_a_predictor.rst`).

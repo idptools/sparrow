@@ -25,7 +25,7 @@ DEVICES = [
 ]
 
 #: How far a network's output on a GPU may be from its output on the CPU, in the
-#: units of the output. On an Apple-silicon GPU (MPS), sparrow's 17 networks are
+#: units of the output. On an Apple-silicon GPU (MPS), sparrow's 17 PARROT 1 networks are
 #: at most 2.3e-5 from the CPU (the end-to-end distance, of up to 100 Angstroms),
 #: over 60 random sequences of 5 to 400 residues. PARROT measured CUDA in full
 #: float32 precision at ~1e-4 from the CPU, and in TF32 at up to ~1e-2, which this

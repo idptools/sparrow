@@ -14,7 +14,7 @@ batches. Subclasses also expose a ``predict_<thing>(seq, ...)`` method by name.
 Whether a network was trained with PARROT 1 or PARROT 2 changes only what
 ``_from_raw`` is given, never how a predictor is called:
 
-* For a network saved by PARROT 1 (every network sparrow ships), ``_from_raw``
+* For a network saved by PARROT 1 (every network sparrow ships but ``plddt2``), ``_from_raw``
   is given the network's raw output, typically reduced with a helper from
   :mod:`sparrow.predictors.outputs`, and ``predict_many`` runs the network
   with sparrow's batch harness,
@@ -101,9 +101,10 @@ class BaseNetworkPredictor:
         # The loader copies the weights into a network built on the CPU, so the
         # network is moved to the device here (a no-op on the CPU). A network is
         # only ever used to predict, so it is also put in evaluation mode, in
-        # which dropout is off. Every network sparrow ships has a dropout
+        # which dropout is off. Every PARROT 1 network sparrow ships has a dropout
         # probability of 0, so this changes no prediction; a network with dropout
-        # would otherwise predict differently on every call.
+        # would otherwise predict differently on every call. (PARROT 2's Predictor
+        # puts the network it loads in evaluation mode itself.)
         if not self.saved_by_parrot2:
             self.network.to(self.device)
             self.network.eval()

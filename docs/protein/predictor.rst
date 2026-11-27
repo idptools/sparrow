@@ -32,7 +32,8 @@ Disorder and secondary structure
    p.predictor.disorder_domains()         # 1 for each residue in an IDR
    p.predictor.disorder_domains(return_boundaries=True)   # [[start, end], ...]
    p.predictor.binary_disorder(disorder_threshold=0.6)    # the IDRs, with metapredict's options
-   p.predictor.pLDDT()                    # predicted AlphaFold2 confidence, 0-1
+   p.predictor.pLDDT()                    # predicted AlphaFold2 confidence, 0-100 (metapredict)
+   p.predictor.pLDDT2()                   # the same, from sparrow's own pLDDT network
 
    p.predictor.dssp_helicity()            # 1/0 for each residue, from DSSP-trained networks
    p.predictor.dssp_extended(mode="probability")
@@ -42,6 +43,13 @@ Disorder and pLDDT come from `metapredict <https://github.com/idptools/metapredi
 (Emenecker *et al.*), with its default networks. ``disorder_domains`` and
 ``binary_disorder`` both use metapredict's IDR-definition algorithm rather than
 a threshold on each residue's score; ``binary_disorder`` exposes its options.
+
+``pLDDT2`` predicts the same AlphaFold2 confidence, on the same 0-100 scale,
+with a network of sparrow's own: a bidirectional LSTM trained with PARROT 2 on
+1.86 million AlphaFold2 structures, whose per-residue error on held-out
+proteins is about a quarter lower than metapredict's (RMSE 15.8 against 20.2
+pLDDT). Loading it needs PARROT 2. ``sparrow/data/networks/plddt2/README.md``
+describes the network and how it was trained.
 
 The three DSSP methods read one network, which predicts the probability of
 helix, extended and coil at each residue, so asking for all three runs it once.
@@ -108,6 +116,7 @@ Disorder and secondary structure
    sparrow.predictors.Predictor.disorder_domains
    sparrow.predictors.Predictor.binary_disorder
    sparrow.predictors.Predictor.pLDDT
+   sparrow.predictors.Predictor.pLDDT2
    sparrow.predictors.Predictor.dssp_helicity
    sparrow.predictors.Predictor.dssp_extended
    sparrow.predictors.Predictor.dssp_coil
@@ -119,6 +128,8 @@ Disorder and secondary structure
 .. automethod:: sparrow.predictors.Predictor.binary_disorder
 
 .. automethod:: sparrow.predictors.Predictor.pLDDT
+
+.. automethod:: sparrow.predictors.Predictor.pLDDT2
 
 .. automethod:: sparrow.predictors.Predictor.dssp_helicity
 

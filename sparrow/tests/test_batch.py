@@ -16,6 +16,7 @@ from sparrow.predictors import BATCH_METHODS
 from sparrow.predictors.base import BaseNetworkPredictor
 from sparrow.properties import PROPERTY_NAMES
 from sparrow.sparrow_exceptions import SparrowException
+from sparrow.tests.parrot2_markers import prediction_param, runnable_here
 
 # lengths either side of MIN_LENGTH_ALBATROSS_RE_RG (35), so both the scaled and
 # the unscaled ALBATROSS networks are used, with charged, Q-rich and S-rich stretches
@@ -301,7 +302,7 @@ def test_the_scalar_properties_are_computed_once_for_the_whole_batch(monkeypatch
     assert len(calls) == 1
 
 
-@pytest.mark.parametrize("name", PREDICTION_NAMES)
+@pytest.mark.parametrize("name", [prediction_param(name) for name in PREDICTION_NAMES])
 def test_each_prediction_is_each_proteins_own(name):
     proteins = sparrow.batch(SEQUENCES, [name])
     for key, sequence in SEQUENCES.items():
@@ -324,14 +325,15 @@ def test_each_sequence_uses_the_network_its_method_would(arguments):
 def test_reading_a_batch_prediction_runs_nothing(monkeypatch):
     from metapredict import meta
 
-    proteins = sparrow.batch(SEQUENCES, PREDICTION_NAMES)
+    names = runnable_here(PREDICTION_NAMES)
+    proteins = sparrow.batch(SEQUENCES, names)
 
     # no network is loaded, and metapredict is not called, to read what was made in the batch
     monkeypatch.setattr("sparrow.predictors.base.load_parrot_network", fail)
     for function_name in ("predict_disorder", "predict_disorder_domains", "predict_pLDDT"):
         monkeypatch.setattr(meta, function_name, fail)
     for protein in proteins.values():
-        for name in PREDICTION_NAMES:
+        for name in names:
             read_back(protein, name, {})
 
 
@@ -466,7 +468,7 @@ def test_a_value_is_free_to_read_with_the_arguments_given_and_computed_with_othe
         proteins["medium"].charge_at_pH(pH=7.0)
 
 
-@pytest.mark.parametrize("name", _available_names())
+@pytest.mark.parametrize("name", [prediction_param(name) for name in _available_names()])
 def test_every_name_batch_accepts_gives_what_a_protein_computes(name):
     arguments = ARGUMENTS.get(name, {})
     proteins = sparrow.batch(SEQUENCES, {name: arguments}, n_processes=1)

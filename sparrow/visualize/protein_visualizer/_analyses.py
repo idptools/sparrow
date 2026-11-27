@@ -55,6 +55,7 @@ _LOOKS: dict[str, _Look] = {
     "predictor.binary_disorder": _Look("IDRs"),
     "predictor.disorder_domains": _Look("IDRs"),
     "predictor.pLDDT": _Look("pLDDT", _PLDDT_RANGE),
+    "predictor.pLDDT2": _Look("pLDDT2", _PLDDT_RANGE),
     "predictor.dssp_helicity": _Look("Helix", _PROBABILITY),
     "predictor.dssp_extended": _Look("Strand", _PROBABILITY),
     "predictor.dssp_coil": _Look("Coil", _PROBABILITY),

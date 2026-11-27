@@ -29,6 +29,7 @@ from sparrow.tests.device_markers import (
     DEVICES,
     requires_two_gpus,
 )
+from sparrow.tests.parrot2_markers import network_param
 
 AMINO_ACIDS = "ACDEFGHIKLMNPQRSTVWY"
 
@@ -91,17 +92,26 @@ def assert_predictions_close_to_cpu(on_device, on_cpu, network):
 
 @functools.cache
 def on_the_cpu(network):
-    """A network's raw output and predictions for SEQUENCES on the CPU, alone and in a batch."""
+    """A network's predictions for SEQUENCES on the CPU, alone and in a batch, and, for a
+    network saved by PARROT 1, its raw output (PARROT 2's Predictor gives none)."""
     predictor = load_network_predictor(network, device="cpu")
-    inputs = [predictor._network_input(sequence) for sequence in SEQUENCES]
-    return {
-        "raw alone": [predictor._raw_predict(network_input) for network_input in inputs],
-        "raw in a batch": run_network(
-            predictor.network, inputs, architecture=predictor.ARCHITECTURE, device=predictor.device
-        ),
+    expected = {
         "alone": [predictor.predict(sequence) for sequence in SEQUENCES],
         "in a batch": predictor.predict_many(SEQUENCES),
     }
+    if not predictor.saved_by_parrot2:
+        inputs = [predictor._network_input(sequence) for sequence in SEQUENCES]
+        expected["raw alone"] = [predictor._raw_predict(network_input) for network_input in inputs]
+        expected["raw in a batch"] = run_network(
+            predictor.network, inputs, architecture=predictor.ARCHITECTURE, device=predictor.device
+        )
+    return expected
+
+
+def torch_module(predictor):
+    """The torch module a predictor runs: its network, or for a network saved by PARROT 2, the one
+    inside PARROT's Predictor."""
+    return predictor.network.network if predictor.saved_by_parrot2 else predictor.network
 
 
 # .................................................................
@@ -315,19 +325,21 @@ def test_every_network_run_is_in_full_float32_precision(tf32_allowed, monkeypatc
 # .................................................................
 # on each device this machine has
 @pytest.mark.parametrize("device", DEVICES)
-@pytest.mark.parametrize("network", list(NETWORK_PREDICTORS))
+@pytest.mark.parametrize("network", [network_param(network) for network in NETWORK_PREDICTORS])
 def test_every_network_runs_on_the_device_and_predicts_as_on_the_cpu(device, network):
     predictor = load_network_predictor(network, device=device)
     assert predictor.device.type == device
-    assert next(predictor.network.parameters()).device.type == device
+    assert next(torch_module(predictor).parameters()).device.type == device
 
     expected = on_the_cpu(network)
-    inputs = [predictor._network_input(sequence) for sequence in SEQUENCES]
-    assert_close_to_cpu([predictor._raw_predict(network_input) for network_input in inputs], expected["raw alone"])
-    assert_close_to_cpu(
-        run_network(predictor.network, inputs, architecture=predictor.ARCHITECTURE, device=predictor.device),
-        expected["raw in a batch"],
-    )
+    if not predictor.saved_by_parrot2:
+        inputs = [predictor._network_input(sequence) for sequence in SEQUENCES]
+        raw_alone = [predictor._raw_predict(network_input) for network_input in inputs]
+        assert_close_to_cpu(raw_alone, expected["raw alone"])
+        assert_close_to_cpu(
+            run_network(predictor.network, inputs, architecture=predictor.ARCHITECTURE, device=predictor.device),
+            expected["raw in a batch"],
+        )
     assert_predictions_close_to_cpu(
         [predictor.predict(sequence) for sequence in SEQUENCES], expected["alone"], network
     )

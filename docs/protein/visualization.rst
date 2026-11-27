@@ -99,6 +99,9 @@ for each residue is drawn too, labelled with its name.
    * - ``predictor.pLDDT``
      - a line, 0 to 100
      - pLDDT
+   * - ``predictor.pLDDT2``
+     - a line, 0 to 100
+     - pLDDT2
    * - ``predictor.dssp_helicity``, ``predictor.dssp_extended``,
        ``predictor.dssp_coil``
      - boxes, or with ``mode='probability'`` a line, 0 to 1

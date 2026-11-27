@@ -1,7 +1,7 @@
 """Networks saved by PARROT 2, loaded through the predictor template.
 
-Every network sparrow ships was saved by PARROT 1; test_predictor_internals.py
-covers those. These tests build small PARROT 2 networks at test time (untrained:
+Every network sparrow ships but plddt2 (test_predictor_plddt2.py) was saved by
+PARROT 1; test_predictor_internals.py covers those. These tests build small PARROT 2 networks at test time (untrained:
 loading and predicting do not depend on the weights being any good), save them
 as PARROT 2 does, and check that the template in
 sparrow/predictors/predictor_template.py, with only its weights path changed,
@@ -11,7 +11,6 @@ in batch_predict and sparrow.batch as a network saved by PARROT 1 does. They are
 skipped when PARROT 2 is not installed, except those that do not need it.
 """
 
-import importlib.util
 import sys
 import types
 
@@ -35,14 +34,8 @@ from sparrow.tests.device_markers import (
     DEVICES,
     requires_two_gpus,
 )
+from sparrow.tests.parrot2_markers import PARROT2_MODULE, requires_parrot2
 from sparrow.tools.utilities import copy_of
-
-# The module that reads PARROT 2 checkpoints, which PARROT 1 does not have
-PARROT2_MODULE = "parrot.checkpoint"
-
-requires_parrot2 = pytest.mark.skipif(
-    importlib.util.find_spec(PARROT2_MODULE) is None, reason="PARROT 2 is not installed"
-)
 
 #: Seed for the random initial weights of the test networks.
 WEIGHTS_SEED = 7

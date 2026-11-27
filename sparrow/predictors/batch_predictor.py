@@ -195,7 +195,7 @@ def run_network(
 ):
     """Run a network saved by PARROT 1 over many sequences, in batches.
 
-    The batch harness behind every network sparrow runs in batches. It returns
+    The batch harness behind every PARROT 1 network sparrow runs in batches. It returns
     the network's raw output for each sequence, in the shape the network gives
     it for that sequence alone, so each predictor turns it into a prediction
     with the transform it uses for one sequence. The output can differ from the
@@ -813,6 +813,7 @@ def batch_predict(
         * ``"ser_phosphorylation"``, ``"thr_phosphorylation"``,
           ``"tyr_phosphorylation"`` - the probability that each residue is
           phosphorylated
+        * ``"plddt2"`` - the pLDDT AlphaFold2 would give each residue, 0-100
 
         The ``Protein.predictor`` methods return these, or values made from
         them: ``pscore()`` rescales to 0-1 by default, and the phosphorylation

@@ -4,6 +4,16 @@ All notable changes to SPARROW are documented here.
 
 ## Unreleased
 
+### Added — `Protein.predictor.pLDDT2()`, sparrow's own pLDDT network
+
+`pLDDT2()` predicts the pLDDT AlphaFold2 would give each residue, on AlphaFold's 0-100 scale, as `pLDDT()` does with metapredict's network. The network (`sparrow/data/networks/plddt2/plddt2_network_v1.pt`) is a two-layer bidirectional LSTM with hidden size 64 (143,489 parameters), trained with PARROT 2 on the per-residue pLDDT of 1.86 million AlphaFold2 structures from the AlphaFold Protein Structure Database, split into training, validation and test sets by MMseqs2 and Foldseek clusters. On the 100,081 held-out test proteins its per-residue RMSE is 15.8 pLDDT and its Pearson R 0.76, against 20.2 and 0.58 for metapredict's network, and its error is the lower of the two for 81% of proteins. It predicts the human proteome in 3.4 s on an NVIDIA RTX A4000 (metapredict 3.7 s), or about 2.5 min on one CPU thread (metapredict 46 s).
+
+* It is the first network sparrow ships that was saved by PARROT 2, so loading it needs PARROT 2 installed; without it, `pLDDT2()` raises an error saying how to install it, and everything else in sparrow works with PARROT 1 as before. It runs in batches through `sparrow.batch(sequences, ["predictor.pLDDT2"])` and `batch_predict(sequences, network="plddt2")`, on the CPU or a GPU, and `PLDDT2Predictor` (`sparrow/predictors/plddt2/plddt2_predictor.py`) loads it directly. Predictions are clipped to 0-100 (0.06% of test-set residues are predicted just above 100).
+* `sparrow/data/networks/plddt2/README.md` describes the network and how it was trained.
+* The protein visualizer draws `predictor.pLDDT2` as a line from 0 to 100.
+* The tests that run every network, or every prediction `sparrow.batch` makes, now run pLDDT2 too, and skip it, with the reason, where PARROT 2 is not installed (`sparrow/tests/parrot2_markers.py`); the device tests check a PARROT 2 network's predictions, since PARROT 2 gives no raw output. `sparrow/tests/test_predictor_plddt2.py` checks that the prediction is PARROT's times 100, clipped, and matches p53's prediction when the network was added.
+* `pLDDT()`'s docstring said its values fall between 0 and 1; they fall between 0 and 100 (metapredict's `normalized=True` clips them to that range), and the docstring now says so.
+
 ### Added — `sparrow.null`, null models of a sequence
 
 A null model makes sequences that match a natural sequence in what you choose to keep, and are random in everything else, so a feature of the sequence can be compared with the same feature of its nulls. Every null model derives from one parent class, `sparrow.null.NullModel`: make it with its options, give it a background with `fit(background)` if it needs one - a FASTA file, a dict or a list of sequences - and ask for nulls with `generate(sequence, count=, seed=)`, which returns a list of sequences, each with exactly the length and composition of the sequence. With a seed, the nulls depend on the seed and the sequence alone, so one seed gives each of many sequences nulls of its own, and the same ones however they are batched.

@@ -13,8 +13,8 @@ Batch prediction
 networks over a whole set of sequences in batched forward passes - the
 ALBATROSS polymer-dimension networks, which give one value per sequence, and the
 per-residue networks for secondary structure, transmembrane regions,
-mitochondrial targeting, localization signals, transactivation domains, PScore
-and phosphorylation. For large collections this is substantially faster than
+mitochondrial targeting, localization signals, transactivation domains, PScore,
+phosphorylation and AlphaFold2's pLDDT. For large collections this is substantially faster than
 constructing one ``Protein`` per sequence and calling its ``predictor``: over 300
 yeast proteins, 7 to 16 times faster for each network.
 
@@ -85,6 +85,9 @@ Each network's prediction is what its predictor makes for one sequence. The
        ``"tyr_phosphorylation"``
      - The probability that each residue is phosphorylated
      - ``serine_phosphorylation()`` and its relatives, which apply a threshold
+   * - ``"plddt2"``
+     - The pLDDT AlphaFold2 would give each residue, 0-100
+     - ``pLDDT2()``
 
 How exact the predictions are
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -242,6 +245,10 @@ results:
        ``TyrPhosphorylationPredictor``
      - 1
      - 1
+   * - ``plddt2``
+     - ``PLDDT2Predictor``
+     - 1
+     - 1
 
 Each class lives in its own module under :mod:`sparrow.predictors`, listed in
 :doc:`../api/predictors`, and :data:`~sparrow.predictors.NETWORK_PREDICTORS`
@@ -287,7 +294,7 @@ turns that into its prediction, the same way it does for one sequence, so a
 prediction is made identically alone or in a batch apart from the arithmetic
 above.
 
-* A network saved by PARROT 1 (every network sparrow ships) is run by sparrow's
+* A network saved by PARROT 1 (every network sparrow ships but ``plddt2``) is run by sparrow's
   batch harness, :func:`~sparrow.predictors.batch_predictor.run_network`, which
   runs a many-to-one network, with one value per sequence, or a many-to-many
   one, with one per residue, over a list of sequences, and returns each
@@ -302,7 +309,7 @@ above.
   its networks: PyTorch otherwise lets cuDNN compute the LSTM in TF32, which
   PARROT measured moving predictions up to ~1e-2 from the CPU's, against ~1e-4
   in full precision.
-* A network saved by PARROT 2 is run by PARROT's own ``Predictor.predict_batch``,
+* A network saved by PARROT 2 (``plddt2``) is run by PARROT's own ``Predictor.predict_batch``,
   which batches sequences of similar length together and masks the padding, and
   returns each sequence's prediction as PARROT makes it alone, to the same 32-bit
   precision. PARROT batches these networks its own way, so ``batch_algorithm``

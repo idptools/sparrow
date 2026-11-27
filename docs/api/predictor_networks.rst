@@ -31,6 +31,11 @@ Secondary structure
 
 .. automodule:: sparrow.predictors.dssp.dssp_predictor
 
+AlphaFold2 confidence (pLDDT)
+-----------------------------
+
+.. automodule:: sparrow.predictors.plddt2.plddt2_predictor
+
 Localization, domains and phase behavior
 ----------------------------------------
 

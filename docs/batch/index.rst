@@ -113,8 +113,8 @@ What is computed for the whole batch
        ``scaling_exponent`` (and the ``polymeric.predicted_*`` values that
        read them), the three DSSP methods, ``transmembrane_regions``,
        ``mitochondrial_targeting_sequence``, ``nuclear_export_signal``,
-       ``nuclear_import_signal``, ``transactivation_domains``, ``pscore`` and
-       the three phosphorylation methods
+       ``nuclear_import_signal``, ``transactivation_domains``, ``pscore``,
+       ``pLDDT2`` and the three phosphorylation methods
      - The batch harness, :func:`~sparrow.predictors.batch_predictor.run_network`, once
        for each network, whatever its methods are asked
      - The 5 ALBATROSS values for 2,000 proteins in 28 s on a CPU, against

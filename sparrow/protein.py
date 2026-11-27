@@ -1801,6 +1801,7 @@ class Protein:
         Currently available predictors include:
 
             * disorder : per-residue disorder prediction
+            * pLDDT, pLDDT2 : per-residue AlphaFold2 confidence (metapredict's, sparrow's own)
             * dssp : per-residue DSSP secondary-structure class
             * nes : nuclear export signal
             * nls : nuclear import signal

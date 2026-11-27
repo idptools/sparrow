@@ -7,6 +7,11 @@ import torch
 from sparrow.predictors import NETWORK_PREDICTORS, load_network_predictor
 from sparrow.predictors.batch_predictor import batch_predict, predict_many, prepare_model, run_network
 from sparrow.sparrow_exceptions import SparrowException
+from sparrow.tests.parrot2_markers import network_param
+
+# Every network sparrow ships, each skipped where it needs PARROT 2 and PARROT 2
+# is not installed (see parrot2_markers.py)
+EVERY_NETWORK = [network_param(network) for network in NETWORK_PREDICTORS]
 
 rng = np.random.default_rng(5)
 AMINO_ACIDS = list("ACDEFGHIKLMNPQRSTVWY")
@@ -61,7 +66,7 @@ def test_the_harness_returns_each_output_as_the_network_gives_it_alone(network, 
 
 
 @pytest.mark.parametrize("batch_algorithm", BATCH_ALGORITHMS)
-@pytest.mark.parametrize("network", NETWORK_PREDICTORS)
+@pytest.mark.parametrize("network", EVERY_NETWORK)
 def test_every_network_predicts_many_as_it_predicts_one(network, batch_algorithm):
     predictor = load_network_predictor(network)
     batched = predictor.predict_many(SEQUENCES, batch_size=4, batch_algorithm=batch_algorithm)
@@ -75,7 +80,7 @@ def test_a_sequence_given_twice_gets_the_same_prediction_twice():
     assert predictions[1] == predictions[-1]
 
 
-@pytest.mark.parametrize("network", NETWORK_PREDICTORS)
+@pytest.mark.parametrize("network", EVERY_NETWORK)
 def test_batch_predict_runs_every_network(network):
     results = batch_predict(SEQUENCES[:3], network=network, show_progress_bar=False, safe=False)
     expected = predict_many(network, SEQUENCES[:3])
